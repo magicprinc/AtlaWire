@@ -1,0 +1,1 @@
+Next development priority: Build the CLI command registry and raw REST passthrough, then establish regression tests for older Atlassian Server/Data Center installations.
