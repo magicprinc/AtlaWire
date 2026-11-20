@@ -11,6 +11,7 @@ import requests
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
+    get_json_array,
     get_json_object,
     get_text,
     normalize_base_url,
@@ -109,6 +110,14 @@ class DirectoryEntry(TypedDict):
     path: str
     type: str | None
     size: int | None
+
+
+class BlameLine(TypedDict):
+    line: int
+    author: str | None
+    email: str | None
+    date: str | None
+    commit: str | None
 
 
 def list_projects(
@@ -241,6 +250,48 @@ def get_repository_file(
             _raw_file_url(base, project, slug, segments),
             params={"at": revision},
         )
+
+
+def get_file_blame(
+    base_url: str,
+    repo: str,
+    path: str,
+    *,
+    token: str,
+    at: str | None = None,
+    allow_http_loopback: bool = False,
+) -> list[BlameLine]:
+    """Return per-line blame for one repository file in server order.
+
+    ``repo`` is ``PROJECT/slug`` and ``path`` is a relative Git path with the
+    same safe segments as
+    [get_repository_file][atlawire.bitbucket.get_repository_file]. The fixed
+    ``/browse`` route is requested exactly once with ``blame=true`` and
+    ``noContent=true``; a nonempty ``at`` is sent only as the revision query.
+    Path, revision, and repository are validated before any session exists.
+
+    Only the blame-only bare JSON array is supported. The documented paged
+    file-content envelope is rejected rather than interpreted, no page cursor
+    or metadata is read, and no alternate response shape or request is tried.
+
+    Rows are projected in array order with a 1-based ``line`` for every entry,
+    including repeated commits. ``author`` and ``email`` come from
+    ``author.name`` and ``author.emailAddress`` and may be null. ``date`` is a
+    UTC ``YYYY-MM-DD`` from integer ``authorTimestamp`` milliseconds, preserving
+    zero and pre-epoch values. ``commit`` prefers a nonempty ``commitHash`` and
+    falls back to a nonempty ``id``; both absent, null, or empty yield null.
+    The whole array is projected before it is returned, so a malformed later
+    entry raises without partial rows.
+    """
+    segments = _file_segments(path)
+    params = _revision_params(at)
+    params["blame"] = "true"
+    params["noContent"] = "true"
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        values = get_json_array(session, _browse_url(url, segments), params=params)
+    return [_blame_line(number, value) for number, value in enumerate(values, start=1)]
 
 
 def list_repository_files(
@@ -1720,16 +1771,86 @@ def _commit_date(value: object) -> str | None:
     the platform timezone and never rounds through a float. Values outside the
     representable calendar raise a sanitized error; pre-epoch values are valid.
     """
-    if value is None:
+    moment = _utc_timestamp(
+        value, error="Invalid author timestamp in a Bitbucket commit."
+    )
+    if moment is None:
         return None
-    invalid = "Invalid author timestamp in a Bitbucket commit."
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise AtlaWireError(invalid)
-    try:
-        moment = _EPOCH + timedelta(seconds=divmod(value, 1000)[0])
-    except OverflowError, ValueError:
-        raise AtlaWireError(invalid) from None
     return (
         f"{moment.year:04d}-{moment.month:02d}-{moment.day:02d} "
         f"{moment.hour:02d}:{moment.minute:02d}"
     )
+
+
+def _blame_line(number: int, value: object) -> BlameLine:
+    """Project one blame array entry, rejecting malformed consumed fields."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket blame object.")
+    author, email = _blame_author(value.get("author"))
+    return BlameLine(
+        line=number,
+        author=author,
+        email=email,
+        date=_blame_date(value.get("authorTimestamp")),
+        commit=_blame_commit(value),
+    )
+
+
+def _blame_author(value: object) -> tuple[str | None, str | None]:
+    """Return the optional name and email address from a blame author object."""
+    if value is None:
+        return None, None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Invalid author in a Bitbucket blame row.")
+    name = value.get("name")
+    email = value.get("emailAddress")
+    if (name is not None and not isinstance(name, str)) or (
+        email is not None and not isinstance(email, str)
+    ):
+        raise AtlaWireError("Invalid author in a Bitbucket blame row.")
+    return (
+        _optional_encodable(name, "blame author"),
+        _optional_encodable(email, "blame email"),
+    )
+
+
+def _blame_commit(value: dict[str, object]) -> str | None:
+    """Prefer a nonempty ``commitHash`` and fall back to a nonempty ``id``."""
+    preferred = value.get("commitHash")
+    if preferred is not None and not isinstance(preferred, str):
+        raise AtlaWireError("Invalid commit in a Bitbucket blame row.")
+    if isinstance(preferred, str) and preferred:
+        return _require_encodable(preferred, "blame commit")
+    identifier = value.get("id")
+    if identifier is not None and not isinstance(identifier, str):
+        raise AtlaWireError("Invalid commit in a Bitbucket blame row.")
+    if isinstance(identifier, str) and identifier:
+        return _require_encodable(identifier, "blame commit")
+    return None
+
+
+def _blame_date(value: object) -> str | None:
+    """Format optional epoch milliseconds as a UTC ``YYYY-MM-DD`` date."""
+    moment = _utc_timestamp(
+        value, error="Invalid author timestamp in a Bitbucket blame row."
+    )
+    if moment is None:
+        return None
+    return f"{moment.year:04d}-{moment.month:02d}-{moment.day:02d}"
+
+
+def _utc_timestamp(value: object, *, error: str) -> datetime | None:
+    """Convert optional epoch milliseconds to a UTC instant with integer math.
+
+    Division is floor-based and subtracting the offset never uses a float, so
+    zero and negative values keep the instant the commit view already used.
+    A value outside the representable calendar fails with ``error``.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise AtlaWireError(error)
+    try:
+        return _EPOCH + timedelta(seconds=divmod(value, 1000)[0])
+    except OverflowError, ValueError:
+        raise AtlaWireError(error) from None

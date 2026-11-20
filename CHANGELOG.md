@@ -33,6 +33,7 @@ No version has been released yet.
 - `atlawire branches` and `commits` list repository history with fixed filters across
   cursor requests and legacy-compatible TSV or JSON.
 - `atlawire files` lists paths recursively; `atlawire ls` lists a directory's direct children.
+- `atlawire blame` lists the author, date, and commit for each line of a repository file.
 - `atlawire commit-changes` lists changed files; `atlawire commit-diff` reviews a whole
   commit or explicit paths.
 - `atlawire issue KEY_OR_URL` retrieves Jira issue JSON, including rendered fields when returned.

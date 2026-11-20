@@ -151,6 +151,16 @@ These commands accept UTF-8 `text/plain` up to 1 MiB after decompression. They p
 LF, CRLF, and trailing whitespace, reject unsafe terminal controls, and add no newline.
 Oversized, partial, or invalid responses produce no file output.
 
+## Attribute lines in a Bitbucket file
+
+```shell
+atlawire blame DEMO/widgets src/app.py --at main --token-from-env
+```
+
+`blame` lists line numbers, authors, UTC dates, and commits. `--json` also includes email
+addresses when the server supplies them. It expects the blame-only array used by `bbk`,
+not the paged file-content response. This response shape is verified offline only.
+
 ## List Bitbucket branches and commits
 
 ```shell

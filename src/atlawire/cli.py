@@ -11,6 +11,7 @@ import click
 
 from atlawire import __version__
 from atlawire.bitbucket import (
+    BlameLine,
     Branch,
     ChangedFile,
     Commit,
@@ -19,6 +20,7 @@ from atlawire.bitbucket import (
     find_repositories,
     get_commit_diff,
     get_commit_diff_text,
+    get_file_blame,
     get_pull_request,
     get_pull_request_diff,
     get_pull_request_diff_text,
@@ -89,6 +91,7 @@ _DIRECTORY_COLUMNS = "path\ttype\tsize"
 _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
 _BRANCH_COLUMNS = "name\tcommit\tdefault"
 _COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
+_BLAME_COLUMNS = "line\tauthor\tdate\tcommit"
 _COMMIT_MESSAGE_MAX = 160
 _SEARCH_SNIPPET_MAX = 110
 _SEARCH_UNSAFE = re.compile(
@@ -622,6 +625,43 @@ def ls_command(
     _print_directory_entries(rows, as_json=as_json)
 
 
+@cli.command("blame")
+@click.argument("repo")
+@click.argument("path")
+@click.option("--at", default=None, help="Revision to blame.")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def blame_command(
+    repo: str,
+    path: str,
+    at: str | None,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Show one line per file line with its author, date, and commit."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = get_file_blame(
+            base_url,
+            repo,
+            path,
+            token=token,
+            at=at,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_blame(rows, as_json=as_json)
+
+
 def _print_changed_files(rows: list[ChangedFile], *, as_json: bool) -> None:
     if as_json:
         click.echo(json.dumps(rows))
@@ -647,6 +687,17 @@ def _print_directory_entries(rows: list[DirectoryEntry], *, as_json: bool) -> No
     click.echo(f"# {len(rows)} row(s)\n{_DIRECTORY_COLUMNS}")
     for row in rows:
         values = (row["path"], row["type"], row["size"])
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _print_blame(rows: list[BlameLine], *, as_json: bool) -> None:
+    """Print the legacy TSV view without email, or every projected field as JSON."""
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_BLAME_COLUMNS}")
+    for row in rows:
+        values = (row["line"], row["author"], row["date"], row["commit"])
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
