@@ -95,6 +95,15 @@ follows the server cursor with the same filters on every page and prints no part
 if a page fails or the page budget is exhausted before completion.
 
 ```shell
+atlawire my-prs --role REVIEWER --state OPEN --participant-status NEEDS_WORK --token-from-env
+```
+
+`my-prs` uses the authenticated user's dashboard, not a repository listing. It defaults
+to `OPEN` and `AUTHOR` and does not accept `ALL`. The repository is the PR's target
+repository, even for a fork. Inactive reviewer and participant names are deduplicated;
+TSV prints them as a JSON array in one cell.
+
+```shell
 atlawire pr DEMO/widgets 123 --token-from-env
 ```
 

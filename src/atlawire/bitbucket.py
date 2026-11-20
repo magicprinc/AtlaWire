@@ -32,6 +32,10 @@ _FIND_LIMIT_DEFAULT = 25
 _PULL_REQUEST_LIMIT_DEFAULT = 25
 _PULL_REQUEST_STATES = frozenset({"OPEN", "MERGED", "DECLINED", "ALL"})
 _PULL_REQUEST_ORDERS = frozenset({"NEWEST", "OLDEST"})
+_DASHBOARD_STATES = frozenset({"OPEN", "MERGED", "DECLINED"})
+_DASHBOARD_ROLES = frozenset({"AUTHOR", "REVIEWER", "PARTICIPANT"})
+_DASHBOARD_PARTICIPANT_STATUSES = frozenset({"UNAPPROVED", "NEEDS_WORK", "APPROVED"})
+_DASHBOARD_PARTICIPANT_STATUS_MAX = 3
 _COMMIT_DIFF_PATH_MAX = 100
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _DIFF_CONTEXT_MAX = 100
@@ -105,6 +109,20 @@ PullRequest = TypedDict(
         "from": str | None,
         "to": str | None,
         "updated": int | None,
+    },
+)
+
+
+MyPullRequest = TypedDict(
+    "MyPullRequest",
+    {
+        "repo": str,
+        "id": int,
+        "title": str,
+        "state": str,
+        "author": str | None,
+        "reviewers_inactive": list[str],
+        "created": int | None,
     },
 )
 
@@ -653,6 +671,55 @@ def list_pull_requests(
             url,
             max_pages,
             project=_pull_request,
+            params=params,
+            limit=limit,
+        )
+
+
+def list_my_pull_requests(
+    base_url: str,
+    *,
+    token: str,
+    state: str = "OPEN",
+    role: str = "AUTHOR",
+    participant_status: str | None = None,
+    limit: int = _PULL_REQUEST_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[MyPullRequest]:
+    """List pull requests where the authenticated user takes part.
+
+    Reads only ``/rest/api/1.0/dashboard/pull-requests`` under the base URL's
+    configured context; no metadata, current-user, or repository request is
+    made. ``state`` must be exactly ``OPEN``, ``MERGED``, or ``DECLINED``
+    (``ALL`` is rejected before any request) and ``role`` must be exactly
+    ``AUTHOR``, ``REVIEWER``, or ``PARTICIPANT``. ``participant_status`` is
+    either ``None`` or a comma-separated list of up to three distinct values
+    from ``UNAPPROVED``, ``NEEDS_WORK``, and ``APPROVED``; its exact spelling
+    and order are sent only when given. Those filters stay fixed on every page,
+    no order or closed-since option is sent, and paging stops at ``limit`` rows
+    without needing an unused next-page hint.
+
+    Only ``repo``, ``id``, ``title``, ``state``, ``author``,
+    ``reviewers_inactive``, and ``created`` are projected. ``repo`` comes from
+    ``toRef``'s repository rather than ``fromRef`` (which may name a fork), and
+    ``reviewers_inactive`` is the deduplicated lexical order of known names
+    whose ``user.active`` is literally ``False``. A later malformed row,
+    transport failure, or page-cap hit raises without returning partial rows or
+    printing anything.
+    """
+    _validate_page_limit(max_pages)
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise AtlaWireError("The pull request limit must be between 1 and 1000.")
+    params = _dashboard_params(state, role, participant_status)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{base}/rest/api/1.0/dashboard/pull-requests"
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            url,
+            max_pages,
+            project=_my_pull_request,
             params=params,
             limit=limit,
         )
@@ -1226,6 +1293,40 @@ def _pull_request_params(state: str, order: str | None) -> dict[str, str]:
     return params
 
 
+def _dashboard_params(
+    state: str, role: str, participant_status: str | None
+) -> dict[str, str]:
+    """Validate the fixed dashboard filters before any request is made."""
+    if not isinstance(state, str) or state not in _DASHBOARD_STATES:
+        raise AtlaWireError("The pull request state must be OPEN, MERGED, or DECLINED.")
+    if not isinstance(role, str) or role not in _DASHBOARD_ROLES:
+        raise AtlaWireError(
+            "The pull request role must be AUTHOR, REVIEWER, or PARTICIPANT."
+        )
+    params = {"state": state, "role": role}
+    if participant_status is not None:
+        params["participantStatus"] = _participant_status(participant_status)
+    return params
+
+
+def _participant_status(value: str) -> str:
+    """Validate up to three distinct statuses, preserving the given order."""
+    invalid = (
+        "The participant status must be a comma-separated list of at most "
+        "three distinct UNAPPROVED, NEEDS_WORK, or APPROVED values."
+    )
+    if not isinstance(value, str) or not value:
+        raise AtlaWireError(invalid)
+    statuses = value.split(",")
+    if (
+        len(statuses) > _DASHBOARD_PARTICIPANT_STATUS_MAX
+        or len(set(statuses)) != len(statuses)
+        or any(status not in _DASHBOARD_PARTICIPANT_STATUSES for status in statuses)
+    ):
+        raise AtlaWireError(invalid)
+    return _require_encodable(value, "participant status")
+
+
 def _validate_pull_request(value: dict[str, object], pr_id: int) -> None:
     """Require the identity requested and the fields this slice promises."""
     identifier = value.get("id")
@@ -1794,19 +1895,7 @@ def _pull_request(value: object) -> PullRequest:
     """Project one pull request row without links, email addresses, or raw payloads."""
     if not isinstance(value, dict):
         raise AtlaWireError("Expected a Bitbucket pull request object.")
-    identifier = value.get("id")
-    title = value.get("title")
-    state = value.get("state")
-    if (
-        not isinstance(identifier, int)
-        or isinstance(identifier, bool)
-        or not 1 <= identifier <= _PULL_REQUEST_ID_MAX
-        or not isinstance(title, str)
-        or not title
-        or not isinstance(state, str)
-        or not state
-    ):
-        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    identifier, title, state = _pull_request_identity(value)
     updated = value.get("updatedDate")
     if updated is not None and (
         not isinstance(updated, int) or isinstance(updated, bool) or updated < 0
@@ -1828,6 +1917,105 @@ def _pull_request(value: object) -> PullRequest:
         "updated": updated,
     }
     return row
+
+
+def _pull_request_identity(value: dict[str, object]) -> tuple[int, str, str]:
+    """Require the identity fields shared by both pull request projections."""
+    identifier = value.get("id")
+    title = value.get("title")
+    state = value.get("state")
+    if (
+        not isinstance(identifier, int)
+        or isinstance(identifier, bool)
+        or not 1 <= identifier <= _PULL_REQUEST_ID_MAX
+        or not isinstance(title, str)
+        or not title
+        or not isinstance(state, str)
+        or not state
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    return identifier, title, state
+
+
+def _my_pull_request(value: object) -> MyPullRequest:
+    """Project one dashboard row without links, email addresses, or raw payloads."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket dashboard pull request object.")
+    identifier, title, state = _pull_request_identity(value)
+    created = value.get("createdDate")
+    if created is not None and (
+        not isinstance(created, int) or isinstance(created, bool) or created < 0
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket dashboard pull request.")
+    row: MyPullRequest = {
+        "repo": _dashboard_repo(value.get("toRef")),
+        "id": identifier,
+        "title": _require_encodable(title, "pull request title"),
+        "state": _require_encodable(state, "pull request state"),
+        "author": _optional_encodable(
+            _pull_request_author(value.get("author")), "pull request author"
+        ),
+        "reviewers_inactive": _inactive_reviewers(value),
+        "created": created,
+    }
+    return row
+
+
+def _dashboard_repo(value: object) -> str:
+    """Return the target repository as ``PROJECT/slug``, never following links."""
+    invalid = "Invalid repository in a Bitbucket dashboard pull request."
+    if not isinstance(value, dict):
+        raise AtlaWireError(invalid)
+    repository = value.get("repository")
+    if not isinstance(repository, dict):
+        raise AtlaWireError(invalid)
+    project = repository.get("project")
+    if not isinstance(project, dict):
+        raise AtlaWireError(invalid)
+    key = project.get("key")
+    slug = repository.get("slug")
+    if not isinstance(key, str) or not _PROJECT_KEY.fullmatch(key):
+        raise AtlaWireError(invalid)
+    if (
+        not isinstance(slug, str)
+        or not _REPOSITORY_SLUG.fullmatch(slug)
+        or slug in {".", ".."}
+    ):
+        raise AtlaWireError(invalid)
+    return f"{key}/{slug}"
+
+
+def _inactive_reviewers(value: dict[str, object]) -> list[str]:
+    """Collect known names whose ``user.active`` is literally false, deduplicated.
+
+    Missing or null people arrays are empty; a missing or null ``active`` says
+    nothing about a person's activity and never counts as inactive.
+    """
+    invalid = "Invalid reviewers in a Bitbucket dashboard pull request."
+    names: set[str] = set()
+    for field in ("reviewers", "participants"):
+        people = value.get(field)
+        if people is None:
+            continue
+        if not isinstance(people, list):
+            raise AtlaWireError(invalid)
+        for person in people:
+            if not isinstance(person, dict):
+                raise AtlaWireError(invalid)
+            user = person.get("user")
+            if user is None:
+                continue
+            if not isinstance(user, dict):
+                raise AtlaWireError(invalid)
+            active = user.get("active")
+            if active is not None and not isinstance(active, bool):
+                raise AtlaWireError(invalid)
+            name = user.get("name")
+            if name is not None and not isinstance(name, str):
+                raise AtlaWireError(invalid)
+            if active is False and name:
+                names.add(_require_encodable(name, "inactive reviewer name"))
+    return sorted(names)
 
 
 def _pull_request_author(value: object) -> str | None:

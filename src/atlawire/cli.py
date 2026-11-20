@@ -16,6 +16,7 @@ from atlawire.bitbucket import (
     ChangedFile,
     Commit,
     DirectoryEntry,
+    MyPullRequest,
     PullRequest,
     PullRequestComment,
     find_repositories,
@@ -31,6 +32,7 @@ from atlawire.bitbucket import (
     list_commit_changes,
     list_commits,
     list_directory,
+    list_my_pull_requests,
     list_projects,
     list_pull_request_comments,
     list_pull_request_commits,
@@ -92,6 +94,7 @@ _FILE_COLUMNS = "path\ttype\tnode"
 _DIRECTORY_COLUMNS = "path\ttype\tsize"
 _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
 _PULL_REQUEST_COLUMNS = "id\ttitle\tstate\tauthor\tfrom\tto\tupdated"
+_MY_PULL_REQUEST_COLUMNS = "repo\tid\ttitle\tstate\tauthor\treviewers_inactive\tcreated"
 _BRANCH_COLUMNS = "name\tcommit\tdefault"
 _COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
 _BLAME_COLUMNS = "line\tauthor\tdate\tcommit"
@@ -735,6 +738,26 @@ def _print_pull_requests(rows: list[PullRequest], *, as_json: bool) -> None:
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
+def _print_my_pull_requests(rows: list[MyPullRequest], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_MY_PULL_REQUEST_COLUMNS}")
+    for row in rows:
+        # The inactive-reviewer cell is already JSON, so escaping it again as
+        # TSV text would corrupt the array; text columns still use _tsv_cell.
+        cells = (
+            _tsv_cell(row["repo"]),
+            _tsv_cell(row["id"]),
+            _tsv_cell(row["title"]),
+            _tsv_cell(row["state"]),
+            _tsv_cell(row["author"]),
+            json.dumps(row["reviewers_inactive"]),
+            _tsv_cell(row["created"]),
+        )
+        click.echo("\t".join(cells))
+
+
 def _print_branches(rows: list[Branch], *, as_json: bool) -> None:
     if as_json:
         click.echo(json.dumps(rows))
@@ -1165,6 +1188,73 @@ def prs(
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
     _print_pull_requests(rows, as_json=as_json)
+
+
+@cli.command("my-prs")
+@click.option(
+    "--state",
+    type=click.Choice(["OPEN", "MERGED", "DECLINED"]),
+    default="OPEN",
+    show_default=True,
+    help="Exact pull request state.",
+)
+@click.option(
+    "--role",
+    type=click.Choice(["AUTHOR", "REVIEWER", "PARTICIPANT"]),
+    default="AUTHOR",
+    show_default=True,
+    help="Exact role of the authenticated user.",
+)
+@click.option(
+    "--participant-status",
+    default=None,
+    help="Comma-separated UNAPPROVED, NEEDS_WORK, or APPROVED (at most three).",
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=25,
+    show_default=True,
+    help="Maximum pull requests to return (1-1000).",
+)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def my_prs(
+    state: str,
+    role: str,
+    participant_status: str | None,
+    limit: int,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List pull requests where the authenticated user takes part."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = list_my_pull_requests(
+            base_url,
+            token=token,
+            state=state,
+            role=role,
+            participant_status=participant_status,
+            limit=limit,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_my_pull_requests(rows, as_json=as_json)
 
 
 @cli.command()
