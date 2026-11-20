@@ -24,6 +24,8 @@ No version has been released yet.
 - `atlawire pr PROJECT/SLUG PR_ID diff --json` retrieves Bitbucket diff JSON and rejects
   declared truncation.
 - `atlawire pr PROJECT/SLUG PR_ID diff` shows a terminal-safe review, not a patch to apply.
+- `atlawire file` and `pr … file` read bounded UTF-8 source, preserving bytes and selecting
+  the correct repository and commit for forked pull requests.
 - `atlawire issue KEY_OR_URL` retrieves Jira issue JSON, including rendered fields when returned.
 - `atlawire issue KEY_OR_URL --markdown` renders issue details and comments while keeping JSON
   as the default. Missing or ambiguous rendered comments fall back to raw text.

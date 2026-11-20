@@ -3,6 +3,9 @@
 import json
 import os
 import re
+import sys
+from io import TextIOWrapper
+from typing import cast
 
 import click
 
@@ -13,6 +16,8 @@ from atlawire.bitbucket import (
     get_pull_request,
     get_pull_request_diff,
     get_pull_request_diff_text,
+    get_pull_request_file,
+    get_repository_file,
     list_projects,
     list_pull_request_comments,
     list_pull_request_files,
@@ -67,6 +72,12 @@ def _tsv_cell(value: str | int | bool | None) -> str:
     return _TSV_CONTROLS.sub(
         lambda match: _TSV_ESCAPES.get(match[0], ascii(match[0])[1:-1]), text
     )
+
+
+def _write_exact_text(text: str) -> None:
+    """Write UTF-8 bytes without newline translation or an added newline."""
+    stream = cast(TextIOWrapper, sys.stdout).buffer
+    stream.write(text.encode("utf-8"))
 
 
 def _environment_token(name: str, enabled: bool) -> str:
@@ -154,6 +165,39 @@ def projects(
     for row in rows:
         values = (row["key"], row["name"], row["public"])
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command("file")
+@click.argument("repo")
+@click.argument("path")
+@click.option("--at", default="master", show_default=True, help="Revision to read.")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def file_command(
+    repo: str,
+    path: str,
+    at: str,
+    base_url: str,
+    token_from_env: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one Bitbucket repository file exactly as stored."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        text = get_repository_file(
+            base_url,
+            repo,
+            path,
+            token=token,
+            at=at,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _write_exact_text(text)
 
 
 def _print_pull_request_files(rows: list[PullRequestFile], *, as_json: bool) -> None:
@@ -256,10 +300,64 @@ def _run_pr_action(
         _print_pull_request_comments(comments, as_json=as_json)
 
 
+def _pr_arguments(
+    action: str | None,
+    path: str | None,
+    side: str | None,
+    *,
+    as_json: bool,
+    max_pages: int | None,
+    context: int | None,
+) -> tuple[str, str]:
+    """Validate the selected PR action and return it with the file side."""
+    selected = "show" if action is None else action
+    if selected not in {"show", "files", "comments", "diff", "file"}:
+        raise click.UsageError(
+            'The optional third argument must be "show", "files", "comments", '
+            '"diff", or "file".'
+        )
+    if selected != "file" and path is not None:
+        raise click.UsageError('PATH is only supported with "file".')
+    if selected != "file" and side is not None:
+        raise click.UsageError('"--side" is only supported with "file".')
+    if selected == "file" and path is None:
+        raise click.UsageError('The "file" action requires PATH.')
+    if selected == "file" and as_json:
+        raise click.UsageError('"--json" is not supported with "file".')
+    if max_pages is not None and selected != "comments":
+        raise click.UsageError('"--max-pages" is only supported with "comments".')
+    if context is not None and selected != "diff":
+        raise click.UsageError('"--context" is only supported with "diff".')
+    return selected, "new" if side is None else side
+
+
+def _run_pr_file_action(
+    repo: str,
+    pr_id: str,
+    path: str,
+    *,
+    base_url: str,
+    token: str,
+    side: str,
+    allow_http_loopback: bool,
+) -> None:
+    text = get_pull_request_file(
+        base_url,
+        repo,
+        pr_id,
+        path,
+        token=token,
+        side=side,
+        allow_http_loopback=allow_http_loopback,
+    )
+    _write_exact_text(text)
+
+
 @cli.command()
 @click.argument("repo")
 @click.argument("pr_id")
 @click.argument("action", required=False)
+@click.argument("path", required=False)
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
 @click.option(
@@ -267,6 +365,12 @@ def _run_pr_action(
     "as_json",
     is_flag=True,
     help="Print files, comments, or the raw diff as JSON.",
+)
+@click.option(
+    "--side",
+    type=click.Choice(["new", "old"]),
+    default=None,
+    help='PR file side ("new" or "old"; default new).',
 )
 @click.option(
     "--max-pages",
@@ -287,35 +391,42 @@ def pr(
     repo: str,
     pr_id: str,
     action: str | None,
+    path: str | None,
     base_url: str,
     token_from_env: bool,
     as_json: bool,
+    side: str | None,
     max_pages: int | None,
     context: int | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Get one Bitbucket pull request, its changed files, comments, or diff.
+    """Get one pull request, its changed files, comments, diff, or one file.
 
-    The optional third argument is "show" (raw JSON, the default), "files"
-    (path, type and node rows), "comments" (comment activity rows), or "diff"
-    (a terminal-safe review view, or the decoded diff object as JSON with
-    "--json"). "--max-pages" is only accepted with "comments" and defaults to
-    100; "--context" is only accepted with "diff" and defaults to 3.
+    The optional third argument is "show" (default raw JSON), "files",
+    "comments", "diff", or "file". "--max-pages" and "--context" apply only to
+    "comments" and "diff"; PATH and "--side" apply only to "file".
     """
-    selected = "show" if action is None else action
-    if selected not in {"show", "files", "comments", "diff"}:
-        raise click.UsageError(
-            'The optional third argument must be "show", "files", "comments", '
-            'or "diff".'
-        )
-    if max_pages is not None and selected != "comments":
-        raise click.UsageError('"--max-pages" is only supported with "comments".')
-    if context is not None and selected != "diff":
-        raise click.UsageError('"--context" is only supported with "diff".')
+    selected, selected_side = _pr_arguments(
+        action,
+        path,
+        side,
+        as_json=as_json,
+        max_pages=max_pages,
+        context=context,
+    )
     token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
-    page_limit = 100 if max_pages is None else max_pages
-    diff_context = 3 if context is None else context
     try:
+        if selected == "file" and path is not None:
+            _run_pr_file_action(
+                repo,
+                pr_id,
+                path,
+                base_url=base_url,
+                token=token,
+                side=selected_side,
+                allow_http_loopback=allow_http_loopback,
+            )
+            return
         _run_pr_action(
             selected,
             repo,
@@ -323,8 +434,8 @@ def pr(
             base_url=base_url,
             token=token,
             as_json=as_json,
-            page_limit=page_limit,
-            context=diff_context,
+            page_limit=100 if max_pages is None else max_pages,
+            context=3 if context is None else context,
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:

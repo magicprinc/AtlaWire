@@ -7,16 +7,16 @@ open, and no product behavior or compatibility claim is made before it is tested
 
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
-- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show, files,
-  comments, and diff text or JSON), `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`,
+- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `file`, `pr` (show,
+  files, comments, diff, and file), `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`,
   and `children`. Check `git status` before resuming; preserve local references and unrelated edits.
-- **Last verification:** 745 offline tests passed, including installed CLI subprocesses.
-  Ruff lint/format/security, Pyright, lock, and diff checks passed. Diff text regressions
-  checked late malformed hunks and safe output for decoded lone surrogates.
+- **Last verification:** 828 offline tests passed, including installed CLI subprocesses.
+  Ruff lint/format/security, Pyright, lock, and diff checks passed. File regressions
+  checked fork-side routing, exact LF/CRLF output, and refusal of partial responses.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket `file` and `pr file`. Share request path and UTF-8 text handling;
-  pin PR-side reads to the repository and commit in the selected ref.
+- **Next slice:** Bitbucket branch and commit listings. Keep filters fixed across cursor
+  requests and distinguish a requested row cap from an incomplete fetch.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -115,8 +115,9 @@ python -B -m pytest -p no:cacheprovider -q tests
       levels without attempting fallback.
 - [x] Render Bitbucket PR diff text as a readable review view, not a patch.
 - [ ] Add and verify per-file diff requests and fallback separately.
-- [ ] Port Bitbucket repository and PR-side file reads with one raw text transport,
+- [x] Port Bitbucket repository and PR-side file reads with one raw text transport,
       repository-relative path validation, and explicit tests for forked PRs.
+- [ ] Port Bitbucket `branches` and `commits` using the repository cursor pager.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

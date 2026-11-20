@@ -3,6 +3,7 @@
 import re
 from collections.abc import Callable
 from typing import TypedDict
+from urllib.parse import quote
 
 import requests
 
@@ -10,11 +11,16 @@ from atlawire.http import (
     AtlaWireError,
     bearer_session,
     get_json_object,
+    get_text,
     normalize_base_url,
 )
 
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
+_FILE_UNSAFE = re.compile(r"[\\\x00-\x1f\x7f-\x9f\ud800-\udfff]")
+_FILE_PERCENT_ESCAPE = re.compile(r"%[0-9A-Fa-f]{2}")
+_REVISION_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]")
+_COMMIT_SHA1 = re.compile(r"[0-9A-Fa-f]{40}")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
 _DIFF_CONTEXT_MAX = 100
@@ -118,13 +124,79 @@ def get_pull_request(
     is the decoded server object, so unknown and nested fields are preserved, and
     links in it are never followed.
     """
-    url, identifier = _pull_request_target(
+    _, url, identifier = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
     with bearer_session(token) as session:
         value = get_json_object(session, url, params={})
     _validate_pull_request(value, identifier)
     return value
+
+
+def get_repository_file(
+    base_url: str,
+    repo: str,
+    path: str,
+    *,
+    token: str,
+    at: str = "master",
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return one repository file at a revision as exact UTF-8 text.
+
+    ``repo`` is ``PROJECT/slug`` and ``path`` is a relative Git path with safe
+    segments. The revision defaults to ``master`` and is sent only as the
+    ``at`` query parameter. The call makes one streamed raw request with
+    ``Accept: text/plain``; content is limited and validated by
+    [get_text][atlawire.http.get_text], so an oversize, non-text, or non-UTF-8
+    response raises without returning partial text.
+    """
+    revision = _revision(at)
+    segments = _file_segments(path)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    project, slug = _split_repo(repo)
+    with bearer_session(token) as session:
+        return get_text(
+            session,
+            _raw_file_url(base, project, slug, segments),
+            params={"at": revision},
+        )
+
+
+def get_pull_request_file(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    path: str,
+    *,
+    token: str,
+    side: str = "new",
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return one pull request file from its ``new`` or ``old`` side.
+
+    ``new`` selects ``fromRef`` and ``old`` selects ``toRef``; the raw request
+    targets the selected ref repository (which may be a fork) on the same
+    configured instance, using only its project key, slug, and full 40-hex
+    ``latestCommit``. Display IDs, caller repository data, opposite refs, and
+    response links are never used. Side and path are validated before any
+    request; malformed selected metadata fails after the pull request request
+    but before the raw request.
+    """
+    selected_side = _file_side(side)
+    segments = _file_segments(path)
+    base, url, identifier = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+        _validate_pull_request(value, identifier)
+        project, slug, commit = _selected_file_ref(value, selected_side)
+        return get_text(
+            session,
+            _raw_file_url(base, project, slug, segments),
+            params={"at": commit},
+        )
 
 
 def list_pull_request_files(
@@ -151,7 +223,7 @@ def list_pull_request_files(
     than followed with another request or reported as a complete result. Only a
     terminal page carrying fewer rows than its reported limit is accepted.
     """
-    url, _ = _pull_request_target(
+    _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
     with bearer_session(token) as session:
@@ -199,7 +271,7 @@ def get_pull_request_diff(
         or not 0 <= context <= _DIFF_CONTEXT_MAX
     ):
         raise AtlaWireError("The diff context must be an integer from 0 to 100.")
-    url, _ = _pull_request_target(
+    _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
     with bearer_session(token) as session:
@@ -273,7 +345,7 @@ def list_pull_request_comments(
     replies are neither flattened nor deduplicated, edits are not merged, and
     anchor metadata is only projected, never followed or acted upon.
     """
-    url, _ = _pull_request_target(
+    _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
     if (
@@ -294,16 +366,16 @@ def _pull_request_target(
     pr_id: str | int,
     *,
     allow_http_loopback: bool,
-) -> tuple[str, int]:
-    """Build the canonical pull request URL and its validated identifier."""
+) -> tuple[str, str, int]:
+    """Build the canonical pull request URL and its validated identity."""
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
     identifier = _pull_request_id(pr_id)
     url = (
-        f"{base}/rest/api/1.0/projects/{project}/repos/{slug}"
-        f"/pull-requests/{identifier}"
+        f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
+        f"/repos/{quote(slug, safe='')}/pull-requests/{identifier}"
     )
-    return url, identifier
+    return base, url, identifier
 
 
 def _split_repo(repo: str) -> tuple[str, str]:
@@ -318,6 +390,76 @@ def _split_repo(repo: str) -> tuple[str, str]:
     ):
         raise AtlaWireError("Expected a repository as PROJECT/slug.")
     return project, slug
+
+
+def _file_side(value: str) -> str:
+    """Return the selected PR file side or reject before any request."""
+    if not isinstance(value, str) or value not in {"new", "old"}:
+        raise AtlaWireError('The file side must be "new" or "old".')
+    return value
+
+
+def _file_segments(path: str) -> tuple[str, ...]:
+    """Validate a relative Git path and return its literal, unencoded segments.
+
+    Percent followed by two hex digits is rejected rather than encoded so a
+    proxy cannot reinterpret a literal name as an escape. A normal literal
+    percent is allowed and is encoded exactly once by ``_raw_file_url``.
+    """
+    invalid = "Expected a relative file path with safe segments."
+    if (
+        not isinstance(path, str)
+        or not path
+        or _FILE_UNSAFE.search(path)
+        or _FILE_PERCENT_ESCAPE.search(path)
+    ):
+        raise AtlaWireError(invalid)
+    segments = path.split("/")
+    if any(not segment or segment in {".", ".."} for segment in segments):
+        raise AtlaWireError(invalid)
+    return tuple(segments)
+
+
+def _revision(value: str) -> str:
+    """Validate a non-empty, control-free revision sent only as ``at``."""
+    if not isinstance(value, str) or not value or _REVISION_UNSAFE.search(value):
+        raise AtlaWireError("Expected a non-empty revision without control characters.")
+    return value
+
+
+def _raw_file_url(base: str, project: str, slug: str, segments: tuple[str, ...]) -> str:
+    """Build a repository raw URL with each safe segment encoded once."""
+    encoded = "/".join(quote(segment, safe="") for segment in segments)
+    return (
+        f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
+        f"/repos/{quote(slug, safe='')}/raw/{encoded}"
+    )
+
+
+def _selected_file_ref(value: dict[str, object], side: str) -> tuple[str, str, str]:
+    """Return the selected ref's validated project, slug, and full commit."""
+    invalid = "Invalid pull request file metadata."
+    ref = value.get("fromRef" if side == "new" else "toRef")
+    if not isinstance(ref, dict):
+        raise AtlaWireError(invalid)
+    commit = ref.get("latestCommit")
+    repository = ref.get("repository")
+    if not isinstance(commit, str) or not _COMMIT_SHA1.fullmatch(commit):
+        raise AtlaWireError(invalid)
+    if not isinstance(repository, dict):
+        raise AtlaWireError(invalid)
+    project = repository.get("project")
+    key = project.get("key") if isinstance(project, dict) else None
+    slug = repository.get("slug")
+    if (
+        not isinstance(key, str)
+        or not _PROJECT_KEY.fullmatch(key)
+        or not isinstance(slug, str)
+        or not _REPOSITORY_SLUG.fullmatch(slug)
+        or slug in {".", ".."}
+    ):
+        raise AtlaWireError(invalid)
+    return key, slug, commit
 
 
 def _pull_request_id(value: str | int) -> int:

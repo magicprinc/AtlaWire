@@ -7,9 +7,9 @@ product scope is deliberately these three products; the design should make indep
 maintained adapters for other products possible without promising them in the initial release.
 
 > **Status: early implementation.** The CLI lists Bitbucket projects and repositories and
-> gets PR details. It also retrieves and searches Jira issues, reads Confluence pages, runs
-> CQL searches, and lists spaces and direct child pages. These workflows are tested offline,
-> not yet verified on live instances.
+> reads PR data and source files. It also retrieves and searches Jira issues, reads Confluence
+> pages, runs CQL searches, and lists spaces and direct child pages. These workflows are tested
+> offline, not yet verified on live instances.
 > See [TODO.md](TODO.md) for the next steps.
 
 ## Install from source
@@ -98,6 +98,22 @@ view ignores whitespace differences, shows markers where no textual hunks were p
 is not a patch to apply. Use `--context` for 0–100 lines of context (default 3). Both formats
 reject declared truncation, including nested flags. AtlaWire cannot detect an unflagged server
 cap and does not attempt automatic per-file fallback.
+
+## Read a Bitbucket source file
+
+```shell
+atlawire file DEMO/widgets src/app.py --at main --token-from-env
+atlawire pr DEMO/widgets 123 file src/app.py --side old --token-from-env
+```
+
+`file` defaults to the `master` ref. `pr … file` defaults to `new` (source); `old` selects
+the target. AtlaWire uses the selected side's repository and full commit ID, including for
+forks on the configured instance. Paths must be repository-relative. Dot segments,
+backslashes, and percent-escape spellings are rejected before any request.
+
+These commands accept UTF-8 `text/plain` up to 1 MiB after decompression. They preserve
+LF, CRLF, and trailing whitespace, reject unsafe terminal controls, and add no newline.
+Oversized, partial, or invalid responses produce no file output.
 
 ## Retrieve a Jira issue
 
