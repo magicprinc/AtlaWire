@@ -121,6 +121,31 @@ def test_one_exact_diff_get_returns_the_decoded_object_unchanged() -> None:
     assert accepts == ["application/json"]
 
 
+def test_source_path_without_a_path_rejects_before_any_request() -> None:
+    seen: list[Request] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            seen.append(request_record(self))
+
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        with pytest.raises(AtlaWireError, match="diff path"):
+            bitbucket.get_pull_request_diff(
+                base,
+                "DEMO/widgets",
+                "7",
+                token=TOKEN,
+                source_path="old.py",
+                allow_http_loopback=True,
+            )
+
+    assert seen == []
+
+
 @pytest.mark.parametrize(
     ("level", "flag"),
     [

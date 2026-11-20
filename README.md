@@ -124,13 +124,16 @@ the full message. A failed page produces no partial list.
 ```shell
 atlawire pr DEMO/widgets 123 diff --token-from-env
 atlawire pr DEMO/widgets 123 diff --token-from-env --json
+atlawire pr DEMO/widgets 123 diff src/new.py --source-path src/old.py --token-from-env
 ```
 
 `diff` prints a text review view; use `--json` for the decoded Bitbucket response. The text
 view ignores whitespace differences, shows markers where no textual hunks were provided, and
-is not a patch to apply. Use `--context` for 0–100 lines of context (default 3). Both formats
-reject declared truncation, including nested flags. AtlaWire cannot detect an unflagged server
-cap and does not attempt automatic per-file fallback.
+is not a patch to apply. Use `--context` for 0–100 lines of context (default 3). Pass a
+repository-relative path to review one file, and supply `--source-path` with its old path if
+the file was renamed, moved, or copied. Both formats reject declared truncation, including
+nested flags. AtlaWire cannot detect an unflagged server cap and does not attempt automatic
+per-file fallback.
 
 ## Read a Bitbucket source file
 

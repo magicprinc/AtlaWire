@@ -392,6 +392,8 @@ def get_pull_request_diff(
     *,
     token: str,
     context: int = 3,
+    path: str | None = None,
+    source_path: str | None = None,
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
     """Return the server's decoded diff object for one pull request.
@@ -401,6 +403,13 @@ def get_pull_request_diff(
     The whole-diff endpoint is requested once with ``contextLines=context``,
     ``whitespace=ignore-all`` and ``withComments=false``; ``context`` must be an
     ``int`` from 0 to 100 and is validated before any session is created.
+
+    An explicit relative ``path`` instead requests that one file's diff once,
+    with each validated segment encoded exactly once. ``source_path`` is only
+    permitted with ``path``: it is validated as relative repository text and
+    sent verbatim as ``srcPath`` so Requests encodes it once. It is required by
+    the server for a renamed, copied or moved file, but this call makes no
+    inference about a missing source path and never adds another route.
 
     The decoded object is returned unchanged, so declared and unknown fields are
     preserved. Bitbucket Server 5.10 documents this endpoint as unpaged and
@@ -421,12 +430,9 @@ def get_pull_request_diff(
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
+    target, params = _pull_request_diff_request(url, context, path, source_path)
     with bearer_session(token) as session:
-        value = get_json_object(
-            session,
-            f"{url}/diff",
-            params=_diff_params(context),
-        )
+        value = get_json_object(session, target, params=params)
     _validate_diff(value, subject="pull request")
     return value
 
@@ -438,15 +444,17 @@ def get_pull_request_diff_text(
     *,
     token: str,
     context: int = 3,
+    path: str | None = None,
+    source_path: str | None = None,
     allow_http_loopback: bool = False,
 ) -> str:
     """Return a terminal-safe review view of one pull request diff.
 
-    The call makes exactly one whole-diff request through
+    The call makes exactly one diff request through
     [get_pull_request_diff][atlawire.bitbucket.get_pull_request_diff], so it
-    inherits its context bounds, fixed ``whitespace=ignore-all`` request and
-    declared-truncation checks. The header describes that request, not metadata
-    echoed by the response.
+    inherits its context bounds, fixed ``whitespace=ignore-all`` request,
+    explicit ``path``/``source_path`` selection and declared-truncation checks.
+    The header describes that request, not metadata echoed by the response.
 
     The result is a readable unified-diff-like view, never an applyable Git
     patch: it omits index, binary and rename markers, preserves ordinary
@@ -462,6 +470,8 @@ def get_pull_request_diff_text(
         pr_id,
         token=token,
         context=context,
+        path=path,
+        source_path=source_path,
         allow_http_loopback=allow_http_loopback,
     )
     return _render_pull_request_diff_text(value, context=context)
@@ -904,6 +914,31 @@ def _diff_params(context: int) -> dict[str, str | int]:
         "whitespace": "ignore-all",
         "withComments": "false",
     }
+
+
+def _pull_request_diff_request(
+    url: str,
+    context: int,
+    path: str | None,
+    source_path: str | None,
+) -> tuple[str, dict[str, str | int]]:
+    """Build one PR diff route and query without issuing a request.
+
+    ``path=None`` keeps the existing whole-diff route and parameters exactly.
+    Otherwise the validated segments are encoded once, and an optional source
+    path is validated as relative text before being sent verbatim as
+    ``srcPath``; Requests then encodes the query value once itself.
+    """
+    params = _diff_params(context)
+    if path is None:
+        if source_path is not None:
+            raise AtlaWireError("Expected a diff path when a source path is given.")
+        return f"{url}/diff", params
+    segments = _file_segments(path)
+    if source_path is not None:
+        _file_segments(source_path)
+        params["srcPath"] = source_path
+    return f"{url}/diff/{_encoded_path(segments)}", params
 
 
 def _diff_context(value: int) -> int:

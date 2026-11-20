@@ -724,6 +724,8 @@ def _run_pr_diff_action(
     token: str,
     as_json: bool,
     context: int,
+    path: str | None,
+    source_path: str | None,
     allow_http_loopback: bool,
 ) -> None:
     read = get_pull_request_diff if as_json else get_pull_request_diff_text
@@ -733,6 +735,8 @@ def _run_pr_diff_action(
         pr_id,
         token=token,
         context=context,
+        path=path,
+        source_path=source_path,
         allow_http_loopback=allow_http_loopback,
     )
     if isinstance(result, str):
@@ -822,6 +826,8 @@ def _run_pr_action(
     as_json: bool,
     page_limit: int,
     context: int,
+    path: str | None,
+    source_path: str | None,
     allow_http_loopback: bool,
 ) -> None:
     if selected == "show":
@@ -850,6 +856,8 @@ def _run_pr_action(
             token=token,
             as_json=as_json,
             context=context,
+            path=path,
+            source_path=source_path,
             allow_http_loopback=allow_http_loopback,
         )
     else:
@@ -869,6 +877,7 @@ def _pr_arguments(
     action: str | None,
     path: str | None,
     side: str | None,
+    source_path: str | None,
     *,
     as_json: bool,
     max_pages: int | None,
@@ -881,8 +890,8 @@ def _pr_arguments(
             'The optional third argument must be "show", "files", "comments", '
             '"commits", "diff", or "file".'
         )
-    if selected != "file" and path is not None:
-        raise click.UsageError('PATH is only supported with "file".')
+    if selected not in {"file", "diff"} and path is not None:
+        raise click.UsageError('PATH is only supported with "file" or "diff".')
     if selected != "file" and side is not None:
         raise click.UsageError('"--side" is only supported with "file".')
     if selected == "file" and path is None:
@@ -895,6 +904,10 @@ def _pr_arguments(
         )
     if context is not None and selected != "diff":
         raise click.UsageError('"--context" is only supported with "diff".')
+    if source_path is not None and selected != "diff":
+        raise click.UsageError('"--source-path" is only supported with "diff".')
+    if source_path is not None and path is None:
+        raise click.UsageError('"--source-path" requires PATH.')
     return selected, "new" if side is None else side
 
 
@@ -952,6 +965,11 @@ def _run_pr_file_action(
     help="Diff context lines (0-100; default 3).",
 )
 @click.option(
+    "--source-path",
+    default=None,
+    help="Previous relative path for a renamed, copied, or moved diff file.",
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def pr(
@@ -965,19 +983,22 @@ def pr(
     side: str | None,
     max_pages: int | None,
     context: int | None,
+    source_path: str | None,
     allow_http_loopback: bool,
 ) -> None:
     """Get one pull request, its changed files, comments, commits, diff, or one file.
 
     The optional third argument is "show" (default raw JSON), "files",
     "comments", "commits", "diff", or "file". "--max-pages" applies to
-    "comments" and "commits"; "--context" applies only to "diff"; PATH and
-    "--side" apply only to "file".
+    "comments" and "commits"; "--context" applies only to "diff"; PATH selects
+    one diff file with "diff" and is required with "file"; "--source-path"
+    applies only to a "diff" with PATH.
     """
     selected, selected_side = _pr_arguments(
         action,
         path,
         side,
+        source_path,
         as_json=as_json,
         max_pages=max_pages,
         context=context,
@@ -1004,6 +1025,8 @@ def pr(
             as_json=as_json,
             page_limit=100 if max_pages is None else max_pages,
             context=3 if context is None else context,
+            path=path,
+            source_path=source_path,
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:

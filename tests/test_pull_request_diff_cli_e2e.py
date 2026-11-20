@@ -3,6 +3,7 @@ import subprocess
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler
 from typing import cast
+from urllib.parse import quote_plus
 
 import pytest
 
@@ -21,6 +22,9 @@ SENTINEL = "PR-DIFF-CLI-SENTINEL"
 CONTEXT = "/scm/bitbucket"
 PR_PATH = f"{CONTEXT}/rest/api/1.0/projects/DEMO/repos/widgets/pull-requests/7"
 DIFF_PATH = f"{PR_PATH}/diff"
+DESTINATION_PATH = "src/é +&?.py"
+DESTINATION_ENCODED = "src/%C3%A9%20%2B%26%3F.py"
+SOURCE_PATH = "old/é +&?#%.py"
 
 
 def diff_payload(context: str) -> dict[str, object]:
@@ -286,6 +290,32 @@ def expected_raw_path(context: str) -> str:
     return f"{DIFF_PATH}?{query}"
 
 
+def expected_file_request(context: str, *, source: str | None = None) -> Request:
+    query: dict[str, list[str]] = {
+        "contextLines": [context],
+        "whitespace": ["ignore-all"],
+        "withComments": ["false"],
+    }
+    if source is not None:
+        query["srcPath"] = [source]
+    return (
+        "GET",
+        f"{PR_PATH}/diff/{DESTINATION_ENCODED}",
+        query,
+        f"Bearer {TOKEN}",
+    )
+
+
+def expected_file_raw_path(context: str, *, source: str | None = None) -> str:
+    raw = (
+        f"{PR_PATH}/diff/{DESTINATION_ENCODED}"
+        f"?contextLines={context}&whitespace=ignore-all&withComments=false"
+    )
+    if source is not None:
+        raw += f"&srcPath={quote_plus(source)}"
+    return raw
+
+
 def run_pr_diff(
     *arguments: str,
     responses: list[tuple[int, object]],
@@ -426,6 +456,80 @@ def test_text_header_uses_the_requested_context_not_response_metadata() -> None:
     )
     assert seen == [expected_request("0")]
     assert raw_paths == [expected_raw_path("0")]
+    assert accepts == ["application/json"]
+
+
+def test_one_file_diff_sends_the_encoded_path_and_decoded_source_path() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff",
+        DESTINATION_PATH,
+        "--source-path",
+        SOURCE_PATH,
+        "--json",
+        "--context",
+        "0",
+        responses=[(200, diff_payload("0"))],
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert json.loads(result.stdout) == diff_payload("0")
+    assert seen == [expected_file_request("0", source=SOURCE_PATH)]
+    assert seen[0][2]["srcPath"] == [SOURCE_PATH]
+    assert raw_paths == [expected_file_raw_path("0", source=SOURCE_PATH)]
+    assert accepts == ["application/json"]
+
+
+def test_a_destination_without_a_rename_omits_srcpath() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", DESTINATION_PATH, "--json", responses=[(200, diff_payload("3"))]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert json.loads(result.stdout) == diff_payload("3")
+    assert seen == [expected_file_request("3")]
+    assert "srcPath" not in seen[0][2]
+    assert "srcPath=" not in raw_paths[0]
+    assert accepts == ["application/json"]
+
+
+def test_one_file_diff_without_json_uses_the_review_renderer() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", DESTINATION_PATH, responses=[(200, readable_payload())]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == (
+        "# Bitbucket PR diff review "
+        "(context=3; whitespace=ignore-all; not a patch)\n"
+        "\n"
+        "--- a/src/app.py\n"
+        "+++ b/src/app.py\n"
+        "@@ -1,2 +1,3 @@\n"
+        " import os  \n"
+        "-import sys  # old\n"
+        "+\n"
+        "+danger\\x1b[31m\n"
+    )
+    assert seen == [expected_file_request("3")]
+    assert raw_paths == [expected_file_raw_path("3")]
+    assert accepts == ["application/json"]
+
+
+def test_one_file_nested_truncation_fails_without_a_fallback_request() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", DESTINATION_PATH, "--json", responses=[(200, truncated_line_payload())]
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "truncated" in result.stderr
+    for detail in (TOKEN, JIRA_TOKEN, CONFLUENCE_TOKEN, SENTINEL):
+        assert detail not in result.stderr
+    assert seen == [expected_file_request("3")]
+    assert raw_paths == [expected_file_raw_path("3")]
     assert accepts == ["application/json"]
 
 
@@ -581,6 +685,47 @@ def test_max_pages_is_still_rejected_for_diff() -> None:
     assert result.stdout == ""
     assert "max-pages" in result.stderr
     assert "comments" in result.stderr
+    assert seen == []
+    assert raw_paths == []
+    assert accepts == []
+
+
+@pytest.mark.parametrize(
+    ("arguments", "code"),
+    [
+        (("show", "--source-path", "old.py"), 2),
+        (("files", "--source-path", "old.py"), 2),
+        (("file", "src/app.py", "--source-path", "old.py"), 2),
+        (("diff", "--source-path", "old.py"), 2),
+        (("diff", "src/app.py", "--side", "old"), 2),
+        (("diff", "--source-path", "", "src/app.py"), 1),
+        (("diff", "--source-path", "../old.py", "src/app.py"), 1),
+        (("diff", "--source-path", "/abs/old.py", "src/app.py"), 1),
+        (("diff", "--source-path", "old/%2e%2e/x.py", "src/app.py"), 1),
+        (("diff", "/abs/new.py"), 1),
+        (("diff", "src//new.py"), 1),
+    ],
+    ids=[
+        "source-with-show",
+        "source-with-files",
+        "source-with-file",
+        "source-without-path",
+        "side-with-diff",
+        "empty-source",
+        "parent-source",
+        "absolute-source",
+        "escaped-source",
+        "absolute-destination",
+        "empty-destination-segment",
+    ],
+)
+def test_invalid_diff_options_and_paths_fail_before_any_request(
+    arguments: tuple[str, ...], code: int
+) -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(*arguments, "--json", responses=[])
+
+    assert result.returncode == code
+    assert result.stdout == ""
     assert seen == []
     assert raw_paths == []
     assert accepts == []

@@ -27,6 +27,7 @@ No version has been released yet.
 - `atlawire pr PROJECT/SLUG PR_ID diff --json` retrieves Bitbucket diff JSON and rejects
   declared truncation.
 - `atlawire pr PROJECT/SLUG PR_ID diff` shows a terminal-safe review, not a patch to apply.
+- `atlawire pr PROJECT/SLUG PR_ID diff PATH` reviews one file, with `--source-path` for renames.
 - `atlawire file` and `pr … file` read bounded UTF-8 source, preserving bytes and selecting
   the correct repository and commit for forked pull requests.
 - `atlawire branches` and `commits` list repository history with fixed filters across
