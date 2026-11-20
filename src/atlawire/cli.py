@@ -8,8 +8,11 @@ import click
 
 from atlawire import __version__
 from atlawire.bitbucket import (
+    PullRequestComment,
+    PullRequestFile,
     get_pull_request,
     list_projects,
+    list_pull_request_comments,
     list_pull_request_files,
     list_repositories,
 )
@@ -45,6 +48,7 @@ _SPACE_COLUMNS = "key\tname\ttype"
 _CHILD_COLUMNS = "id\ttitle\tversion"
 _PROJECT_COLUMNS = "key\tname\tpublic"
 _FILE_COLUMNS = "path\ttype\tnode"
+_COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
 
 
 @click.group(invoke_without_command=True)
@@ -150,6 +154,70 @@ def projects(
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
+def _print_pull_request_files(rows: list[PullRequestFile], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_FILE_COLUMNS}")
+    for row in rows:
+        values = (row["path"], row["type"], row["node"])
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _print_pull_request_comments(
+    rows: list[PullRequestComment], *, as_json: bool
+) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_COMMENT_COLUMNS}")
+    for row in rows:
+        text = " ".join(row["text"].split())
+        values = (row["id"], row["author"], row["path"], row["line"], text)
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _run_pr_action(
+    selected: str,
+    repo: str,
+    pr_id: str,
+    *,
+    base_url: str,
+    token: str,
+    as_json: bool,
+    page_limit: int,
+    allow_http_loopback: bool,
+) -> None:
+    if selected == "show":
+        result = get_pull_request(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+        click.echo(json.dumps(result))
+    elif selected == "files":
+        files = list_pull_request_files(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+        _print_pull_request_files(files, as_json=as_json)
+    else:
+        comments = list_pull_request_comments(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            max_pages=page_limit,
+            allow_http_loopback=allow_http_loopback,
+        )
+        _print_pull_request_comments(comments, as_json=as_json)
+
+
 @cli.command()
 @click.argument("repo")
 @click.argument("pr_id")
@@ -157,7 +225,16 @@ def projects(
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
 @click.option(
-    "--json", "as_json", is_flag=True, help="Print changed files as a JSON array."
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print files or comments as a JSON array.",
+)
+@click.option(
+    "--max-pages",
+    type=click.IntRange(1, 1000),
+    default=None,
+    help="Maximum comment activity pages (1-1000; default 100).",
 )
 @click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
@@ -169,47 +246,38 @@ def pr(
     base_url: str,
     token_from_env: bool,
     as_json: bool,
+    max_pages: int | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Get one Bitbucket pull request or list its changed files.
+    """Get one Bitbucket pull request, its changed files, or its comments.
 
-    The optional third argument is "show" (raw JSON, the default) or "files"
-    (path, type and node rows). "--json" only changes the "files" output.
+    The optional third argument is "show" (raw JSON, the default), "files"
+    (path, type and node rows), or "comments" (comment activity rows).
+    "--json" only changes the "files" and "comments" output. "--max-pages"
+    is only accepted with "comments" and defaults to 100.
     """
     selected = "show" if action is None else action
-    if selected not in {"show", "files"}:
-        raise click.UsageError('The optional third argument must be "show" or "files".')
+    if selected not in {"show", "files", "comments"}:
+        raise click.UsageError(
+            'The optional third argument must be "show", "files", or "comments".'
+        )
+    if max_pages is not None and selected != "comments":
+        raise click.UsageError('"--max-pages" is only supported with "comments".')
     token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
-    if selected == "show":
-        try:
-            result = get_pull_request(
-                base_url,
-                repo,
-                pr_id,
-                token=token,
-                allow_http_loopback=allow_http_loopback,
-            )
-        except AtlaWireError as exc:
-            raise click.ClickException(str(exc)) from None
-        click.echo(json.dumps(result))
-        return
+    page_limit = 100 if max_pages is None else max_pages
     try:
-        files = list_pull_request_files(
-            base_url,
+        _run_pr_action(
+            selected,
             repo,
             pr_id,
+            base_url=base_url,
             token=token,
+            as_json=as_json,
+            page_limit=page_limit,
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
-    if as_json:
-        click.echo(json.dumps(files))
-        return
-    click.echo(f"# {len(files)} row(s)\n{_FILE_COLUMNS}")
-    for row in files:
-        values = (row["path"], row["type"], row["node"])
-        click.echo("\t".join(map(_tsv_cell, values)))
 
 
 @cli.command()

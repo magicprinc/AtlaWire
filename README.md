@@ -75,8 +75,18 @@ atlawire pr DEMO/widgets 123 files --token-from-env --json
 For `files`, the default TSV columns are `path`, `type`, and `node`; `--json` returns those
 fields as an array of objects. Bitbucket 5.10 can cap the list in one response. If the response
 reaches the reported cap or otherwise indicates truncation, AtlaWire fails without printing
-partial rows. This can also reject a list that happens to fit the cap exactly. Diffs and
-comments are not implemented yet.
+partial rows. This can also reject a list that happens to fit the cap exactly.
+
+```shell
+atlawire pr DEMO/widgets 123 comments --token-from-env --json
+```
+
+`comments` reads PR comment activity. TSV uses the legacy columns `id`, `author`, `path`,
+`line`, and `text`, and collapses whitespace in the text. JSON keeps the original text and
+adds `created` in the units supplied by the server. The command does not flatten replies
+or merge repeated activities into threads. It reads up to 100 pages by default
+(`--max-pages` accepts 1–1000) and prints no partial results if a page fails or the cap is
+reached before the last page. Diffs are not implemented yet.
 
 ## Retrieve a Jira issue
 

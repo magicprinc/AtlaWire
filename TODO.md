@@ -7,15 +7,16 @@ open, and no product behavior or compatibility claim is made before it is tested
 
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
-- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show and files),
+- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show, files, comments),
   `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`, and `children`. Check
   `git status` before resuming; preserve local reference material and unrelated edits.
-- **Last verification:** 583 offline tests passed, including installed CLI subprocesses.
-  Ruff lint/format/security, Pyright, lock, and diff checks passed. The PR files cap test
-  rejected the faulty variant that accepted a response at the server's reported limit.
+- **Last verification:** 631 offline tests passed, including installed CLI subprocesses.
+  Ruff lint/format/security, Pyright, lock, and diff checks passed. The PR comment tests
+  rejected early stops on comment-free pages and loss of original text in JSON.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket `pr PROJECT/SLUG PR_ID comments` from paginated activity.
+- **Next slice:** Bitbucket PR diff retrieval. Establish the JSON and truncation contract
+  before rendering or attempting per-file fallback.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -102,8 +103,10 @@ python -B -m pytest -p no:cacheprovider -q tests
       response even though it uses a page envelope. Do not apply the repository cursor pager
       or treat a cap as a complete list. Test nested path objects and explicit or plausible
       truncation using the versioned reference before claiming parity.
-- [ ] Port Bitbucket PR comment activity with cursor pagination and no partial output.
-      Preserve legacy columns; check the 5.10 `commentAnchor` and `createdDate` fields.
+- [x] Port Bitbucket PR comment activity with cursor pagination and no partial output.
+      Preserve legacy columns and handle the 5.10 `commentAnchor` and `createdDate` fields.
+- [ ] Port Bitbucket PR diff retrieval and rendering. Do not silently render a truncated
+      payload as a complete diff. Verify per-file fallback separately before enabling it.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

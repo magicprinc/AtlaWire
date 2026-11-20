@@ -40,6 +40,15 @@ class PullRequestFile(TypedDict):
     node: str | None
 
 
+class PullRequestComment(TypedDict):
+    id: int
+    author: str | None
+    path: str | None
+    line: int | None
+    text: str
+    created: int | None
+
+
 def list_projects(
     base_url: str,
     *,
@@ -135,6 +144,42 @@ def list_pull_request_files(
             session, f"{url}/changes", params={"limit": _CHANGES_LIMIT}
         )
     return _pull_request_files(page)
+
+
+def list_pull_request_comments(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[PullRequestComment]:
+    """List comment activities of one pull request in server order.
+
+    ``repo`` is ``PROJECT/slug`` and ``pr_id`` follows the same canonical
+    positive decimal rules as [get_pull_request][atlawire.bitbucket.get_pull_request].
+    Every page is read from the fixed ``/activities`` endpoint; an activity
+    without a top-level comment is skipped without consuming a row, while an
+    activity carrying a malformed comment or anchor fails the whole call.
+
+    This is a comment-activity view, not a canonical thread export: nested
+    replies are neither flattened nor deduplicated, edits are not merged, and
+    anchor metadata is only projected, never followed or acted upon.
+    """
+    url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    if (
+        not isinstance(max_pages, int)
+        or isinstance(max_pages, bool)
+        or not 1 <= max_pages <= 1000
+    ):
+        raise AtlaWireError("The page limit must be between 1 and 1000.")
+    with bearer_session(token) as session:
+        return _read_pages(
+            session, f"{url}/activities", max_pages, project=_pull_request_comment
+        )
 
 
 def _pull_request_target(
@@ -289,12 +334,88 @@ def _change_path(value: object) -> str:
     return name
 
 
+def _pull_request_comment(value: object) -> PullRequestComment | None:
+    """Project one activity row, or ``None`` for an unrelated activity."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket activity object.")
+    comment = value.get("comment")
+    if comment is None:
+        return None
+    if not isinstance(comment, dict):
+        raise AtlaWireError("Expected a Bitbucket comment object.")
+    identifier = comment.get("id")
+    if (
+        not isinstance(identifier, int)
+        or isinstance(identifier, bool)
+        or identifier <= 0
+    ):
+        raise AtlaWireError("Invalid id in a Bitbucket comment.")
+    text = comment.get("text")
+    if text is None:
+        text = ""
+    elif not isinstance(text, str):
+        raise AtlaWireError("Invalid text in a Bitbucket comment.")
+    path, line = _comment_anchor(value)
+    return PullRequestComment(
+        id=identifier,
+        author=_comment_author(comment.get("author")),
+        path=path,
+        line=line,
+        text=text,
+        created=_comment_created(comment),
+    )
+
+
+def _comment_author(value: object) -> str | None:
+    """Return ``comment.author.name`` when it is a string, or ``None``."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Invalid author in a Bitbucket comment.")
+    name = value.get("name")
+    if name is not None and not isinstance(name, str):
+        raise AtlaWireError("Invalid author in a Bitbucket comment.")
+    return name
+
+
+def _comment_anchor(activity: dict[str, object]) -> tuple[str | None, int | None]:
+    """Prefer ``commentAnchor`` and fall back to legacy ``anchor`` when absent."""
+    anchor: object = activity.get("commentAnchor")
+    if anchor is None:
+        anchor = activity.get("anchor")
+    if anchor is None:
+        return None, None
+    if not isinstance(anchor, dict):
+        raise AtlaWireError("Invalid anchor in a Bitbucket comment activity.")
+    path = anchor.get("path")
+    line = anchor.get("line")
+    if path is not None and not isinstance(path, str):
+        raise AtlaWireError("Invalid path in a Bitbucket comment activity.")
+    if line is not None and (
+        not isinstance(line, int) or isinstance(line, bool) or line < 0
+    ):
+        raise AtlaWireError("Invalid line in a Bitbucket comment activity.")
+    return path, line
+
+
+def _comment_created(comment: dict[str, object]) -> int | None:
+    """Prefer ``createdDate`` and fall back to legacy ``created`` when absent."""
+    created: object = comment.get("createdDate")
+    if created is None:
+        created = comment.get("created")
+    if created is None:
+        return None
+    if not isinstance(created, int) or isinstance(created, bool) or created < 0:
+        raise AtlaWireError("Invalid creation time in a Bitbucket comment.")
+    return created
+
+
 def _read_pages[RowT](
     session: requests.Session,
     url: str,
     max_pages: int,
     *,
-    project: Callable[[object], RowT],
+    project: Callable[[object], RowT | None],
 ) -> list[RowT]:
     start = 0
     rows: list[RowT] = []
@@ -306,7 +427,10 @@ def _read_pages[RowT](
         last = page.get("isLastPage")
         if not isinstance(last, bool):
             raise AtlaWireError("Expected a Bitbucket isLastPage boolean.")
-        rows.extend(project(row) for row in values)
+        for value in values:
+            row = project(value)
+            if row is not None:
+                rows.append(row)
         if last:
             return rows
         next_start = page.get("nextPageStart")

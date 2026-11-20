@@ -182,13 +182,14 @@ def test_pr_failures_are_sanitized_and_never_retried_or_followed(
     assert intruder == []
 
 
-def test_third_argument_is_only_show_or_files() -> None:
+def test_third_argument_is_only_show_files_or_comments() -> None:
     result, seen, _raw, _accepts, _intruder, _decoy = run_pr("ok", "bogus")
 
     assert result.returncode == 2
     assert result.stdout == ""
     assert '"show"' in result.stderr
     assert '"files"' in result.stderr
+    assert '"comments"' in result.stderr
     assert seen == []
 
 
