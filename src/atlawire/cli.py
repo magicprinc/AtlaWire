@@ -11,6 +11,7 @@ from atlawire.bitbucket import (
     PullRequestComment,
     PullRequestFile,
     get_pull_request,
+    get_pull_request_diff,
     list_projects,
     list_pull_request_comments,
     list_pull_request_files,
@@ -186,6 +187,7 @@ def _run_pr_action(
     token: str,
     as_json: bool,
     page_limit: int,
+    context: int,
     allow_http_loopback: bool,
 ) -> None:
     if selected == "show":
@@ -206,6 +208,16 @@ def _run_pr_action(
             allow_http_loopback=allow_http_loopback,
         )
         _print_pull_request_files(files, as_json=as_json)
+    elif selected == "diff":
+        diff = get_pull_request_diff(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            context=context,
+            allow_http_loopback=allow_http_loopback,
+        )
+        click.echo(json.dumps(diff))
     else:
         comments = list_pull_request_comments(
             base_url,
@@ -228,13 +240,19 @@ def _run_pr_action(
     "--json",
     "as_json",
     is_flag=True,
-    help="Print files or comments as a JSON array.",
+    help="Print files or comments as JSON; required for diff.",
 )
 @click.option(
     "--max-pages",
     type=click.IntRange(1, 1000),
     default=None,
     help="Maximum comment activity pages (1-1000; default 100).",
+)
+@click.option(
+    "--context",
+    type=click.IntRange(0, 100),
+    default=None,
+    help="Diff context lines (0-100; default 3).",
 )
 @click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
@@ -247,24 +265,33 @@ def pr(
     token_from_env: bool,
     as_json: bool,
     max_pages: int | None,
+    context: int | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Get one Bitbucket pull request, its changed files, or its comments.
+    """Get one Bitbucket pull request, its changed files, comments, or diff.
 
     The optional third argument is "show" (raw JSON, the default), "files"
-    (path, type and node rows), or "comments" (comment activity rows).
-    "--json" only changes the "files" and "comments" output. "--max-pages"
-    is only accepted with "comments" and defaults to 100.
+    (path, type and node rows), "comments" (comment activity rows), or "diff"
+    (the decoded diff object as JSON). "--json" only changes the "files" and
+    "comments" output and is required for "diff". "--max-pages" is only
+    accepted with "comments" and defaults to 100; "--context" is only accepted
+    with "diff" and defaults to 3.
     """
     selected = "show" if action is None else action
-    if selected not in {"show", "files", "comments"}:
+    if selected not in {"show", "files", "comments", "diff"}:
         raise click.UsageError(
-            'The optional third argument must be "show", "files", or "comments".'
+            'The optional third argument must be "show", "files", "comments", '
+            'or "diff".'
         )
+    if selected == "diff" and not as_json:
+        raise click.UsageError('"diff" requires "--json".')
     if max_pages is not None and selected != "comments":
         raise click.UsageError('"--max-pages" is only supported with "comments".')
+    if context is not None and selected != "diff":
+        raise click.UsageError('"--context" is only supported with "diff".')
     token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
     page_limit = 100 if max_pages is None else max_pages
+    diff_context = 3 if context is None else context
     try:
         _run_pr_action(
             selected,
@@ -274,6 +301,7 @@ def pr(
             token=token,
             as_json=as_json,
             page_limit=page_limit,
+            context=diff_context,
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:

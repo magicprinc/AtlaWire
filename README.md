@@ -86,7 +86,16 @@ atlawire pr DEMO/widgets 123 comments --token-from-env --json
 adds `created` in the units supplied by the server. The command does not flatten replies
 or merge repeated activities into threads. It reads up to 100 pages by default
 (`--max-pages` accepts 1–1000) and prints no partial results if a page fails or the cap is
-reached before the last page. Diffs are not implemented yet.
+reached before the last page.
+
+```shell
+atlawire pr DEMO/widgets 123 diff --token-from-env --json
+```
+
+`diff --json` requests the whole diff as Bitbucket JSON. Use `--context` to set 0–100 context
+lines (default 3). AtlaWire rejects a declared truncation flag, including in a nested file,
+hunk, segment, or line. It cannot detect an unflagged server cap. Text rendering and automatic
+per-file fallback are not implemented yet.
 
 ## Retrieve a Jira issue
 

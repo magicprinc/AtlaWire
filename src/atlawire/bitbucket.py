@@ -17,6 +17,7 @@ _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
+_DIFF_CONTEXT_MAX = 100
 
 
 class Repository(TypedDict):
@@ -144,6 +145,61 @@ def list_pull_request_files(
             session, f"{url}/changes", params={"limit": _CHANGES_LIMIT}
         )
     return _pull_request_files(page)
+
+
+def get_pull_request_diff(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    context: int = 3,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return the server's decoded diff object for one pull request.
+
+    ``repo`` is ``PROJECT/slug`` and ``pr_id`` follows the same canonical
+    positive decimal rules as [get_pull_request][atlawire.bitbucket.get_pull_request].
+    The whole-diff endpoint is requested once with ``contextLines=context``,
+    ``whitespace=ignore-all`` and ``withComments=false``; ``context`` must be an
+    ``int`` from 0 to 100 and is validated before any session is created.
+
+    The decoded object is returned unchanged, so declared and unknown fields are
+    preserved. Bitbucket Server 5.10 documents this endpoint as unpaged and
+    capped server-side, so a declared ``truncated`` flag never triggers a
+    fallback request: the call fails instead. Validation checks the
+    ``truncated`` flags declared at the documented envelope, file, hunk,
+    segment and line nodes, accepting a missing flag and the exact
+    ``false``/``"false"`` values while failing on a declared true value and
+    rejecting any other present value. Nested collections that carry those
+    nodes must be lists of objects when present, but omitted ``hunks``,
+    ``segments`` and ``lines`` are accepted.
+
+    This validates declared flags only; it cannot prove that an unflagged
+    stream was complete, and unknown metadata is not scanned for truncation.
+    Sources and links carried by the object are never fetched.
+    """
+    if (
+        not isinstance(context, int)
+        or isinstance(context, bool)
+        or not 0 <= context <= _DIFF_CONTEXT_MAX
+    ):
+        raise AtlaWireError("The diff context must be an integer from 0 to 100.")
+    url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        value = get_json_object(
+            session,
+            f"{url}/diff",
+            params={
+                "contextLines": context,
+                "whitespace": "ignore-all",
+                "withComments": "false",
+            },
+        )
+    _validate_pull_request_diff(value)
+    return value
 
 
 def list_pull_request_comments(
@@ -332,6 +388,78 @@ def _change_path(value: object) -> str:
     if not isinstance(name, str) or not name:
         raise AtlaWireError(invalid)
     return name
+
+
+def _validate_pull_request_diff(value: dict[str, object]) -> None:
+    """Reject declared truncation and malformed truncation-bearing collections.
+
+    Only the documented envelope, file, hunk, segment and line nodes are
+    inspected; unknown metadata is left untouched and is not searched for
+    flags.
+    """
+    _check_diff_truncation(value)
+    diffs = value.get("diffs")
+    if not isinstance(diffs, list):
+        raise AtlaWireError("Expected a Bitbucket diffs array.")
+    for diff in diffs:
+        if not isinstance(diff, dict):
+            raise AtlaWireError("Expected a Bitbucket diff object.")
+        _check_diff_truncation(diff)
+        if "hunks" not in diff:
+            continue
+        hunks = diff["hunks"]
+        if not isinstance(hunks, list):
+            raise AtlaWireError("Invalid hunks in a Bitbucket diff.")
+        for hunk in hunks:
+            _check_diff_hunk(hunk)
+
+
+def _check_diff_hunk(hunk: object) -> None:
+    """Validate one file hunk and its segments, if declared."""
+    if not isinstance(hunk, dict):
+        raise AtlaWireError("Expected a Bitbucket diff hunk object.")
+    _check_diff_truncation(hunk)
+    if "segments" not in hunk:
+        return
+    segments = hunk["segments"]
+    if not isinstance(segments, list):
+        raise AtlaWireError("Invalid segments in a Bitbucket diff hunk.")
+    for segment in segments:
+        _check_diff_segment(segment)
+
+
+def _check_diff_segment(segment: object) -> None:
+    """Validate one hunk segment and its lines, if declared."""
+    if not isinstance(segment, dict):
+        raise AtlaWireError("Expected a Bitbucket diff segment object.")
+    _check_diff_truncation(segment)
+    if "lines" not in segment:
+        return
+    lines = segment["lines"]
+    if not isinstance(lines, list):
+        raise AtlaWireError("Invalid lines in a Bitbucket diff segment.")
+    for line in lines:
+        if not isinstance(line, dict):
+            raise AtlaWireError("Expected a Bitbucket diff line object.")
+        _check_diff_truncation(line)
+
+
+def _check_diff_truncation(value: dict[str, object]) -> None:
+    """Accept an omitted or exact false flag; reject true and any other value.
+
+    Server 5.10 emits both bare booleans and the lowercase strings ``"true"``
+    and ``"false"`` across the envelope levels, so those exact strings are
+    accepted alongside the booleans. Truthiness is deliberately not used:
+    ``"false"`` must never be mistaken for a truncation report.
+    """
+    if "truncated" not in value:
+        return
+    flag = value["truncated"]
+    if flag is True or flag == "true":
+        raise AtlaWireError("Bitbucket reported a truncated pull request diff.")
+    if flag is False or flag == "false":
+        return
+    raise AtlaWireError("Invalid Bitbucket diff truncation flag.")
 
 
 def _pull_request_comment(value: object) -> PullRequestComment | None:
