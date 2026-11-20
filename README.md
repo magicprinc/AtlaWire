@@ -6,10 +6,10 @@ Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server*
 product scope is deliberately these three products; the design should make independently
 maintained adapters for other products possible without promising them in the initial release.
 
-> **Status: early implementation.** The CLI lists Bitbucket projects and repositories and
-> reads PR data and source files. It also retrieves and searches Jira issues, reads Confluence
-> pages, runs CQL searches, and lists spaces and direct child pages. These workflows are tested
-> offline, not yet verified on live instances.
+> **Status: early implementation.** The CLI lists Bitbucket projects, repositories, branches,
+> and commits and reads PR data and source files. It also retrieves and searches Jira issues,
+> reads Confluence pages, runs CQL searches, and lists spaces and direct child pages. These
+> workflows are tested offline, not yet verified on live instances.
 > See [TODO.md](TODO.md) for the next steps.
 
 ## Install from source
@@ -114,6 +114,18 @@ backslashes, and percent-escape spellings are rejected before any request.
 These commands accept UTF-8 `text/plain` up to 1 MiB after decompression. They preserve
 LF, CRLF, and trailing whitespace, reject unsafe terminal controls, and add no newline.
 Oversized, partial, or invalid responses produce no file output.
+
+## List Bitbucket branches and commits
+
+```shell
+atlawire branches DEMO/widgets --filter release --token-from-env
+atlawire commits DEMO/widgets --at main --path src/app.py --limit 15 --token-from-env --json
+```
+
+Both commands follow the server cursor and preserve its order. `commits` returns up to the
+requested count (default 15) and prints UTC dates. The TSV message matches the legacy
+`bbk` summary; JSON keeps the full message. An HTTP or pagination failure before completion
+or the requested row limit produces no partial rows.
 
 ## Retrieve a Jira issue
 

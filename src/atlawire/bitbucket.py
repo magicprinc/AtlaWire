@@ -1,7 +1,8 @@
 """Read operations for self-hosted Bitbucket."""
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from typing import TypedDict
 from urllib.parse import quote
 
@@ -23,6 +24,9 @@ _REVISION_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]")
 _COMMIT_SHA1 = re.compile(r"[0-9A-Fa-f]{40}")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
+_PAGE_SIZE = 100
+_COMMIT_LIMIT_DEFAULT = 25
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _DIFF_CONTEXT_MAX = 100
 _DIFF_REVIEW_HEADER = (
     "# Bitbucket PR diff review (context={context}; whitespace=ignore-all; not a patch)"
@@ -68,6 +72,20 @@ class PullRequestComment(TypedDict):
     line: int | None
     text: str
     created: int | None
+
+
+class Branch(TypedDict):
+    name: str
+    id: str
+    commit: str | None
+    default: bool | None
+
+
+class Commit(TypedDict):
+    hash: str
+    date: str | None
+    author: str | None
+    message: str
 
 
 def list_projects(
@@ -360,6 +378,75 @@ def list_pull_request_comments(
         )
 
 
+def list_branches(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    filter_text: str | None = None,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[Branch]:
+    """List repository branches in server order or raise without partial rows.
+
+    ``repo`` is ``PROJECT/slug``. A nonempty ``filter_text`` is sent verbatim as
+    ``filterText`` on every page request; ``None`` and the empty string omit the
+    filter. Text that UTF-8 cannot encode is rejected before any request. Only
+    ``displayId``, ``id``, ``latestCommit`` and ``isDefault`` are projected, and
+    each page is followed through its own ``nextPageStart``.
+    """
+    _validate_page_limit(max_pages)
+    params = _branch_filter(filter_text)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            f"{url}/branches",
+            max_pages,
+            project=_branch,
+            params=params,
+        )
+
+
+def list_commits(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    at: str | None = None,
+    path: str | None = None,
+    limit: int = _COMMIT_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[Commit]:
+    """List repository commits newest first, stopping at ``limit`` rows.
+
+    ``repo`` is ``PROJECT/slug``. A nonempty ``at`` is sent only as ``until``
+    and a nonempty ``path`` only as ``path``; absent and empty filters are
+    omitted. The pager requests no more than the missing rows on each page,
+    follows the server's ``nextPageStart`` even after a short page, and returns
+    as soon as ``limit`` rows are projected, so an unused next-page hint on the
+    final page is never required. Every projected row carries the raw commit
+    message; only the TSV view normalizes it.
+    """
+    _validate_page_limit(max_pages)
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise AtlaWireError("The commit limit must be between 1 and 1000.")
+    params = _commit_params(at, path)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            f"{url}/commits",
+            max_pages,
+            project=_commit,
+            params=params,
+            limit=limit,
+        )
+
+
 def _pull_request_target(
     base_url: str,
     repo: str,
@@ -369,13 +456,60 @@ def _pull_request_target(
 ) -> tuple[str, str, int]:
     """Build the canonical pull request URL and its validated identity."""
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    project, slug = _split_repo(repo)
     identifier = _pull_request_id(pr_id)
-    url = (
-        f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
-        f"/repos/{quote(slug, safe='')}/pull-requests/{identifier}"
-    )
+    url = f"{_repository_url(base, repo)}/pull-requests/{identifier}"
     return base, url, identifier
+
+
+def _repository_url(base: str, repo: str) -> str:
+    """Build the validated repository URL under an already-normalized base."""
+    project, slug = _split_repo(repo)
+    return (
+        f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
+        f"/repos/{quote(slug, safe='')}"
+    )
+
+
+def _validate_page_limit(max_pages: int) -> None:
+    if (
+        not isinstance(max_pages, int)
+        or isinstance(max_pages, bool)
+        or not 1 <= max_pages <= 1000
+    ):
+        raise AtlaWireError("The page limit must be between 1 and 1000.")
+
+
+def _branch_filter(value: str | None) -> dict[str, str] | None:
+    """Return the fixed branch filter or reject it before any request.
+
+    A string that UTF-8 cannot encode cannot become a query value; rejecting it
+    here keeps the failure a sanitized [AtlaWireError][atlawire.http.AtlaWireError]
+    instead of a transport preparation error. Valid Unicode and reserved
+    characters pass unchanged.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise AtlaWireError("The branch filter must be a string.")
+    if not value:
+        return None
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise AtlaWireError("The branch filter must be valid UTF-8 text.") from None
+    return {"filterText": value}
+
+
+def _commit_params(at: str | None, path: str | None) -> dict[str, str]:
+    """Build the optional ``until`` and ``path`` commit query filters."""
+    params: dict[str, str] = {}
+    if at is not None and at != "":
+        params["until"] = _revision(at)
+    if path is not None and path != "":
+        if not isinstance(path, str) or _REVISION_UNSAFE.search(path):
+            raise AtlaWireError("Expected a path filter without control characters.")
+        params["path"] = path
+    return params
 
 
 def _split_repo(repo: str) -> tuple[str, str]:
@@ -846,14 +980,32 @@ def _read_pages[RowT](
     max_pages: int,
     *,
     project: Callable[[object], RowT | None],
+    params: Mapping[str, str] | None = None,
+    limit: int | None = None,
 ) -> list[RowT]:
+    """Read cursor pages, optionally stopping after ``limit`` projected rows.
+
+    ``params`` are fixed filters repeated on every request; ``start`` and
+    ``limit`` are always set here. Every page must carry an exact
+    ``isLastPage`` boolean. With a row ``limit`` each request asks for no more
+    than the rows still missing, a wider page is rejected, and the call returns
+    at the row cap without needing the unused next-page hint. Otherwise each
+    nonterminal page is followed through its own ``nextPageStart``.
+    """
+    extras = {} if params is None else dict(params)
     start = 0
     rows: list[RowT] = []
     for _ in range(max_pages):
-        page = get_json_object(session, url, params={"start": start, "limit": 100})
+        remaining = None if limit is None else limit - len(rows)
+        size = _PAGE_SIZE if remaining is None else min(_PAGE_SIZE, remaining)
+        page = get_json_object(
+            session, url, params={**extras, "start": start, "limit": size}
+        )
         values = page.get("values")
         if not isinstance(values, list):
             raise AtlaWireError("Expected a Bitbucket values array.")
+        if limit is not None and len(values) > size:
+            raise AtlaWireError("Bitbucket returned more rows than requested.")
         last = page.get("isLastPage")
         if not isinstance(last, bool):
             raise AtlaWireError("Expected a Bitbucket isLastPage boolean.")
@@ -861,6 +1013,8 @@ def _read_pages[RowT](
             row = project(value)
             if row is not None:
                 rows.append(row)
+        if limit is not None and len(rows) >= limit:
+            return rows
         if last:
             return rows
         next_start = page.get("nextPageStart")
@@ -936,3 +1090,77 @@ def _repository(value: object) -> Repository:
     ):
         raise AtlaWireError("Invalid fields in a Bitbucket repository.")
     return Repository(slug=slug, name=name, state=state, public=public)
+
+
+def _branch(value: object) -> Branch:
+    """Project one branch, requiring its name and full ref identity."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket branch object.")
+    name = value.get("displayId")
+    identifier = value.get("id")
+    commit = value.get("latestCommit")
+    default = value.get("isDefault")
+    if (
+        not isinstance(name, str)
+        or not name
+        or not isinstance(identifier, str)
+        or not identifier
+        or (commit is not None and not isinstance(commit, str))
+        or (default is not None and not isinstance(default, bool))
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket branch.")
+    return Branch(name=name, id=identifier, commit=commit, default=default)
+
+
+def _commit(value: object) -> Commit:
+    """Project one commit, keeping the raw message for the JSON view."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket commit object.")
+    identifier = value.get("id")
+    if not isinstance(identifier, str) or not identifier:
+        raise AtlaWireError("Invalid fields in a Bitbucket commit.")
+    message = value.get("message")
+    if message is None:
+        message = ""
+    elif not isinstance(message, str):
+        raise AtlaWireError("Invalid fields in a Bitbucket commit.")
+    return Commit(
+        hash=identifier,
+        date=_commit_date(value.get("authorTimestamp")),
+        author=_commit_author(value.get("author")),
+        message=message,
+    )
+
+
+def _commit_author(value: object) -> str | None:
+    """Return ``author.name`` when the optional object declares it."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Invalid author in a Bitbucket commit.")
+    name = value.get("name")
+    if name is not None and not isinstance(name, str):
+        raise AtlaWireError("Invalid author in a Bitbucket commit.")
+    return name
+
+
+def _commit_date(value: object) -> str | None:
+    """Format optional epoch milliseconds as UTC ``YYYY-MM-DD HH:MM``.
+
+    Division and offsetting use integers only, so the instant is independent of
+    the platform timezone and never rounds through a float. Values outside the
+    representable calendar raise a sanitized error; pre-epoch values are valid.
+    """
+    if value is None:
+        return None
+    invalid = "Invalid author timestamp in a Bitbucket commit."
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise AtlaWireError(invalid)
+    try:
+        moment = _EPOCH + timedelta(seconds=divmod(value, 1000)[0])
+    except OverflowError, ValueError:
+        raise AtlaWireError(invalid) from None
+    return (
+        f"{moment.year:04d}-{moment.month:02d}-{moment.day:02d} "
+        f"{moment.hour:02d}:{moment.minute:02d}"
+    )

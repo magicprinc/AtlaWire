@@ -11,6 +11,8 @@ import click
 
 from atlawire import __version__
 from atlawire.bitbucket import (
+    Branch,
+    Commit,
     PullRequestComment,
     PullRequestFile,
     get_pull_request,
@@ -18,6 +20,8 @@ from atlawire.bitbucket import (
     get_pull_request_diff_text,
     get_pull_request_file,
     get_repository_file,
+    list_branches,
+    list_commits,
     list_projects,
     list_pull_request_comments,
     list_pull_request_files,
@@ -56,6 +60,9 @@ _CHILD_COLUMNS = "id\ttitle\tversion"
 _PROJECT_COLUMNS = "key\tname\tpublic"
 _FILE_COLUMNS = "path\ttype\tnode"
 _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
+_BRANCH_COLUMNS = "name\tcommit\tdefault"
+_COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
+_COMMIT_MESSAGE_MAX = 160
 
 
 @click.group(invoke_without_command=True)
@@ -167,6 +174,96 @@ def projects(
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
+@cli.command()
+@click.argument("repo")
+@click.option("--filter", "filter_text", default=None, help="Branch text to match.")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def branches(
+    repo: str,
+    filter_text: str | None,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List repository branches in server order."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = list_branches(
+            base_url,
+            repo,
+            token=token,
+            filter_text=filter_text,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_branches(rows, as_json=as_json)
+
+
+@cli.command()
+@click.argument("repo")
+@click.option("--at", default=None, help="Commit ID or ref to list commits up to.")
+@click.option("--path", default=None, help="Only commits affecting this path.")
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=15,
+    show_default=True,
+    help="Maximum commits to return (1-1000).",
+)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def commits(
+    repo: str,
+    at: str | None,
+    path: str | None,
+    limit: int,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List repository commits newest first."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = list_commits(
+            base_url,
+            repo,
+            token=token,
+            at=at,
+            path=path,
+            limit=limit,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_commits(rows, as_json=as_json)
+
+
 @cli.command("file")
 @click.argument("repo")
 @click.argument("path")
@@ -220,6 +317,28 @@ def _print_pull_request_comments(
     for row in rows:
         text = " ".join(row["text"].split())
         values = (row["id"], row["author"], row["path"], row["line"], text)
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _print_branches(rows: list[Branch], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_BRANCH_COLUMNS}")
+    for row in rows:
+        values = (row["name"], row["commit"], row["default"])
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _print_commits(rows: list[Commit], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_COMMIT_COLUMNS}")
+    for row in rows:
+        # Legacy text view: collapse whitespace, then cut, then escape.
+        message = " ".join(row["message"].split())[:_COMMIT_MESSAGE_MAX]
+        values = (row["hash"], row["date"], row["author"], message)
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
