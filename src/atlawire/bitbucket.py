@@ -29,6 +29,9 @@ _CHANGES_LIMIT = 1000
 _PAGE_SIZE = 100
 _COMMIT_LIMIT_DEFAULT = 25
 _FIND_LIMIT_DEFAULT = 25
+_PULL_REQUEST_LIMIT_DEFAULT = 25
+_PULL_REQUEST_STATES = frozenset({"OPEN", "MERGED", "DECLINED", "ALL"})
+_PULL_REQUEST_ORDERS = frozenset({"NEWEST", "OLDEST"})
 _COMMIT_DIFF_PATH_MAX = 100
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _DIFF_CONTEXT_MAX = 100
@@ -90,6 +93,20 @@ class PullRequestComment(TypedDict):
     line: int | None
     text: str
     created: int | None
+
+
+PullRequest = TypedDict(
+    "PullRequest",
+    {
+        "id": int,
+        "title": str,
+        "state": str,
+        "author": str | None,
+        "from": str | None,
+        "to": str | None,
+        "updated": int | None,
+    },
+)
 
 
 class Branch(TypedDict):
@@ -593,6 +610,52 @@ def list_pull_request_commits(
     )
     with bearer_session(token) as session:
         return _read_pages(session, f"{url}/commits", max_pages, project=_commit)
+
+
+def list_pull_requests(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    state: str = "OPEN",
+    order: str | None = None,
+    limit: int = _PULL_REQUEST_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[PullRequest]:
+    """List a repository's pull requests in server order, stopping at ``limit``.
+
+    ``repo`` is ``PROJECT/slug``. ``state`` must be exactly ``OPEN``,
+    ``MERGED``, ``DECLINED`` or ``ALL`` and is sent on every page; an explicit
+    ``order`` must be exactly ``NEWEST`` or ``OLDEST`` and is sent only when
+    given, while ``direction`` is never sent so the server default applies. The
+    fixed ``/pull-requests`` route is paged from ``start=0`` with no more than
+    the missing rows per request, following each page's exact
+    ``nextPageStart`` until ``limit`` rows are projected or the terminal page is
+    reached, so an unused next-page hint is never required. No client-side
+    filtering, reordering, metadata lookup, or link request is performed.
+
+    Only ``id``, ``title``, ``state``, ``author``, ``from``, ``to`` and
+    ``updated`` are projected; the author name comes from ``author.user.name``
+    and the branch names from the respective ``displayId`` values. A later
+    malformed row, transport failure, or page-cap hit raises without returning
+    partial rows or printing anything.
+    """
+    _validate_page_limit(max_pages)
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise AtlaWireError("The pull request limit must be between 1 and 1000.")
+    params = _pull_request_params(state, order)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_repository_url(base, repo)}/pull-requests"
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            url,
+            max_pages,
+            project=_pull_request,
+            params=params,
+            limit=limit,
+        )
 
 
 def list_branches(
@@ -1145,6 +1208,22 @@ def _pull_request_id(value: str | int) -> int:
     if not 1 <= identifier <= _PULL_REQUEST_ID_MAX:
         raise AtlaWireError(invalid)
     return identifier
+
+
+def _pull_request_params(state: str, order: str | None) -> dict[str, str]:
+    """Validate the fixed filters and omit an unspecified order."""
+    if not isinstance(state, str) or state not in _PULL_REQUEST_STATES:
+        raise AtlaWireError(
+            "The pull request state must be OPEN, MERGED, DECLINED, or ALL."
+        )
+    if order is not None and (
+        not isinstance(order, str) or order not in _PULL_REQUEST_ORDERS
+    ):
+        raise AtlaWireError("The pull request order must be NEWEST or OLDEST.")
+    params = {"state": state}
+    if order is not None:
+        params["order"] = order
+    return params
 
 
 def _validate_pull_request(value: dict[str, object], pr_id: int) -> None:
@@ -1709,6 +1788,75 @@ def _repository(value: object) -> Repository:
     ):
         raise AtlaWireError("Invalid fields in a Bitbucket repository.")
     return Repository(slug=slug, name=name, state=state, public=public)
+
+
+def _pull_request(value: object) -> PullRequest:
+    """Project one pull request row without links, email addresses, or raw payloads."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket pull request object.")
+    identifier = value.get("id")
+    title = value.get("title")
+    state = value.get("state")
+    if (
+        not isinstance(identifier, int)
+        or isinstance(identifier, bool)
+        or not 1 <= identifier <= _PULL_REQUEST_ID_MAX
+        or not isinstance(title, str)
+        or not title
+        or not isinstance(state, str)
+        or not state
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    updated = value.get("updatedDate")
+    if updated is not None and (
+        not isinstance(updated, int) or isinstance(updated, bool) or updated < 0
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    row: PullRequest = {
+        "id": identifier,
+        "title": _require_encodable(title, "pull request title"),
+        "state": _require_encodable(state, "pull request state"),
+        "author": _optional_encodable(
+            _pull_request_author(value.get("author")), "pull request author"
+        ),
+        "from": _optional_encodable(
+            _pull_request_ref(value.get("fromRef")), "pull request source branch"
+        ),
+        "to": _optional_encodable(
+            _pull_request_ref(value.get("toRef")), "pull request target branch"
+        ),
+        "updated": updated,
+    }
+    return row
+
+
+def _pull_request_author(value: object) -> str | None:
+    """Return ``author.user.name`` when every present wrapper is well formed."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    user = value.get("user")
+    if user is None:
+        return None
+    if not isinstance(user, dict):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    name = user.get("name")
+    if name is not None and not isinstance(name, str):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    return name
+
+
+def _pull_request_ref(value: object) -> str | None:
+    """Return a ref's ``displayId`` when present, rejecting malformed wrappers."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    display = value.get("displayId")
+    if display is not None and not isinstance(display, str):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    return display
 
 
 def _branch(value: object) -> Branch:

@@ -86,6 +86,15 @@ It is not a regex search. The plugin workflow has been exercised offline only.
 ## Retrieve a Bitbucket pull request
 
 ```shell
+atlawire prs DEMO/widgets --state ALL --order OLDEST --limit 25 --token-from-env
+```
+
+`prs` lists a repository's pull requests in server order. It defaults to open requests,
+up to 25 rows. Use `--json` for the same fields as TSV with nulls preserved. The command
+follows the server cursor with the same filters on every page and prints no partial list
+if a page fails or the page budget is exhausted before completion.
+
+```shell
 atlawire pr DEMO/widgets 123 --token-from-env
 ```
 

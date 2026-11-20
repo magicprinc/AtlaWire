@@ -16,6 +16,7 @@ from atlawire.bitbucket import (
     ChangedFile,
     Commit,
     DirectoryEntry,
+    PullRequest,
     PullRequestComment,
     find_repositories,
     get_commit_diff,
@@ -34,6 +35,7 @@ from atlawire.bitbucket import (
     list_pull_request_comments,
     list_pull_request_commits,
     list_pull_request_files,
+    list_pull_requests,
     list_repositories,
     list_repository_files,
 )
@@ -89,6 +91,7 @@ _FIND_REPOS_COLUMNS = "project\tslug\tname\tstate"
 _FILE_COLUMNS = "path\ttype\tnode"
 _DIRECTORY_COLUMNS = "path\ttype\tsize"
 _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
+_PULL_REQUEST_COLUMNS = "id\ttitle\tstate\tauthor\tfrom\tto\tupdated"
 _BRANCH_COLUMNS = "name\tcommit\tdefault"
 _COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
 _BLAME_COLUMNS = "line\tauthor\tdate\tcommit"
@@ -714,6 +717,24 @@ def _print_pull_request_comments(
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
+def _print_pull_requests(rows: list[PullRequest], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_PULL_REQUEST_COLUMNS}")
+    for row in rows:
+        values = (
+            row["id"],
+            row["title"],
+            row["state"],
+            row["author"],
+            row["from"],
+            row["to"],
+            row["updated"],
+        )
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
 def _print_branches(rows: list[Branch], *, as_json: bool) -> None:
     if as_json:
         click.echo(json.dumps(rows))
@@ -1082,6 +1103,68 @@ def pr(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
+
+
+@cli.command()
+@click.argument("repo")
+@click.option(
+    "--state",
+    type=click.Choice(["OPEN", "MERGED", "DECLINED", "ALL"]),
+    default="OPEN",
+    show_default=True,
+    help="Exact pull request state.",
+)
+@click.option(
+    "--order",
+    type=click.Choice(["NEWEST", "OLDEST"]),
+    default=None,
+    help="Exact pull request order (server default when omitted).",
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=25,
+    show_default=True,
+    help="Maximum pull requests to return (1-1000).",
+)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def prs(
+    repo: str,
+    state: str,
+    order: str | None,
+    limit: int,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List a repository's pull requests in server order."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = list_pull_requests(
+            base_url,
+            repo,
+            token=token,
+            state=state,
+            order=order,
+            limit=limit,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_pull_requests(rows, as_json=as_json)
 
 
 @cli.command()
