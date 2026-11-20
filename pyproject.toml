@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "atlawire"
+description = "Command-line interface and library for self-hosted Jira, Confluence, and Bitbucket."
+readme = "README.md"
+requires-python = ">=3.15"
+dynamic = ["version"]
+dependencies = [
+    "click>=8.2",
+    "keyring>=25.7.0",
+    "markdownify>=1.2.3,<2",
+    "platformdirs>=4.14.5",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+atlawire = "atlawire.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "hypothesis>=6.170.15",
+    "pip-audit>=2.10.1",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "responses>=0.26.3",
+    "ruff>=0.17.5",
+]
+
+[tool.hatch.version]
+path = "src/atlawire/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/atlawire"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

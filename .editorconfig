@@ -1,34 +1,42 @@
-# EditorConfig is awesome: https://EditorConfig.org
+# EditorConfig: https://EditorConfig.org
+# Core settings for a Python project. Line length 88 matches the intended Ruff default;
+# revisit both here and in pyproject.toml when the tool configuration is added.
 
 root = true
 
 [*]
 charset = utf-8
-indent_style = tab
-trim_trailing_whitespace = true
 end_of_line = lf
 insert_final_newline = true
-spaces_around_operators = true
-tab_width = 2
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 88
+
+[*.py]
+indent_size = 4
+max_line_length = 88
+
+# Markdown: hard line breaks are meaningful; never trim trailing spaces.
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+max_line_length = off
+
+[*.{yml,yaml}]
 indent_size = 2
 
-ij_continuation_indent_size = 2
-ij_any_align_multiline_parameters = false
+[*.toml]
+indent_size = 4
 
-max_line_length = 160
+[*.{json,jsonc}]
+indent_size = 2
 
-ij_formatter_on_tag = @formatter:on
-ij_formatter_off_tag = @formatter:off
-ij_formatter_tags_enabled = true
-ij_smart_tabs = false
-ij_visual_guides = 100,120,160
-ij_wrap_on_typing = false
-ij_spaces_around_operators = true
+[*.{cfg,ini}]
+indent_size = 4
 
-[*.env]
-indent_style = space
-tab_width = 2
+# Makefiles require tabs for recipe lines.
+[Makefile]
+indent_style = tab
 
-[{*.yaml,*.yml}]
-indent_style = space
-tab_width = 2
+[*.{sh,bash}]
+indent_size = 2
