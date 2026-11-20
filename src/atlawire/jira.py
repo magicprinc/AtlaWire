@@ -21,6 +21,10 @@ _MY_ISSUES_QUERY = (
 )
 SEARCH_LIMIT_MIN = 1
 SEARCH_LIMIT_MAX = 1000
+COMMENT_PAGES_MIN = 1
+COMMENT_PAGES_MAX = 1000
+COMMENT_PAGES_DEFAULT = 100
+_COMMENT_PAGE_SIZE = 50
 
 
 class IssueRow(TypedDict):
@@ -41,6 +45,16 @@ class TransitionRow(TypedDict):
     id: str
     name: str
     to_status: str | None
+
+
+class CommentRow(TypedDict):
+    """One Jira issue comment reduced to the fields AtlaWire exposes."""
+
+    id: str
+    author: str | None
+    created: str | None
+    updated: str | None
+    body: str | None
 
 
 class CurrentUser(TypedDict):
@@ -86,6 +100,152 @@ def get_issue(
     if not isinstance(returned_key, str) or not isinstance(issue.get("fields"), dict):
         raise AtlaWireError("Expected a Jira issue with a key and fields.")
     return issue
+
+
+def list_issue_comments(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    max_pages: int = COMMENT_PAGES_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> list[CommentRow]:
+    """Return every comment of one issue in server order.
+
+    Only the key is taken from ``key_or_url``; every request goes to the
+    configured ``base_url``. A page is accepted only when its ``startAt``,
+    required ``total``, and nonempty ``maxResults`` agree with the rows read so
+    far, so a server cap is followed without skipping comments. Duplicate IDs
+    and any metadata drift reject the whole thread; a page cap or HTTP failure
+    after valid rows also publishes nothing.
+    """
+    key = _issue_key(key_or_url)
+    _check_comment_pages(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{base}/rest/api/2/issue/{key}/comment"
+    with bearer_session(token) as session:
+        return _read_comments(session, url, max_pages)
+
+
+def _check_comment_pages(max_pages: int) -> None:
+    if (
+        not isinstance(max_pages, int)
+        or isinstance(max_pages, bool)
+        or not COMMENT_PAGES_MIN <= max_pages <= COMMENT_PAGES_MAX
+    ):
+        raise AtlaWireError(
+            "The page limit must be between "
+            f"{COMMENT_PAGES_MIN} and {COMMENT_PAGES_MAX}."
+        )
+
+
+def _read_comments(
+    session: requests.Session, url: str, max_pages: int
+) -> list[CommentRow]:
+    rows: list[CommentRow] = []
+    seen_ids: set[str] = set()
+    start = 0
+    total: int | None = None
+    for _ in range(max_pages):
+        page = get_json_object(
+            session,
+            url,
+            params={"startAt": start, "maxResults": _COMMENT_PAGE_SIZE},
+        )
+        comments, reported_total = _comment_page(page, start, total)
+        total = reported_total
+        if not comments:
+            return rows
+        for value in comments:
+            row = _project_comment(value)
+            if row["id"] in seen_ids:
+                raise AtlaWireError("Jira returned duplicate comment IDs.")
+            seen_ids.add(row["id"])
+            rows.append(row)
+        start += len(comments)
+        if start == total:
+            return rows
+    raise AtlaWireError(
+        "Jira comments exceeded the page limit; raise --max-pages or retry."
+    )
+
+
+def _comment_page(
+    page: dict[str, object], start: int, expected_total: int | None
+) -> tuple[list[object], int]:
+    reported_start = page.get("startAt")
+    if (
+        not isinstance(reported_start, int)
+        or isinstance(reported_start, bool)
+        or reported_start != start
+    ):
+        raise AtlaWireError(
+            "Expected Jira comments startAt to match the requested offset."
+        )
+    total = page.get("total")
+    if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+        raise AtlaWireError("Invalid Jira comments total.")
+    if expected_total is not None and total != expected_total:
+        raise AtlaWireError("Jira comments total changed between pages.")
+    comments = page.get("comments")
+    if not isinstance(comments, list):
+        raise AtlaWireError("Expected a Jira comments array.")
+    if not comments:
+        if total != start:
+            raise AtlaWireError("Jira comments ended before all comments were read.")
+        return comments, total
+    advertised = page.get("maxResults")
+    if (
+        not isinstance(advertised, int)
+        or isinstance(advertised, bool)
+        or advertised <= 0
+    ):
+        raise AtlaWireError("Invalid Jira comments maxResults.")
+    if len(comments) > advertised:
+        raise AtlaWireError("Jira returned more comments than maxResults.")
+    if len(comments) > _COMMENT_PAGE_SIZE:
+        raise AtlaWireError("Jira returned more comments than requested.")
+    if total < start + len(comments):
+        raise AtlaWireError("Inconsistent Jira comments pagination metadata.")
+    return comments, total
+
+
+def _project_comment(value: object) -> CommentRow:
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected Jira comment objects.")
+    comment_id = value.get("id")
+    if not isinstance(comment_id, str) or not comment_id.strip():
+        raise AtlaWireError("Expected a non-empty Jira comment ID.")
+    return CommentRow(
+        id=_comment_text(comment_id, "ID"),
+        author=_comment_author(value.get("author")),
+        created=_optional_comment_text(value.get("created"), "created"),
+        updated=_optional_comment_text(value.get("updated"), "updated"),
+        body=_optional_comment_text(value.get("body"), "body"),
+    )
+
+
+def _comment_author(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Jira comment author object.")
+    return _optional_comment_text(value.get("name"), "author name")
+
+
+def _optional_comment_text(value: object, label: str) -> str | None:
+    return None if value is None else _comment_text(value, label)
+
+
+def _comment_text(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise AtlaWireError(f"Expected the Jira comment {label} as text.")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        message = f"Expected the Jira comment {label} as valid UTF-8 text."
+        raise AtlaWireError(message) from None
+    return value
 
 
 def search_issues(

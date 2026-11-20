@@ -75,10 +75,14 @@ from atlawire.confluence_markdown import render_page_markdown
 from atlawire.http import AtlaWireError
 from atlawire.issue_markdown import render_issue_markdown
 from atlawire.jira import (
+    COMMENT_PAGES_DEFAULT,
+    COMMENT_PAGES_MAX,
+    COMMENT_PAGES_MIN,
     SEARCH_LIMIT_MAX,
     SEARCH_LIMIT_MIN,
     get_current_user,
     get_issue,
+    list_issue_comments,
     list_my_issues,
     list_statuses,
     list_transitions,
@@ -1362,6 +1366,41 @@ def issue(
         click.echo(rendered, nl=False)
         return
     click.echo(json.dumps(result))
+
+
+@cli.command("issue-comments")
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--max-pages",
+    type=click.IntRange(COMMENT_PAGES_MIN, COMMENT_PAGES_MAX),
+    default=COMMENT_PAGES_DEFAULT,
+    show_default=True,
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_comments(
+    key_or_url: str,
+    base_url: str,
+    token_from_env: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """Print the full comment thread of a Jira issue as JSON."""
+    token = _environment_token("ATLAWIRE_JIRA_TOKEN", token_from_env)
+    try:
+        rows = list_issue_comments(
+            base_url,
+            key_or_url,
+            token=token,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(rows))
 
 
 @cli.command()

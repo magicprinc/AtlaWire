@@ -243,6 +243,17 @@ and image alt text, not their destinations. Treat the Markdown as untrusted cont
 
 See the [Jira Server 8.22 REST reference](https://docs.atlassian.com/software/jira/docs/api/REST/8.22.0/).
 
+## Read comments on a Jira issue
+
+```shell
+atlawire issue-comments DEMO-42 --token-from-env
+```
+
+`issue-comments` returns the comments visible to your Jira account as JSON. It preserves
+the original body text and follows Jira's offsets, even when the server caps a page.
+It prints no partial thread on pagination errors, duplicate IDs, or a failed request.
+Change the default 100-page budget with `--max-pages`.
+
 ## Check your Jira identity
 
 ```shell

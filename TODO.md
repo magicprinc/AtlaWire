@@ -10,16 +10,16 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branch`, `branches`, `commits`,
   `find-repos`, `search`, `file`, `files`, `ls`, `blame`, `commit`, `commit-changes`, `commit-diff`,
   `prs`, `my-prs`, `pr` (show, files, comments, commits, diff, and file), `issue` and `page`
-  (JSON or Markdown), `jql`, `mine`, `statuses`, `jira-me`, `transitions`, `cql`, `spaces`,
+  (JSON or Markdown), `issue-comments`, `jql`, `mine`, `statuses`, `jira-me`, `transitions`, `cql`, `spaces`,
   and `children`.
   Check `git status` before resuming; preserve local references and unrelated edits.
-- **Last verification:** 1359 offline tests passed using Python 3.15 outside a venv, including
+- **Last verification:** 1384 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Jira transition tests checked literal IDs and target statuses, including empty text versus null.
+  Jira issue comment tests checked capped pages, duplicate IDs, and failure without partial output.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** read one Jira issue's comments with bounded offset paging. Keep cross-issue
-  author search, transition execution, and automatic PR diff fallback separate.
+- **Next slice:** design Jira cross-issue author search. Get a sanitized ChatGPT HIGH review
+  of exact identity versus fuzzy resolution before dispatching implementation.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -137,8 +137,9 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port exact Bitbucket branch lookup without treating case variants as the same ref.
 - [x] Port Jira current-user lookup with a fixed endpoint and a minimal identity projection.
 - [x] Port Jira transition listing without changing issue state.
-- [ ] Read all comments for one Jira issue with bounded offset paging and fail on
+- [x] Read all comments for one Jira issue with bounded offset paging and fail on
       incomplete or inconsistent results. Keep cross-issue author search separate.
+- [ ] Port cross-issue Jira comment search after deciding the author resolution contract.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

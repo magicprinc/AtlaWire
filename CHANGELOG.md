@@ -43,6 +43,7 @@ No version has been released yet.
 - `atlawire issue KEY_OR_URL` retrieves Jira issue JSON, including rendered fields when returned.
 - `atlawire issue KEY_OR_URL --markdown` renders issue details and comments while keeping JSON
   as the default. Missing or ambiguous rendered comments fall back to raw text.
+- `atlawire issue-comments` reads one issue's comments with bounded pagination.
 - `atlawire jql QUERY` searches Jira with bounded pagination and `bbk`-compatible TSV and JSON rows.
 - `atlawire mine` lists the current user's issues; `atlawire statuses` lists visible status names.
 - `atlawire jira-me` returns the current Jira user's identity as JSON.
