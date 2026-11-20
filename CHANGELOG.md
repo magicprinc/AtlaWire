@@ -17,6 +17,7 @@ No version has been released yet.
   or JSON output. It follows server-provided pagination and fails without printing partial rows.
 - `atlawire projects` lists visible Bitbucket projects with `bbk`-compatible TSV or JSON
   including optional descriptions and server-provided links.
+- `atlawire find-repos` searches visible projects in server order under one total page budget.
 - `atlawire pr PROJECT/SLUG PR_ID [show]` retrieves a pull request as raw Bitbucket JSON.
 - `atlawire pr PROJECT/SLUG PR_ID files` lists changed paths and rejects responses that
   reach the server's reported cap.

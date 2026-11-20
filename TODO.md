@@ -8,16 +8,18 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branches`, `commits`,
-  `file`, `files`, `ls`, `commit-changes`, `commit-diff`, `pr` (show, files, comments, diff, and
-  file), `issue` and `page` (JSON or Markdown), `jql`, `mine`, `statuses`, `cql`, `spaces`,
-  and `children`. Check `git status` before resuming; preserve local references and unrelated edits.
-- **Last verification:** 1047 offline tests passed using Python 3.15 outside a venv, including
+  `find-repos`, `file`, `files`, `ls`, `commit-changes`, `commit-diff`, `pr` (show, files,
+  comments, diff, and file), `issue` and `page` (JSON or Markdown), `jql`, `mine`, `statuses`,
+  `cql`, `spaces`, and `children`. Check `git status` before resuming; preserve local
+  references and unrelated edits.
+- **Last verification:** 1064 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Commit review tests checked encoded paths, late truncation, and failure without partial output.
+  Repository search tests checked the shared request budget and a later project failure
+  after an earlier match.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket `find-repos`. Preserve legacy match order with a total page budget
-  across project and repository lists.
+- **Next slice:** Bitbucket indexed code `search`. Use the plugin's read-only search endpoint;
+  distinguish server highlights from context and keep validation separate from live compatibility.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -124,7 +126,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Jira `mine` and `statuses` with legacy output and offline tests for scoped status filters.
 - [x] Port Bitbucket `files` and `ls`, including directory cursor paging without partial output.
 - [x] Port Bitbucket `commit-changes` and `commit-diff` with explicit server-cap behavior.
-- [ ] Port Bitbucket `find-repos` with bounded fanout and the legacy match/failure regressions.
+- [x] Port Bitbucket `find-repos` with bounded fanout and the legacy match/failure regressions.
+- [ ] Port Bitbucket indexed code `search` with the plugin cursor and explicit evidence labels.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

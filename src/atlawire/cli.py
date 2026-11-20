@@ -16,6 +16,7 @@ from atlawire.bitbucket import (
     Commit,
     DirectoryEntry,
     PullRequestComment,
+    find_repositories,
     get_commit_diff,
     get_commit_diff_text,
     get_pull_request,
@@ -67,6 +68,7 @@ _CQL_COLUMNS = "id\tspace\ttype\ttitle\turl"
 _SPACE_COLUMNS = "key\tname\ttype"
 _CHILD_COLUMNS = "id\ttitle\tversion"
 _PROJECT_COLUMNS = "key\tname\tpublic"
+_FIND_REPOS_COLUMNS = "project\tslug\tname\tstate"
 _FILE_COLUMNS = "path\ttype\tnode"
 _DIRECTORY_COLUMNS = "path\ttype\tsize"
 _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
@@ -181,6 +183,61 @@ def projects(
     click.echo(f"# {len(rows)} row(s)\n{_PROJECT_COLUMNS}")
     for row in rows:
         values = (row["key"], row["name"], row["public"])
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command("find-repos")
+@click.argument("name")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=25,
+    show_default=True,
+    help="Maximum repositories to return (1-1000).",
+)
+@click.option(
+    "--max-pages",
+    type=click.IntRange(1, 1000),
+    default=100,
+    show_default=True,
+    help="Total page budget across projects and repositories (1-1000).",
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def find_repos_command(
+    name: str,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    limit: int,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """Find repositories across visible projects by name or slug substring."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = find_repositories(
+            base_url,
+            name,
+            token=token,
+            limit=limit,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_FIND_REPOS_COLUMNS}")
+    for row in rows:
+        values = (row["project"], row["slug"], row["name"], row["state"])
         click.echo("\t".join(map(_tsv_cell, values)))
 
 

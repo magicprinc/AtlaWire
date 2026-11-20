@@ -41,6 +41,15 @@ Use the same Bitbucket settings as for `repos`. The default TSV columns match `b
 available. AtlaWire does not request that URL. If paging fails or `--max-pages` is reached
 before the last page, no partial list is printed. The page limit defaults to 100.
 
+```shell
+atlawire find-repos widgets --token-from-env --limit 25 --json
+```
+
+`find-repos` walks visible projects in server order and matches a case-insensitive substring
+of the repository name or slug. `--limit` caps the matches; `--max-pages` is one request
+budget across both project and repository lists (default 100). A later request failure or an
+exhausted budget produces no partial list.
+
 ## List Bitbucket repositories
 
 With `ATLAWIRE_BITBUCKET_TOKEN` supplied by your secret provider, run:

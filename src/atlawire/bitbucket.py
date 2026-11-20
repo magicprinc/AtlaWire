@@ -27,6 +27,7 @@ _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
 _PAGE_SIZE = 100
 _COMMIT_LIMIT_DEFAULT = 25
+_FIND_LIMIT_DEFAULT = 25
 _COMMIT_DIFF_PATH_MAX = 100
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _DIFF_CONTEXT_MAX = 100
@@ -54,6 +55,13 @@ class Repository(TypedDict):
     name: str | None
     state: str | None
     public: bool | None
+
+
+class RepositoryMatch(TypedDict):
+    project: str
+    slug: str
+    name: str | None
+    state: str | None
 
 
 class Project(TypedDict):
@@ -140,6 +148,45 @@ def list_repositories(
     url = f"{base}/rest/api/1.0/projects/{project}/repos"
     with bearer_session(token) as session:
         return _read_pages(session, url, max_pages, project=_repository)
+
+
+def find_repositories(
+    base_url: str,
+    name: str,
+    *,
+    token: str,
+    limit: int = _FIND_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[RepositoryMatch]:
+    """Find repositories across the visible projects by name or slug substring.
+
+    The search is case-insensitive through ``lower()``: a repository matches
+    when the needle is a substring of its slug or of a non-null name. The exact
+    nonblank needle is preserved, project and repository order is the server's,
+    and only ``project``, ``slug``, ``name`` and ``state`` are projected.
+
+    The legacy visible-project walk is reproduced: the project list is read to
+    exhaustion first, then each project's repositories are fully paged in
+    order, and no further project is started once ``limit`` rows are found.
+    ``max_pages`` is one total request-attempt budget shared by the project list
+    and every repository page, not a per-project allowance. Any later cursor,
+    transport, or budget failure raises without returning partial rows. Server
+    project keys are validated before a repository path is built and response
+    links are never followed.
+    """
+    needle = _repository_needle(name)
+    _validate_row_limit(limit)
+    _validate_page_limit(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        return _find_in_projects(
+            session,
+            f"{base}/rest/api/1.0/projects",
+            needle,
+            limit=limit,
+            max_pages=max_pages,
+        )
 
 
 def get_pull_request(
@@ -684,6 +731,84 @@ def _validate_page_limit(max_pages: int) -> None:
         or not 1 <= max_pages <= 1000
     ):
         raise AtlaWireError("The page limit must be between 1 and 1000.")
+
+
+def _repository_needle(name: str) -> str:
+    """Return the preserved lowercase needle or reject it before any request."""
+    if not isinstance(name, str) or not name.strip():
+        raise AtlaWireError("The repository search must be non-empty text.")
+    return _require_encodable(name, "repository search").lower()
+
+
+def _validate_row_limit(limit: int) -> None:
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise AtlaWireError("The repository limit must be between 1 and 1000.")
+
+
+def _find_in_projects(
+    session: requests.Session,
+    projects_url: str,
+    needle: str,
+    *,
+    limit: int,
+    max_pages: int,
+) -> list[RepositoryMatch]:
+    """Walk the project list and each repository list under one shared budget."""
+    remaining = max_pages
+
+    def take_pages() -> int:
+        if remaining <= 0:
+            raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+        return remaining
+
+    def spent_page() -> None:
+        nonlocal remaining
+        remaining -= 1
+
+    found: list[RepositoryMatch] = []
+    projects = _read_pages(
+        session, projects_url, take_pages(), project=_project, on_page=spent_page
+    )
+    for project in projects:
+        key = _server_project_key(project["key"])
+        repositories = _read_pages(
+            session,
+            f"{projects_url}/{quote(key, safe='')}/repos",
+            take_pages(),
+            project=_repository,
+            on_page=spent_page,
+        )
+        for repository in repositories:
+            if _repository_matches(repository, needle):
+                found.append(_repository_match(key, repository))
+                if len(found) >= limit:
+                    return found
+    return found
+
+
+def _server_project_key(value: str) -> str:
+    """Validate a server-supplied project key before building any path."""
+    if not _PROJECT_KEY.fullmatch(value):
+        raise AtlaWireError("Invalid project key in a Bitbucket project.")
+    return value
+
+
+def _repository_matches(repository: Repository, needle: str) -> bool:
+    """Match the needle against the slug or a non-null name, ignoring case."""
+    name = repository["name"]
+    return needle in repository["slug"].lower() or (
+        name is not None and needle in name.lower()
+    )
+
+
+def _repository_match(project: str, repository: Repository) -> RepositoryMatch:
+    """Project a match, rejecting values UTF-8 cannot encode."""
+    return RepositoryMatch(
+        project=project,
+        slug=_require_encodable(repository["slug"], "repository slug"),
+        name=_optional_encodable(repository["name"], "repository name"),
+        state=_optional_encodable(repository["state"], "repository state"),
+    )
 
 
 def _branch_filter(value: str | None) -> dict[str, str] | None:
@@ -1346,6 +1471,7 @@ def _read_pages[RowT](
     params: Mapping[str, str] | None = None,
     limit: int | None = None,
     transform: Callable[[dict[str, object]], dict[str, object]] | None = None,
+    on_page: Callable[[], None] | None = None,
 ) -> list[RowT]:
     """Read cursor pages, optionally stopping after ``limit`` projected rows.
 
@@ -1355,7 +1481,9 @@ def _read_pages[RowT](
     than the rows still missing, a wider page is rejected, and the call returns
     at the row cap without needing the unused next-page hint. Otherwise each
     nonterminal page is followed through its own ``nextPageStart``. An optional
-    ``transform`` replaces the fetched page before its cursor and rows are read.
+    ``transform`` replaces the fetched page before its cursor and rows are read,
+    and an optional ``on_page`` observes each completed request so callers can
+    share one page budget across several calls.
     """
     extras = {} if params is None else dict(params)
     start = 0
@@ -1366,6 +1494,8 @@ def _read_pages[RowT](
         page = get_json_object(
             session, url, params={**extras, "start": start, "limit": size}
         )
+        if on_page is not None:
+            on_page()
         if transform is not None:
             page = transform(page)
         values = page.get("values")
