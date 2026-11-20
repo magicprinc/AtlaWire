@@ -13,6 +13,7 @@ from atlawire import __version__
 from atlawire.bitbucket import (
     Branch,
     Commit,
+    DirectoryEntry,
     PullRequestComment,
     PullRequestFile,
     get_pull_request,
@@ -22,10 +23,12 @@ from atlawire.bitbucket import (
     get_repository_file,
     list_branches,
     list_commits,
+    list_directory,
     list_projects,
     list_pull_request_comments,
     list_pull_request_files,
     list_repositories,
+    list_repository_files,
 )
 from atlawire.confluence import (
     CHILD_LIMIT_DEFAULT,
@@ -62,6 +65,7 @@ _SPACE_COLUMNS = "key\tname\ttype"
 _CHILD_COLUMNS = "id\ttitle\tversion"
 _PROJECT_COLUMNS = "key\tname\tpublic"
 _FILE_COLUMNS = "path\ttype\tnode"
+_DIRECTORY_COLUMNS = "path\ttype\tsize"
 _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
 _BRANCH_COLUMNS = "name\tcommit\tdefault"
 _COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
@@ -300,6 +304,87 @@ def file_command(
     _write_exact_text(text)
 
 
+@cli.command("files")
+@click.argument("repo")
+@click.option("--at", default=None, help="Revision to list files at.")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of plain paths."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def files_command(
+    repo: str,
+    at: str | None,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List every file path in a Bitbucket repository recursively."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        paths = list_repository_files(
+            base_url,
+            repo,
+            token=token,
+            at=at,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_repository_files(paths, as_json=as_json)
+
+
+@cli.command("ls")
+@click.argument("repo")
+@click.argument("path", required=False, default="")
+@click.option("--at", default=None, help="Revision to list at.")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def ls_command(
+    repo: str,
+    path: str,
+    at: str | None,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List the direct children of a Bitbucket repository directory."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = list_directory(
+            base_url,
+            repo,
+            path,
+            token=token,
+            at=at,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_directory_entries(rows, as_json=as_json)
+
+
 def _print_pull_request_files(rows: list[PullRequestFile], *, as_json: bool) -> None:
     if as_json:
         click.echo(json.dumps(rows))
@@ -307,6 +392,24 @@ def _print_pull_request_files(rows: list[PullRequestFile], *, as_json: bool) -> 
     click.echo(f"# {len(rows)} row(s)\n{_FILE_COLUMNS}")
     for row in rows:
         values = (row["path"], row["type"], row["node"])
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _print_repository_files(paths: list[str], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(paths))
+        return
+    for path in paths:
+        click.echo(_tsv_cell(path))
+
+
+def _print_directory_entries(rows: list[DirectoryEntry], *, as_json: bool) -> None:
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_DIRECTORY_COLUMNS}")
+    for row in rows:
+        values = (row["path"], row["type"], row["size"])
         click.echo("\t".join(map(_tsv_cell, values)))
 
 

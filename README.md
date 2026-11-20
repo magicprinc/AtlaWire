@@ -127,6 +127,18 @@ requested count (default 15) and prints UTC dates. The TSV message matches the l
 `bbk` summary; JSON keeps the full message. An HTTP or pagination failure before completion
 or the requested row limit produces no partial rows.
 
+## Browse a Bitbucket repository
+
+```shell
+atlawire files DEMO/widgets --at main --token-from-env
+atlawire ls DEMO/widgets src --at main --token-from-env --json
+```
+
+`files` recursively lists file paths, one escaped path per line. `ls` lists only the
+immediate children of the requested directory, or the repository root if no path is supplied.
+Its default TSV columns are `path`, `type`, and `size`. Both support `--json`, use the
+server's default branch if `--at` is omitted, and print no partial list on failure.
+
 ## Retrieve a Jira issue
 
 With `ATLAWIRE_JIRA_TOKEN` supplied by your secret provider, run:

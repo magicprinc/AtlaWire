@@ -8,16 +8,17 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branches`, `commits`,
-  `file`, `pr` (show, files, comments, diff, and file), `issue` and `page` (JSON or Markdown),
-  `jql`, `mine`, `statuses`, `cql`, `spaces`, and `children`. Check `git status` before resuming;
-  preserve local references and unrelated edits.
-- **Last verification:** 937 offline tests passed using Python 3.15 outside a venv, including
+  `file`, `files`, `ls`, `pr` (show, files, comments, diff, and file), `issue` and `page`
+  (JSON or Markdown), `jql`, `mine`, `statuses`, `cql`, `spaces`, and `children`. Check
+  `git status` before resuming; preserve local references and unrelated edits.
+- **Last verification:** 992 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Jira regressions checked literal status filters and all-or-nothing status list output.
+  Bitbucket directory tests checked the nested cursor, encoded paths, and failure without
+  partial output.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket `files` and `ls`. Distinguish the recursive file list from
-  immediate directory children; reuse the repository cursor pager.
+- **Next slice:** Bitbucket `commit-changes` and `commit-diff`. Reuse changed-path projection
+  and review text without confusing the paged changes and unpaged diff contracts.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -122,7 +123,8 @@ python -B -m pytest -p no:cacheprovider -q tests
       repository-relative path validation, and explicit tests for forked PRs.
 - [x] Port Bitbucket `branches` and `commits` using the repository cursor pager.
 - [x] Port Jira `mine` and `statuses` with legacy output and offline tests for scoped status filters.
-- [ ] Port Bitbucket `files` and `ls`, including capped directory pages without partial output.
+- [x] Port Bitbucket `files` and `ls`, including directory cursor paging without partial output.
+- [ ] Port Bitbucket `commit-changes` and `commit-diff` with explicit server-cap behavior.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

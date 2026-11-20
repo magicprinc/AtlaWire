@@ -88,6 +88,12 @@ class Commit(TypedDict):
     message: str
 
 
+class DirectoryEntry(TypedDict):
+    path: str
+    type: str | None
+    size: int | None
+
+
 def list_projects(
     base_url: str,
     *,
@@ -178,6 +184,78 @@ def get_repository_file(
             session,
             _raw_file_url(base, project, slug, segments),
             params={"at": revision},
+        )
+
+
+def list_repository_files(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    at: str | None = None,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[str]:
+    """List every file path under the repository root in server order.
+
+    ``repo`` is ``PROJECT/slug``. The fixed ``/files`` endpoint searches
+    recursively from the root. A nonempty ``at`` is sent only as the revision
+    query; ``None`` and the empty string are omitted so the server uses its
+    default branch. Rows are projected from the documented nonempty string
+    values, with the legacy object representation read through the shared path
+    reader. Each page is followed through its own ``nextPageStart``, and the
+    whole list is built before it is returned, so a later failure yields no
+    partial list.
+    """
+    _validate_page_limit(max_pages)
+    params = _revision_params(at)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            f"{url}/files",
+            max_pages,
+            project=_repository_file_path,
+            params=params,
+        )
+
+
+def list_directory(
+    base_url: str,
+    repo: str,
+    path: str = "",
+    *,
+    token: str,
+    at: str | None = None,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[DirectoryEntry]:
+    """List the direct children of one repository directory in server order.
+
+    ``repo`` is ``PROJECT/slug`` and ``path`` is a relative directory path with
+    the same safe segments as
+    [get_repository_file][atlawire.bitbucket.get_repository_file]; the empty
+    string means the repository root. The fixed ``/browse`` endpoint is
+    requested once per cursor page, and every page reads the nested ``children``
+    envelope rather than the outer browse metadata. A file ``lines`` response
+    or a missing/malformed ``children`` object fails the whole call instead of
+    looking empty. ``size`` is kept exactly, including zero, and no parent path,
+    link, or URL is reconstructed or followed.
+    """
+    _validate_page_limit(max_pages)
+    segments = _directory_segments(path)
+    params = _revision_params(at)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            _browse_url(url, segments),
+            max_pages,
+            project=_directory_entry,
+            params=params,
+            children=True,
         )
 
 
@@ -561,6 +639,37 @@ def _revision(value: str) -> str:
     return value
 
 
+def _revision_params(at: str | None) -> dict[str, str]:
+    """Send a nonempty revision as ``at``; ``None`` and empty omit it."""
+    if at is None or at == "":
+        return {}
+    return {"at": _revision(at)}
+
+
+def _directory_segments(path: str) -> tuple[str, ...]:
+    """Validate an optional relative directory path; empty means the root."""
+    if path == "":
+        return ()
+    return _file_segments(path)
+
+
+def _browse_url(repository_url: str, segments: tuple[str, ...]) -> str:
+    """Build the browse URL with each safe segment encoded exactly once."""
+    if not segments:
+        return f"{repository_url}/browse"
+    encoded = "/".join(quote(segment, safe="") for segment in segments)
+    return f"{repository_url}/browse/{encoded}"
+
+
+def _require_encodable(value: str, label: str) -> str:
+    """Reject text that UTF-8 cannot encode while keeping valid Unicode intact."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise AtlaWireError(f"The {label} must be valid UTF-8 text.") from None
+    return value
+
+
 def _raw_file_url(base: str, project: str, slug: str, segments: tuple[str, ...]) -> str:
     """Build a repository raw URL with each safe segment encoded once."""
     encoded = "/".join(quote(segment, safe="") for segment in segments)
@@ -714,6 +823,45 @@ def _change_path(value: object) -> str:
     if not isinstance(name, str) or not name:
         raise AtlaWireError(invalid)
     return name
+
+
+def _repository_file_path(value: object) -> str:
+    """Project one ``/files`` value, accepting the legacy object wrapper.
+
+    Server 5.10 documents nonempty strings. A legacy object may carry the path
+    under ``path`` or expose it at the top level through the shared path
+    reader; every consumed representation must still yield a nonempty,
+    UTF-8-encodable path.
+    """
+    raw = value["path"] if isinstance(value, dict) and "path" in value else value
+    return _require_encodable(_change_path(raw), "file path")
+
+
+def _directory_entry(value: object) -> DirectoryEntry:
+    """Project one ``children.values`` row without reconstructing its path."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket child object.")
+    invalid = "Invalid fields in a Bitbucket child."
+    path = _require_encodable(_change_path(value.get("path")), "child path")
+    kind = value.get("type")
+    if kind is not None:
+        if not isinstance(kind, str):
+            raise AtlaWireError(invalid)
+        _require_encodable(kind, "child type")
+    size = value.get("size")
+    if size is not None and (
+        not isinstance(size, int) or isinstance(size, bool) or size < 0
+    ):
+        raise AtlaWireError(invalid)
+    return DirectoryEntry(path=path, type=kind, size=size)
+
+
+def _children_envelope(page: dict[str, object]) -> dict[str, object]:
+    """Return the nested browse children page, rejecting file ``lines`` pages."""
+    children = page.get("children")
+    if not isinstance(children, dict):
+        raise AtlaWireError("Expected a Bitbucket children page.")
+    return children
 
 
 def _validate_pull_request_diff(value: dict[str, object]) -> None:
@@ -982,6 +1130,7 @@ def _read_pages[RowT](
     project: Callable[[object], RowT | None],
     params: Mapping[str, str] | None = None,
     limit: int | None = None,
+    children: bool = False,
 ) -> list[RowT]:
     """Read cursor pages, optionally stopping after ``limit`` projected rows.
 
@@ -990,7 +1139,9 @@ def _read_pages[RowT](
     ``isLastPage`` boolean. With a row ``limit`` each request asks for no more
     than the rows still missing, a wider page is rejected, and the call returns
     at the row cap without needing the unused next-page hint. Otherwise each
-    nonterminal page is followed through its own ``nextPageStart``.
+    nonterminal page is followed through its own ``nextPageStart``. When
+    ``children`` is set, the nested browse ``children`` page supplies those
+    fields while the outer browse metadata is ignored.
     """
     extras = {} if params is None else dict(params)
     start = 0
@@ -1001,6 +1152,8 @@ def _read_pages[RowT](
         page = get_json_object(
             session, url, params={**extras, "start": start, "limit": size}
         )
+        if children:
+            page = _children_envelope(page)
         values = page.get("values")
         if not isinstance(values, list):
             raise AtlaWireError("Expected a Bitbucket values array.")

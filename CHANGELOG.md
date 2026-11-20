@@ -28,6 +28,7 @@ No version has been released yet.
   the correct repository and commit for forked pull requests.
 - `atlawire branches` and `commits` list repository history with fixed filters across
   cursor requests and legacy-compatible TSV or JSON.
+- `atlawire files` lists paths recursively; `atlawire ls` lists a directory's direct children.
 - `atlawire issue KEY_OR_URL` retrieves Jira issue JSON, including rendered fields when returned.
 - `atlawire issue KEY_OR_URL --markdown` renders issue details and comments while keeping JSON
   as the default. Missing or ambiguous rendered comments fall back to raw text.
