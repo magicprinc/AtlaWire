@@ -243,6 +243,16 @@ and image alt text, not their destinations. Treat the Markdown as untrusted cont
 
 See the [Jira Server 8.22 REST reference](https://docs.atlassian.com/software/jira/docs/api/REST/8.22.0/).
 
+## Check your Jira identity
+
+```shell
+atlawire jira-me --token-from-env
+```
+
+`jira-me` reads the current user from the configured Jira instance and prints `name`,
+`displayName`, and `email` as JSON. Jira may omit the display name or email; missing values
+are returned as `null`. The command does not look up other users or check permissions.
+
 ## Search Jira with JQL
 
 ```shell

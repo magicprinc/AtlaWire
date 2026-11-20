@@ -35,6 +35,14 @@ class IssueRow(TypedDict):
     summary: str
 
 
+class CurrentUser(TypedDict):
+    """The authenticated caller's three legacy Jira identity fields."""
+
+    name: str
+    displayName: str | None
+    email: str | None
+
+
 def _issue_key(key_or_url: str) -> str:
     if re.fullmatch(_ISSUE_KEY, key_or_url):
         return key_or_url
@@ -183,6 +191,53 @@ def list_statuses(
             raise AtlaWireError("Expected Jira statuses with valid Unicode names.")
         names.append(name)
     return sorted(set(names))
+
+
+def get_current_user(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> CurrentUser:
+    """Return the caller's legacy identity fields from the configured instance.
+
+    The ``/myself`` user object is reduced to ``name``, ``displayName``, and
+    ``emailAddress`` exposed as ``email``. Every other field is ignored, so the
+    result carries no links, account IDs, or permission claims, and it never
+    implies that the caller is anonymous or authorized.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        user = get_json_object(session, f"{base}/rest/api/2/myself", params={})
+    return _project_current_user(user)
+
+
+def _project_current_user(value: dict[str, object]) -> CurrentUser:
+    """Project the identity fields, rejecting blank names and unprintable text."""
+    name = _user_text(value.get("name"), "name")
+    if not name.strip():
+        raise AtlaWireError("Expected a Jira user with a non-empty name.")
+    return CurrentUser(
+        name=name,
+        displayName=_optional_user_text(value.get("displayName"), "display name"),
+        email=_optional_user_text(value.get("emailAddress"), "email"),
+    )
+
+
+def _optional_user_text(value: object, label: str) -> str | None:
+    return None if value is None else _user_text(value, label)
+
+
+def _user_text(value: object, label: str) -> str:
+    """Return one consumed field as text that UTF-8 output can represent."""
+    if not isinstance(value, str):
+        raise AtlaWireError(f"Invalid Jira user {label}.")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        message = f"The Jira user {label} must be valid UTF-8 text."
+        raise AtlaWireError(message) from None
+    return value
 
 
 def _read_search(

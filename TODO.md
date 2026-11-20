@@ -10,15 +10,15 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branch`, `branches`, `commits`,
   `find-repos`, `search`, `file`, `files`, `ls`, `blame`, `commit`, `commit-changes`, `commit-diff`,
   `prs`, `my-prs`, `pr` (show, files, comments, commits, diff, and file), `issue` and `page`
-  (JSON or Markdown), `jql`, `mine`, `statuses`, `cql`, `spaces`, and `children`. Check `git status` before
-  resuming; preserve local references and unrelated edits.
-- **Last verification:** 1342 offline tests passed using Python 3.15 outside a venv, including
+  (JSON or Markdown), `jql`, `mine`, `statuses`, `jira-me`, `cql`, `spaces`, and `children`.
+  Check `git status` before resuming; preserve local references and unrelated edits.
+- **Last verification:** 1349 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Branch lookup tests checked exact case and incomplete traversal, including a repeated cursor.
+  Jira identity tests checked product credential selection, projected fields, and sanitized errors.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Jira current-user lookup. Port the existing `me` projection without
-  guessing identities from a user search. Keep automatic PR diff fallback separate.
+- **Next slice:** list Jira's available transitions for an issue. Keep transition execution
+  and automatic PR diff fallback separate.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -134,7 +134,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port the Bitbucket current-user PR dashboard and preserve inactive participant names.
 - [x] Port exact Bitbucket commit lookup with response identity verification.
 - [x] Port exact Bitbucket branch lookup without treating case variants as the same ref.
-- [ ] Port Jira current-user lookup with a fixed endpoint and a minimal identity projection.
+- [x] Port Jira current-user lookup with a fixed endpoint and a minimal identity projection.
+- [ ] Port Jira transition listing without changing issue state.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

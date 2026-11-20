@@ -45,6 +45,7 @@ No version has been released yet.
   as the default. Missing or ambiguous rendered comments fall back to raw text.
 - `atlawire jql QUERY` searches Jira with bounded pagination and `bbk`-compatible TSV and JSON rows.
 - `atlawire mine` lists the current user's issues; `atlawire statuses` lists visible status names.
+- `atlawire jira-me` returns the current Jira user's identity as JSON.
 - `atlawire page ID_OR_URL` retrieves Confluence page JSON, including the storage body.
 - `atlawire page ID_OR_URL --markdown` converts stored Confluence content without extra
   requests, preserving basic document structure and code macros.

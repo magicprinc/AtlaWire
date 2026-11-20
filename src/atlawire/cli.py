@@ -77,6 +77,7 @@ from atlawire.issue_markdown import render_issue_markdown
 from atlawire.jira import (
     SEARCH_LIMIT_MAX,
     SEARCH_LIMIT_MIN,
+    get_current_user,
     get_issue,
     list_my_issues,
     list_statuses,
@@ -1498,6 +1499,28 @@ def statuses(
         return
     for name in names:
         click.echo(_tsv_cell(name))
+
+
+@cli.command("jira-me")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def jira_me(
+    base_url: str,
+    token_from_env: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print the authenticated Jira user as JSON."""
+    token = _environment_token("ATLAWIRE_JIRA_TOKEN", token_from_env)
+    try:
+        user = get_current_user(
+            base_url, token=token, allow_http_loopback=allow_http_loopback
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(user))
 
 
 @cli.command()
