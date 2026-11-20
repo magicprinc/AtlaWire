@@ -16,6 +16,7 @@ from atlawire.http import (
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
+_CHANGES_LIMIT = 1000
 
 
 class Repository(TypedDict):
@@ -31,6 +32,12 @@ class Project(TypedDict):
     public: bool | None
     description: str | None
     url: str | None
+
+
+class PullRequestFile(TypedDict):
+    path: str
+    type: str | None
+    node: str | None
 
 
 def list_projects(
@@ -87,6 +94,57 @@ def get_pull_request(
     is the decoded server object, so unknown and nested fields are preserved, and
     links in it are never followed.
     """
+    url, identifier = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+    _validate_pull_request(value, identifier)
+    return value
+
+
+def list_pull_request_files(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[PullRequestFile]:
+    """List the changed files of one pull request from a single terminal page.
+
+    ``repo`` is ``PROJECT/slug`` and ``pr_id`` follows the same canonical
+    positive decimal rules as [get_pull_request][atlawire.bitbucket.get_pull_request].
+    Rows are projected in server order with ``path``, ``type`` and ``node``
+    fields; the path is read from the representation the server supplied and is
+    never opened or requested.
+
+    Bitbucket Server 5.10 documents ``/changes`` as not pageable: it returns one
+    page, ignores ``start``, and silently truncates to the request limit or its
+    own hard limit, whichever is smaller. The response envelope cannot tell a
+    complete page from one capped exactly at the reported limit, so a page whose
+    row count equals the reported limit is rejected as possibly incomplete rather
+    than followed with another request or reported as a complete result. Only a
+    terminal page carrying fewer rows than its reported limit is accepted.
+    """
+    url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        page = get_json_object(
+            session, f"{url}/changes", params={"limit": _CHANGES_LIMIT}
+        )
+    return _pull_request_files(page)
+
+
+def _pull_request_target(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    allow_http_loopback: bool,
+) -> tuple[str, int]:
+    """Build the canonical pull request URL and its validated identifier."""
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
     identifier = _pull_request_id(pr_id)
@@ -94,10 +152,7 @@ def get_pull_request(
         f"{base}/rest/api/1.0/projects/{project}/repos/{slug}"
         f"/pull-requests/{identifier}"
     )
-    with bearer_session(token) as session:
-        value = get_json_object(session, url, params={})
-    _validate_pull_request(value, identifier)
-    return value
+    return url, identifier
 
 
 def _split_repo(repo: str) -> tuple[str, str]:
@@ -147,6 +202,91 @@ def _validate_pull_request(value: dict[str, object], pr_id: int) -> None:
         or not isinstance(state, str)
     ):
         raise AtlaWireError("Invalid pull request identity or fields.")
+
+
+def _pull_request_files(page: dict[str, object]) -> list[PullRequestFile]:
+    """Validate the single 5.10 changes envelope and project its rows."""
+    values = page.get("values")
+    if not isinstance(values, list):
+        raise AtlaWireError("Expected a Bitbucket values array.")
+    if page.get("isLastPage") is not True:
+        raise AtlaWireError("Expected a terminal Bitbucket changes page.")
+    limit = page.get("limit")
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not 1 <= limit <= _CHANGES_LIMIT
+    ):
+        raise AtlaWireError("Expected a Bitbucket changes limit between 1 and 1000.")
+    if "size" in page:
+        size = page["size"]
+        if not isinstance(size, int) or isinstance(size, bool) or size != len(values):
+            raise AtlaWireError("Invalid Bitbucket changes size.")
+    if "start" in page:
+        start = page["start"]
+        if not isinstance(start, int) or isinstance(start, bool) or start != 0:
+            raise AtlaWireError("Invalid Bitbucket changes start.")
+    if "truncated" in page:
+        truncated = page["truncated"]
+        if not isinstance(truncated, bool):
+            raise AtlaWireError("Invalid Bitbucket changes truncation flag.")
+        if truncated:
+            raise AtlaWireError("Bitbucket reported truncated pull request changes.")
+    if len(values) >= limit:
+        raise AtlaWireError(
+            "The pull request changes reached the reported limit; "
+            "the result may be truncated."
+        )
+    return [_pull_request_file(value) for value in values]
+
+
+def _pull_request_file(value: object) -> PullRequestFile:
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket change object.")
+    path = _change_path(value.get("path"))
+    change_type = value.get("type")
+    node = value.get("nodeType")
+    if (change_type is not None and not isinstance(change_type, str)) or (
+        node is not None and not isinstance(node, str)
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket change.")
+    return PullRequestFile(path=path, type=change_type, node=node)
+
+
+def _change_path(value: object) -> str:
+    """Return the best full path representation the server supplied.
+
+    Server 5.10 may send the path as a plain string or as an object with
+    ``toString``, ``components`` and ``name``. A full representation wins over
+    components, which win over the basename; missing optional metadata in an
+    unused representation is irrelevant.
+    """
+    invalid = "Invalid path in a Bitbucket change."
+    if isinstance(value, str):
+        if not value:
+            raise AtlaWireError(invalid)
+        return value
+    if not isinstance(value, dict):
+        raise AtlaWireError(invalid)
+    full = value.get("toString")
+    if full is not None:
+        if not isinstance(full, str):
+            raise AtlaWireError(invalid)
+        if full:
+            return full
+    components = value.get("components")
+    if components is not None:
+        if (
+            not isinstance(components, list)
+            or not components
+            or any(not isinstance(part, str) or not part for part in components)
+        ):
+            raise AtlaWireError(invalid)
+        return "/".join(components)
+    name = value.get("name")
+    if not isinstance(name, str) or not name:
+        raise AtlaWireError(invalid)
+    return name
 
 
 def _read_pages[RowT](

@@ -7,7 +7,12 @@ import re
 import click
 
 from atlawire import __version__
-from atlawire.bitbucket import get_pull_request, list_projects, list_repositories
+from atlawire.bitbucket import (
+    get_pull_request,
+    list_projects,
+    list_pull_request_files,
+    list_repositories,
+)
 from atlawire.confluence import (
     CHILD_LIMIT_DEFAULT,
     CHILD_LIMIT_MAX,
@@ -39,6 +44,7 @@ _CQL_COLUMNS = "id\tspace\ttype\ttitle\turl"
 _SPACE_COLUMNS = "key\tname\ttype"
 _CHILD_COLUMNS = "id\ttitle\tversion"
 _PROJECT_COLUMNS = "key\tname\tpublic"
+_FILE_COLUMNS = "path\ttype\tnode"
 
 
 @click.group(invoke_without_command=True)
@@ -147,26 +153,48 @@ def projects(
 @cli.command()
 @click.argument("repo")
 @click.argument("pr_id")
-@click.argument("show", required=False)
+@click.argument("action", required=False)
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print changed files as a JSON array."
+)
 @click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def pr(
     repo: str,
     pr_id: str,
-    show: str | None,
+    action: str | None,
     base_url: str,
     token_from_env: bool,
+    as_json: bool,
     allow_http_loopback: bool,
 ) -> None:
-    """Get one Bitbucket pull request as raw JSON by PROJECT/slug and ID."""
-    if show is not None and show != "show":
-        raise click.UsageError('The optional third argument must be "show".')
+    """Get one Bitbucket pull request or list its changed files.
+
+    The optional third argument is "show" (raw JSON, the default) or "files"
+    (path, type and node rows). "--json" only changes the "files" output.
+    """
+    selected = "show" if action is None else action
+    if selected not in {"show", "files"}:
+        raise click.UsageError('The optional third argument must be "show" or "files".')
     token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    if selected == "show":
+        try:
+            result = get_pull_request(
+                base_url,
+                repo,
+                pr_id,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        except AtlaWireError as exc:
+            raise click.ClickException(str(exc)) from None
+        click.echo(json.dumps(result))
+        return
     try:
-        result = get_pull_request(
+        files = list_pull_request_files(
             base_url,
             repo,
             pr_id,
@@ -175,7 +203,13 @@ def pr(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
-    click.echo(json.dumps(result))
+    if as_json:
+        click.echo(json.dumps(files))
+        return
+    click.echo(f"# {len(files)} row(s)\n{_FILE_COLUMNS}")
+    for row in files:
+        values = (row["path"], row["type"], row["node"])
+        click.echo("\t".join(map(_tsv_cell, values)))
 
 
 @cli.command()

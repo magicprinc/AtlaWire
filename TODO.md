@@ -7,17 +7,16 @@ open, and no product behavior or compatibility claim is made before it is tested
 
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
-- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show only),
+- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show and files),
   `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`, and `children`. Check
   `git status` before resuming; preserve local reference material and unrelated edits.
-- **Last verification:** 495 offline tests passed, including installed CLI subprocesses. Ruff
-  lint/format/security, Pyright, lock, and diff checks passed. The PR tests distinguish boolean
-  and mismatched IDs from valid integer IDs, and verify one configured-instance request.
+- **Last verification:** 583 offline tests passed, including installed CLI subprocesses.
+  Ruff lint/format/security, Pyright, lock, and diff checks passed. The PR files cap test
+  rejected the faulty variant that accepted a response at the server's reported limit.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket `pr PROJECT/SLUG PR_ID files`. Validate capped `/changes` responses
-  before presenting a file list. Verify `projects` and `repos` live before relying on them
-  for caching.
+- **Next slice:** Bitbucket `pr PROJECT/SLUG PR_ID comments` from paginated activity.
+  Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
   and `tests/test_repos_e2e.py` as local-server test patterns. Compare the existing tool's
@@ -99,10 +98,12 @@ python -B -m pytest -p no:cacheprovider -q tests
       pagination regressions using the same pager and page-ID parser.
 - [x] Port Bitbucket PR lookup with one instance-bound request and response identity checks.
       AtlaWire currently returns raw JSON; the legacy compact view remains open.
-- [ ] Port Bitbucket PR file listing. Server 5.10 documents `/changes` as a single capped
+- [x] Port Bitbucket PR file listing. Server 5.10 documents `/changes` as a single capped
       response even though it uses a page envelope. Do not apply the repository cursor pager
       or treat a cap as a complete list. Test nested path objects and explicit or plausible
       truncation using the versioned reference before claiming parity.
+- [ ] Port Bitbucket PR comment activity with cursor pagination and no partial output.
+      Preserve legacy columns; check the 5.10 `commentAnchor` and `createdDate` fields.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

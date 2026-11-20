@@ -66,7 +66,16 @@ atlawire pr DEMO/widgets 123 --token-from-env
 
 Use the same Bitbucket settings as for `repos`. `show` is an optional third argument. Unlike
 `bbk pr show`, AtlaWire returns the server's JSON object without compacting it. It verifies the
-returned PR ID and does not request any links in the response. Changed files, diffs, and
+returned PR ID and does not request any links in the response.
+
+```shell
+atlawire pr DEMO/widgets 123 files --token-from-env --json
+```
+
+For `files`, the default TSV columns are `path`, `type`, and `node`; `--json` returns those
+fields as an array of objects. Bitbucket 5.10 can cap the list in one response. If the response
+reaches the reported cap or otherwise indicates truncation, AtlaWire fails without printing
+partial rows. This can also reject a list that happens to fit the cap exactly. Diffs and
 comments are not implemented yet.
 
 ## Retrieve a Jira issue
