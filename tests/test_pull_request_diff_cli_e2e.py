@@ -1,5 +1,6 @@
 import json
 import subprocess
+from copy import deepcopy
 from http.server import BaseHTTPRequestHandler
 from typing import cast
 
@@ -202,6 +203,71 @@ def truncated_line_payload() -> dict[str, object]:
     return payload
 
 
+def readable_payload() -> dict[str, object]:
+    """Build a response whose metadata differs from the default request."""
+    payload = diff_payload("0")
+    payload["extension"] = {"note": SENTINEL}
+    diffs = cast(list[dict[str, object]], payload["diffs"])
+    hunks = cast(list[dict[str, object]], diffs[0]["hunks"])
+    segments = cast(list[dict[str, object]], hunks[0]["segments"])
+    context_lines = cast(list[dict[str, object]], segments[0]["lines"])
+    context_lines[0]["line"] = "import os  "
+    removed_lines = cast(list[dict[str, object]], segments[1]["lines"])
+    removed_lines[0]["line"] = "import sys  # old"
+    added_lines = cast(list[dict[str, object]], segments[2]["lines"])
+    added_lines[0]["line"] = ""
+    added_lines[1]["line"] = "danger\x1b[31m"
+    return payload
+
+
+def missing_destination_payload() -> dict[str, object]:
+    """Build a deleted-file view with zero ranges and an empty removed line."""
+    payload = diff_payload("5")
+    diffs = cast(list[dict[str, object]], payload["diffs"])
+    diff = diffs[0]
+    diff["destination"] = None
+    hunks = cast(list[dict[str, object]], diff["hunks"])
+    hunk = hunks[0]
+    hunk["sourceLine"] = 7
+    hunk["sourceSpan"] = 0
+    hunk["destinationLine"] = 0
+    hunk["destinationSpan"] = 0
+    hunk["segments"] = [
+        {
+            "type": "REMOVED",
+            "lines": [{"source": 7, "destination": 0, "line": ""}],
+        }
+    ]
+    return payload
+
+
+def surrogate_payload() -> dict[str, object]:
+    """Build a response with lone surrogates in a path and a line."""
+    payload = diff_payload("3")
+    diffs = cast(list[dict[str, object]], payload["diffs"])
+    diff = diffs[0]
+    diff["source"] = {"toString": "src/\ud800.py"}
+    diff["destination"] = {"toString": "src/\ud800.py"}
+    hunks = cast(list[dict[str, object]], diff["hunks"])
+    segments = cast(list[dict[str, object]], hunks[0]["segments"])
+    context_lines = cast(list[dict[str, object]], segments[0]["lines"])
+    context_lines[0]["line"] = "keep \ud800"
+    removed_lines = cast(list[dict[str, object]], segments[1]["lines"])
+    removed_lines[0]["line"] = "old"
+    return payload
+
+
+def two_file_payload() -> dict[str, object]:
+    """Build a valid first file followed by a copy that tests can corrupt."""
+    payload = diff_payload("3")
+    diffs = cast(list[dict[str, object]], payload["diffs"])
+    second = deepcopy(diffs[0])
+    second["source"] = {"toString": "src/second.py"}
+    second["destination"] = {"toString": "src/second.py"}
+    diffs.append(second)
+    return payload
+
+
 def expected_request(context: str) -> Request:
     return (
         "GET",
@@ -324,15 +390,143 @@ def test_nested_true_truncation_exits_one_without_output_or_retry() -> None:
     assert accepts == ["application/json"]
 
 
-def test_diff_without_json_is_a_usage_error_before_any_request() -> None:
-    result, seen, raw_paths, accepts = run_pr_diff("diff", responses=[])
+def test_diff_without_json_prints_a_readable_text_review() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", responses=[(200, readable_payload())]
+    )
 
-    assert result.returncode == 2
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == (
+        "# Bitbucket PR diff review "
+        "(context=3; whitespace=ignore-all; not a patch)\n"
+        "\n"
+        "--- a/src/app.py\n"
+        "+++ b/src/app.py\n"
+        "@@ -1,2 +1,3 @@\n"
+        " import os  \n"
+        "-import sys  # old\n"
+        "+\n"
+        "+danger\\x1b[31m\n"
+    )
+    assert SENTINEL not in result.stdout
+    assert seen == [expected_request("3")]
+    assert raw_paths == [expected_raw_path("3")]
+    assert accepts == ["application/json"]
+
+
+def test_text_header_uses_the_requested_context_not_response_metadata() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", "--context", "0", responses=[(200, diff_payload("99"))]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith(
+        "# Bitbucket PR diff review (context=0; whitespace=ignore-all; not a patch)\n"
+    )
+    assert seen == [expected_request("0")]
+    assert raw_paths == [expected_raw_path("0")]
+    assert accepts == ["application/json"]
+
+
+def test_diff_text_escapes_lone_surrogates_as_visible_ascii() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", responses=[(200, surrogate_payload())]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == (
+        "# Bitbucket PR diff review "
+        "(context=3; whitespace=ignore-all; not a patch)\n"
+        "\n"
+        "--- a/src/\\ud800.py\n"
+        "+++ b/src/\\ud800.py\n"
+        "@@ -1,2 +1,3 @@\n"
+        " keep \\ud800\n"
+        "-old\n"
+        "+import re\n"
+        "+import json\n"
+    )
+    assert "\ud800" not in result.stdout
+    assert seen == [expected_request("3")]
+    assert raw_paths == [expected_raw_path("3")]
+    assert accepts == ["application/json"]
+
+
+def test_diff_text_uses_null_device_for_a_missing_side_and_zero_spans() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", responses=[(200, missing_destination_payload())]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == (
+        "# Bitbucket PR diff review "
+        "(context=3; whitespace=ignore-all; not a patch)\n"
+        "\n"
+        "--- a/src/app.py\n"
+        "+++ /dev/null\n"
+        "@@ -7,0 +0,0 @@\n"
+        "-\n"
+    )
+    assert seen == [expected_request("3")]
+    assert raw_paths == [expected_raw_path("3")]
+    assert accepts == ["application/json"]
+
+
+@pytest.mark.parametrize(
+    ("node", "expected"),
+    [
+        ("hunk", "segments"),
+        ("segment", "lines"),
+        ("line", "text"),
+        ("break", "line break"),
+    ],
+    ids=["empty-segments", "empty-lines", "non-string-text", "literal-break"],
+)
+def test_a_malformed_later_file_fails_without_partial_text(
+    node: str, expected: str
+) -> None:
+    payload = two_file_payload()
+    diffs = cast(list[dict[str, object]], payload["diffs"])
+    hunks = cast(list[dict[str, object]], diffs[1]["hunks"])
+    segments = cast(list[dict[str, object]], hunks[0]["segments"])
+    lines = cast(list[dict[str, object]], segments[0]["lines"])
+    if node == "hunk":
+        hunks[0]["segments"] = []
+    elif node == "segment":
+        segments[0]["lines"] = []
+    elif node == "line":
+        lines[0]["line"] = 7
+    else:
+        lines[0]["line"] = "two\nlines"
+
+    result, seen, raw_paths, accepts = run_pr_diff("diff", responses=[(200, payload)])
+
+    assert result.returncode == 1
     assert result.stdout == ""
-    assert "json" in result.stderr
-    assert seen == []
-    assert raw_paths == []
-    assert accepts == []
+    assert expected in result.stderr
+    for detail in (TOKEN, JIRA_TOKEN, CONFLUENCE_TOKEN, SENTINEL):
+        assert detail not in result.stderr
+    assert seen == [expected_request("3")]
+    assert raw_paths == [expected_raw_path("3")]
+    assert accepts == ["application/json"]
+
+
+def test_diff_text_rejects_a_flagged_payload_before_output() -> None:
+    result, seen, raw_paths, accepts = run_pr_diff(
+        "diff", responses=[(200, truncated_line_payload())]
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "truncated" in result.stderr
+    for detail in (TOKEN, JIRA_TOKEN, CONFLUENCE_TOKEN, SENTINEL):
+        assert detail not in result.stderr
+    assert seen == [expected_request("3")]
+    assert raw_paths == [expected_raw_path("3")]
+    assert accepts == ["application/json"]
 
 
 @pytest.mark.parametrize(

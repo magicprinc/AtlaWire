@@ -8,15 +8,15 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show, files,
-  comments, and diff JSON), `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`,
+  comments, and diff text or JSON), `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`,
   and `children`. Check `git status` before resuming; preserve local references and unrelated edits.
-- **Last verification:** 712 offline tests passed, including installed CLI subprocesses.
-  Ruff lint/format/security, Pyright, lock, and diff checks passed. Diff regressions checked
-  nondefault context and failure on nested truncation flags without output or a retry.
+- **Last verification:** 745 offline tests passed, including installed CLI subprocesses.
+  Ruff lint/format/security, Pyright, lock, and diff checks passed. Diff text regressions
+  checked late malformed hunks and safe output for decoded lone surrogates.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket PR diff text rendering. Set the output contract before rendering;
-  design per-file fallback separately.
+- **Next slice:** Bitbucket `file` and `pr file`. Share request path and UTF-8 text handling;
+  pin PR-side reads to the repository and commit in the selected ref.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -33,6 +33,12 @@ open, and no product behavior or compatibility claim is made before it is tested
   V4.1 Flash HIGH implements the named tests and code, runs checks, fixes failures, and
   self-reviews. The primary agent reviews both production code and the tests' ability to catch
   defects, sends corrections back, and reruns affected checks. Test counts are not acceptance.
+- **Verification cadence:** one assignment per usable workflow where practical. The worker runs
+  focused tests and lint/type checks during implementation. The primary reviews the code and
+  tests and runs the full regression suite once on the milestone candidate, not after every
+  intermediate check. Cover each distinct failure mode at the smallest useful test boundary.
+  Add a checkpoint or independent check when security, writes, or uncertain server behavior
+  justify it; do not weaken those checks to save time.
 - **Milestone commits:** commit each completed, verified milestone locally with a message
   explaining what changed and how it was verified. Exclude unrelated work. Only the owner
   pushes.
@@ -107,8 +113,10 @@ python -B -m pytest -p no:cacheprovider -q tests
       Preserve legacy columns and handle the 5.10 `commentAnchor` and `createdDate` fields.
 - [x] Port Bitbucket whole-PR diff JSON retrieval. Reject declared truncation at all known
       levels without attempting fallback.
-- [ ] Render Bitbucket PR diff text. Distinguish a readable review view from an applyable
-      patch. Verify per-file fallback separately before enabling it.
+- [x] Render Bitbucket PR diff text as a readable review view, not a patch.
+- [ ] Add and verify per-file diff requests and fallback separately.
+- [ ] Port Bitbucket repository and PR-side file reads with one raw text transport,
+      repository-relative path validation, and explicit tests for forked PRs.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

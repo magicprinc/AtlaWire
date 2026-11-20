@@ -89,13 +89,15 @@ or merge repeated activities into threads. It reads up to 100 pages by default
 reached before the last page.
 
 ```shell
+atlawire pr DEMO/widgets 123 diff --token-from-env
 atlawire pr DEMO/widgets 123 diff --token-from-env --json
 ```
 
-`diff --json` requests the whole diff as Bitbucket JSON. Use `--context` to set 0–100 context
-lines (default 3). AtlaWire rejects a declared truncation flag, including in a nested file,
-hunk, segment, or line. It cannot detect an unflagged server cap. Text rendering and automatic
-per-file fallback are not implemented yet.
+`diff` prints a text review view; use `--json` for the decoded Bitbucket response. The text
+view ignores whitespace differences, shows markers where no textual hunks were provided, and
+is not a patch to apply. Use `--context` for 0–100 lines of context (default 3). Both formats
+reject declared truncation, including nested flags. AtlaWire cannot detect an unflagged server
+cap and does not attempt automatic per-file fallback.
 
 ## Retrieve a Jira issue
 

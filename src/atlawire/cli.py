@@ -12,6 +12,7 @@ from atlawire.bitbucket import (
     PullRequestFile,
     get_pull_request,
     get_pull_request_diff,
+    get_pull_request_diff_text,
     list_projects,
     list_pull_request_comments,
     list_pull_request_files,
@@ -178,6 +179,31 @@ def _print_pull_request_comments(
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
+def _run_pr_diff_action(
+    repo: str,
+    pr_id: str,
+    *,
+    base_url: str,
+    token: str,
+    as_json: bool,
+    context: int,
+    allow_http_loopback: bool,
+) -> None:
+    read = get_pull_request_diff if as_json else get_pull_request_diff_text
+    result = read(
+        base_url,
+        repo,
+        pr_id,
+        token=token,
+        context=context,
+        allow_http_loopback=allow_http_loopback,
+    )
+    if isinstance(result, str):
+        click.echo(result, nl=False)
+    else:
+        click.echo(json.dumps(result))
+
+
 def _run_pr_action(
     selected: str,
     repo: str,
@@ -209,15 +235,15 @@ def _run_pr_action(
         )
         _print_pull_request_files(files, as_json=as_json)
     elif selected == "diff":
-        diff = get_pull_request_diff(
-            base_url,
+        _run_pr_diff_action(
             repo,
             pr_id,
+            base_url=base_url,
             token=token,
+            as_json=as_json,
             context=context,
             allow_http_loopback=allow_http_loopback,
         )
-        click.echo(json.dumps(diff))
     else:
         comments = list_pull_request_comments(
             base_url,
@@ -240,7 +266,7 @@ def _run_pr_action(
     "--json",
     "as_json",
     is_flag=True,
-    help="Print files or comments as JSON; required for diff.",
+    help="Print files, comments, or the raw diff as JSON.",
 )
 @click.option(
     "--max-pages",
@@ -272,10 +298,9 @@ def pr(
 
     The optional third argument is "show" (raw JSON, the default), "files"
     (path, type and node rows), "comments" (comment activity rows), or "diff"
-    (the decoded diff object as JSON). "--json" only changes the "files" and
-    "comments" output and is required for "diff". "--max-pages" is only
-    accepted with "comments" and defaults to 100; "--context" is only accepted
-    with "diff" and defaults to 3.
+    (a terminal-safe review view, or the decoded diff object as JSON with
+    "--json"). "--max-pages" is only accepted with "comments" and defaults to
+    100; "--context" is only accepted with "diff" and defaults to 3.
     """
     selected = "show" if action is None else action
     if selected not in {"show", "files", "comments", "diff"}:
@@ -283,8 +308,6 @@ def pr(
             'The optional third argument must be "show", "files", "comments", '
             'or "diff".'
         )
-    if selected == "diff" and not as_json:
-        raise click.UsageError('"diff" requires "--json".')
     if max_pages is not None and selected != "comments":
         raise click.UsageError('"--max-pages" is only supported with "comments".')
     if context is not None and selected != "diff":

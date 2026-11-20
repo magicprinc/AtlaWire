@@ -18,6 +18,20 @@ _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
 _DIFF_CONTEXT_MAX = 100
+_DIFF_REVIEW_HEADER = (
+    "# Bitbucket PR diff review (context={context}; whitespace=ignore-all; not a patch)"
+)
+_DIFF_NO_HUNKS = "(no textual hunks in the response)"
+_DIFF_NO_FILE_HUNKS = "(no textual hunks in this file)"
+_DIFF_RANGE_KEYS = ("sourceLine", "sourceSpan", "destinationLine", "destinationSpan")
+_DIFF_SEGMENT_PREFIXES = {"CONTEXT": " ", "ADDED": "+", "REMOVED": "-"}
+# JSON can decode \uD800-style escapes into lone surrogates, which UTF-8 output
+# cannot encode; escaping them keeps the review view printable and single-line.
+_DIFF_TEXT_UNSAFE = re.compile(
+    r"[\\\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069"
+    r"\ud800-\udfff]"
+)
+_DIFF_LINE_BREAKS = ("\r", "\n", "\u2028", "\u2029")
 
 
 class Repository(TypedDict):
@@ -200,6 +214,42 @@ def get_pull_request_diff(
         )
     _validate_pull_request_diff(value)
     return value
+
+
+def get_pull_request_diff_text(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    context: int = 3,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return a terminal-safe review view of one pull request diff.
+
+    The call makes exactly one whole-diff request through
+    [get_pull_request_diff][atlawire.bitbucket.get_pull_request_diff], so it
+    inherits its context bounds, fixed ``whitespace=ignore-all`` request and
+    declared-truncation checks. The header describes that request, not metadata
+    echoed by the response.
+
+    The result is a readable unified-diff-like view, never an applyable Git
+    patch: it omits index, binary and rename markers, preserves ordinary
+    Unicode and spaces, and escapes controls, bidi formatting characters,
+    surrogate code points and backslashes. Missing or empty hunk collections
+    produce an explicit no-textual-hunks marker rather than a claim that
+    nothing changed. The text is built completely before it is returned, so a
+    later malformed node raises without producing partial output.
+    """
+    value = get_pull_request_diff(
+        base_url,
+        repo,
+        pr_id,
+        token=token,
+        context=context,
+        allow_http_loopback=allow_http_loopback,
+    )
+    return _render_pull_request_diff_text(value, context=context)
 
 
 def list_pull_request_comments(
@@ -460,6 +510,116 @@ def _check_diff_truncation(value: dict[str, object]) -> None:
     if flag is False or flag == "false":
         return
     raise AtlaWireError("Invalid Bitbucket diff truncation flag.")
+
+
+def _render_pull_request_diff_text(value: dict[str, object], *, context: int) -> str:
+    """Build the full review view without I/O or partial output.
+
+    The view is deliberately not an applyable Git patch. Declared numeric ranges
+    are printed exactly as integers, including zero, and are never derived from
+    per-line positions. Hunk and segment counts are never assumed to agree.
+    """
+    diffs = value.get("diffs")
+    if not isinstance(diffs, list):
+        raise AtlaWireError("Expected a Bitbucket diffs array.")
+    lines = [_DIFF_REVIEW_HEADER.format(context=context), ""]
+    if not diffs:
+        lines.append(_DIFF_NO_HUNKS)
+        return "\n".join(lines) + "\n"
+    for diff in diffs:
+        lines.extend(_diff_text_file(diff))
+    return "\n".join(lines) + "\n"
+
+
+def _diff_text_file(value: object) -> list[str]:
+    """Render one file header and its hunks in declared order."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket diff object.")
+    source = _diff_side_path(value, "source")
+    destination = _diff_side_path(value, "destination")
+    if source is None and destination is None:
+        raise AtlaWireError("A Bitbucket diff must declare a path.")
+    lines = ["--- " + _diff_side(source, "a"), "+++ " + _diff_side(destination, "b")]
+    hunks = value.get("hunks")
+    if "hunks" not in value or hunks == []:
+        lines.append(_DIFF_NO_FILE_HUNKS)
+        return lines
+    if not isinstance(hunks, list):
+        raise AtlaWireError("Invalid hunks in a Bitbucket diff.")
+    for hunk in hunks:
+        lines.extend(_diff_hunk_text(hunk))
+    return lines
+
+
+def _diff_side_path(diff: dict[str, object], key: str) -> str | None:
+    """Return one declared path, treating an absent or null side as missing."""
+    value = diff.get(key)
+    return None if value is None else _change_path(value)
+
+
+def _diff_side(path: str | None, prefix: str) -> str:
+    """Prefix a present path; a missing side is the unprefixed null device."""
+    if path is None:
+        return "/dev/null"
+    return f"{prefix}/" + _diff_text(path, reject_breaks=False)
+
+
+def _diff_hunk_text(value: object) -> list[str]:
+    """Render one hunk header and its segments in declared order."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket diff hunk object.")
+    numbers = [_diff_range_number(value, key) for key in _DIFF_RANGE_KEYS]
+    lines = [f"@@ -{numbers[0]},{numbers[1]} +{numbers[2]},{numbers[3]} @@"]
+    lines.extend(_diff_segment_lines(value))
+    return lines
+
+
+def _diff_range_number(hunk: dict[str, object], key: str) -> int:
+    """Return an exact declared nonnegative integer, preserving zero."""
+    value = hunk.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise AtlaWireError("Invalid line range in a Bitbucket diff hunk.")
+    return value
+
+
+def _diff_segment_lines(hunk: dict[str, object]) -> list[str]:
+    """Render nonempty segments, rejecting unsupported types."""
+    segments = hunk.get("segments")
+    if not isinstance(segments, list) or not segments:
+        raise AtlaWireError("Invalid segments in a Bitbucket diff hunk.")
+    lines: list[str] = []
+    for segment in segments:
+        if not isinstance(segment, dict):
+            raise AtlaWireError("Expected a Bitbucket diff segment object.")
+        kind = segment.get("type")
+        prefix = _DIFF_SEGMENT_PREFIXES.get(kind) if isinstance(kind, str) else None
+        if prefix is None:
+            raise AtlaWireError("Unsupported type in a Bitbucket diff segment.")
+        lines.extend(prefix + text for text in _diff_line_texts(segment))
+    return lines
+
+
+def _diff_line_texts(segment: dict[str, object]) -> list[str]:
+    """Require nonempty lines with string text and no literal line breaks."""
+    entries = segment.get("lines")
+    if not isinstance(entries, list) or not entries:
+        raise AtlaWireError("Invalid lines in a Bitbucket diff segment.")
+    texts: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise AtlaWireError("Expected a Bitbucket diff line object.")
+        text = entry.get("line")
+        if not isinstance(text, str):
+            raise AtlaWireError("Invalid text in a Bitbucket diff line.")
+        texts.append(_diff_text(text, reject_breaks=True))
+    return texts
+
+
+def _diff_text(value: str, *, reject_breaks: bool) -> str:
+    """Escape controls and surrogate code points, preserving ordinary text."""
+    if reject_breaks and any(char in value for char in _DIFF_LINE_BREAKS):
+        raise AtlaWireError("Invalid line break in a Bitbucket diff line.")
+    return _DIFF_TEXT_UNSAFE.sub(lambda match: ascii(match[0])[1:-1], value)
 
 
 def _pull_request_comment(value: object) -> PullRequestComment | None:
