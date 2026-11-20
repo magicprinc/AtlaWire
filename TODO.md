@@ -5,27 +5,34 @@ open, and no product behavior or compatibility claim is made before it is tested
 
 ## Resume after restart
 
-- **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
-  regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
+- **Goal:** let agents find scattered requirements, decisions, and implementation
+  evidence across Jira, Confluence, and Bitbucket while doing real Java work. Keep
+  `bbk` working now and use it for workflows AtlaWire cannot yet verify.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branch`, `branches`, `commits`,
   `find-repos`, `search`, `file`, `files`, `ls`, `blame`, `commit`, `commit-changes`, `commit-diff`,
   `prs`, `my-prs`, `pr` (show, files, comments, commits, diff, and file), `issue` and `page`
   (JSON or Markdown), `issue-comments`, `jql`, `mine`, `statuses`, `jira-me`, `transitions`, `cql`, `spaces`,
   and `children`.
   Check `git status` before resuming; preserve local references and unrelated edits.
-- **Last verification:** 1386 offline tests passed using Python 3.15 outside a venv, including
-  installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  The HTTP 206 regression produced exit 0 and a row before the fix and now requires a
-  static error with empty stdout. Jira issue comment tests checked capped pages, duplicate
-  IDs, and failure without partial output.
-  Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
-  No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** prepare the bounded Jira comment search and its live response-shape
-  check. The JSON readers now reject HTTP 206. See the
-  [implementation handoff](.development/review/2026-11-20_IMPLEMENTATION_HANDOFF.md)
-  and [design review](.development/review/2026-11-20_WEB_STUDY_APPLICATION.md).
-  Scope/contract changes and live checks need separate approval.
-  Verify `projects` and `repos` live before relying on them for caching.
+- **Last verification:** `C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests`
+  passed 1,433 offline tests with no failures or skips, including installed CLI
+  subprocesses and 47 cases for the live runner. Ruff lint/format/security, Pyright,
+  offline lock, and diff checks passed. The HTTP 206 regression requires a static
+  error with empty stdout. Runtime tests used installed `markdownify` 1.2.3; the
+  lock resolves 1.2.4.
+- **Live evidence on this machine:** the existing BBK credentials authenticated to all
+  three products. Independent read comparisons passed for Jira issue search and comments,
+  Confluence search and page retrieval, and Bitbucket indexed Java search, PR inspection,
+  exact source bytes at a fixed commit, and two-page commit history. Empty Jira results
+  and missing objects on all three products also behaved as expected. This does not prove
+  other versions, proxies, or pagers.
+- **Next:** use the [quickstart](docs/AGENT-QUICKSTART.md) on real Java tasks and
+  capture practical blockers in the [feedback template](docs/FEEDBACK.md). Recheck the
+  [live gate](docs/LIVE-READ-ONLY.md) on another deployment before relying on it. Do
+  not add profiles, cross-issue comments, writes, or caching without practical evidence.
+- **Local credentials:** prefer `~/.config/AtlaWire/` for owner-managed settings.
+  AtlaWire currently reads credentials from the process environment, not from a file.
+  The approved live run reused BBK's existing store in memory; no credential migration.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
   and `tests/test_repos_e2e.py` as local-server test patterns. Compare the existing tool's
@@ -148,8 +155,8 @@ python -B -m pytest -p no:cacheprovider -q tests
       incomplete or inconsistent results. Keep cross-issue author search separate.
 - [ ] Port cross-issue Jira comment search after approving the scoped identity, date, and
       request-budget contract. Track fuzzy and transliterated discovery as separate parity work.
-- [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
-      approval. Verify each write offline before any separately authorized live test.
+- [ ] Defer any Jira, Confluence, or Bitbucket mutation support. Agents prepare proposed
+      changes locally; the owner reviews and applies them on the server. No live write tests.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve
       useful behavior and document any intentional differences that affect scripts.
 - [ ] Show concrete improvements over the current tool: clearer failures, no silent pagination
@@ -161,7 +168,29 @@ python -B -m pytest -p no:cacheprovider -q tests
 Keep the current tool available until AtlaWire passes these checks. Prioritize a working port
 over more packaging or framework work.
 
-## Final acceptance: `bbk` parity
+## Read-only handoff and 90% task success
+
+Full `bbk` parity is not a prerequisite. A checklist score cannot replace a mandatory
+test or override a security or data-integrity defect.
+
+- [x] Pass focused unit tests and installed-CLI end-to-end tests against local fixtures.
+- [x] With owner approval and credentials supplied locally, pass the nine-check
+      read-only CLI gate on the intended Jira, Confluence, and Bitbucket. Independent
+      server reads checked issue, page, PR, and source evidence and real Bitbucket commit
+      pagination. Jira and Confluence paging-failure paths were checked offline; this
+      run does not establish their multi-page behavior live. No live write tests.
+- [ ] Pin the verified local commit and hand the quickstart and feedback template to
+      agents already working on Java tasks. No separate recruitment or remote release.
+- [ ] Sample 20–30 representative tasks from normal work. Expand only after independently
+      checking that at least 90% succeed correctly without human intervention or an
+      unplanned workaround, with zero critical defects and no recurring core blocker.
+- [ ] Stop on P0, fix P1 before expansion, and prioritize lower-severity changes only
+      when actual work repeatedly shows a gap.
+
+## Long-term: broader `bbk` parity (not the pilot gate)
+
+These items are demand-driven and must not delay the pilot. Keep `bbk` available until a
+workflow is exercised on the target and explicitly migrated.
 
 - [ ] Make a disposition table for every current `bbk` CLI command, library workflow, and test
       file. Record the AtlaWire equivalent, adapted test, and verified outcome; do not silently

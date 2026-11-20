@@ -6,11 +6,12 @@ Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server*
 product scope is deliberately these three products; the design should make independently
 maintained adapters for other products possible without promising them in the initial release.
 
-> **Status: early implementation.** The CLI lists Bitbucket projects, repositories, branches,
-> and commits and reads PR data and source files. It also retrieves and searches Jira issues,
-> reads Confluence pages, runs CQL searches, and lists spaces and direct child pages. These
-> workflows are tested offline, not yet verified on live instances.
-> See [TODO.md](TODO.md) for the next steps.
+> **Status: local read-only use.** Core discovery and retrieval passed end-to-end
+> checks on one self-hosted Jira, Confluence, and Bitbucket setup. This is not a
+> general compatibility guarantee or a replacement for every `bbk` workflow.
+> Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), rerun the
+> [read-only checks](docs/LIVE-READ-ONLY.md) on another setup, and report practical
+> gaps using the [local feedback template](docs/FEEDBACK.md).
 
 ## Install from source
 
@@ -81,7 +82,8 @@ distinguishes server-highlighted lines (`hits`) from surrounding `context` and r
 `matchEvidence` as `highlight`, `context-only`, or `none`.
 
 This searches indexed content, typically on the default branch, not every file or branch.
-It is not a regex search. The plugin workflow has been exercised offline only.
+It is not a regex search. Repository-scoped Java identifier discovery passed on the
+tested live plugin instance; other deployments may differ.
 
 ## Retrieve a Bitbucket pull request
 
