@@ -1,7 +1,7 @@
 """Read operations for self-hosted Bitbucket."""
 
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import TypedDict
 from urllib.parse import quote
@@ -22,15 +22,20 @@ _FILE_UNSAFE = re.compile(r"[\\\x00-\x1f\x7f-\x9f\ud800-\udfff]")
 _FILE_PERCENT_ESCAPE = re.compile(r"%[0-9A-Fa-f]{2}")
 _REVISION_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]")
 _COMMIT_SHA1 = re.compile(r"[0-9A-Fa-f]{40}")
+_COMMIT_ID = re.compile(r"[0-9A-Fa-f]{7,40}")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
 _PAGE_SIZE = 100
 _COMMIT_LIMIT_DEFAULT = 25
+_COMMIT_DIFF_PATH_MAX = 100
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _DIFF_CONTEXT_MAX = 100
 _DIFF_REVIEW_HEADER = (
-    "# Bitbucket PR diff review (context={context}; whitespace=ignore-all; not a patch)"
+    "# Bitbucket {subject} diff review "
+    "(context={context}; whitespace=ignore-all; not a patch)"
 )
+_DIFF_SUBJECT_PULL_REQUEST = "PR"
+_DIFF_SUBJECT_COMMIT = "commit"
 _DIFF_NO_HUNKS = "(no textual hunks in the response)"
 _DIFF_NO_FILE_HUNKS = "(no textual hunks in this file)"
 _DIFF_RANGE_KEYS = ("sourceLine", "sourceSpan", "destinationLine", "destinationSpan")
@@ -59,10 +64,14 @@ class Project(TypedDict):
     url: str | None
 
 
-class PullRequestFile(TypedDict):
+class ChangedFile(TypedDict):
     path: str
     type: str | None
     node: str | None
+
+
+# The pull request file listing shares the changed-file projection.
+PullRequestFile = ChangedFile
 
 
 class PullRequestComment(TypedDict):
@@ -255,7 +264,7 @@ def list_directory(
             max_pages,
             project=_directory_entry,
             params=params,
-            children=True,
+            transform=_children_envelope,
         )
 
 
@@ -361,12 +370,7 @@ def get_pull_request_diff(
     stream was complete, and unknown metadata is not scanned for truncation.
     Sources and links carried by the object are never fetched.
     """
-    if (
-        not isinstance(context, int)
-        or isinstance(context, bool)
-        or not 0 <= context <= _DIFF_CONTEXT_MAX
-    ):
-        raise AtlaWireError("The diff context must be an integer from 0 to 100.")
+    _diff_context(context)
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
@@ -374,13 +378,9 @@ def get_pull_request_diff(
         value = get_json_object(
             session,
             f"{url}/diff",
-            params={
-                "contextLines": context,
-                "whitespace": "ignore-all",
-                "withComments": "false",
-            },
+            params=_diff_params(context),
         )
-    _validate_pull_request_diff(value)
+    _validate_diff(value, subject="pull request")
     return value
 
 
@@ -525,6 +525,135 @@ def list_commits(
         )
 
 
+def list_commit_changes(
+    base_url: str,
+    repo: str,
+    sha: str,
+    *,
+    token: str,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[ChangedFile]:
+    """List the files changed by one commit in server order.
+
+    ``repo`` is ``PROJECT/slug`` and ``sha`` must be 7 to 40 hexadecimal
+    characters: branch and symbolic refs are rejected before any request, so no
+    caller text reaches the URL path. Unlike the single-response pull request
+    changes view, this endpoint is paged: the existing cursor starts at ``0``
+    with ``limit=100`` and follows each page's ``nextPageStart``, failing on a
+    malformed or non-advancing cursor, an HTTP error, or the page cap without
+    returning partial rows.
+
+    A page declaring ``truncated`` as ``true`` (bare boolean or the exact
+    lowercase string) fails the call, any other present value is a malformed
+    flag, and an omitted flag or the exact ``false``/``"false"`` values are
+    accepted. This checks declared flags only: the server's documented hard cap
+    may cut a page short without setting one, and this view does not claim to
+    detect that case.
+    """
+    _validate_page_limit(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    commit = _commit_id(sha)
+    url = f"{_repository_url(base, repo)}/commits/{commit}/changes"
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            url,
+            max_pages,
+            project=_changed_file,
+            transform=_commit_changes_page,
+        )
+
+
+def get_commit_diff(
+    base_url: str,
+    repo: str,
+    sha: str,
+    *,
+    token: str,
+    paths: Sequence[str] | None = None,
+    context: int = 3,
+    allow_http_loopback: bool = False,
+) -> dict[str, object] | list[dict[str, object]]:
+    """Return the decoded diff for one commit or for explicit relative paths.
+
+    ``repo`` is ``PROJECT/slug`` and ``sha`` is validated as 7 to 40 hexadecimal
+    characters before any request. Without paths exactly one whole-commit
+    request is made and the decoded object is returned unchanged. With explicit
+    paths every relative path is validated before the session is created; the
+    call then makes one ``/diff/{path}`` request per path in input order and
+    returns the decoded objects in the same order, even for a single path. At
+    most 100 paths are accepted, and there is no implicit fallback.
+
+    Every request sends only ``contextLines`` (an exact integer from 0 to 100),
+    ``whitespace=ignore-all`` and ``withComments=false``; ``autoSrcPath``,
+    ``since`` and other filters are never sent. Declared truncation and
+    malformed truncation-bearing collections fail the whole call, so no partial
+    result is returned. Sources and links carried by a response are never
+    fetched.
+    """
+    _diff_context(context)
+    targets = _commit_diff_targets(paths)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    commit = _commit_id(sha)
+    url = f"{_repository_url(base, repo)}/commits/{commit}/diff"
+    params = _diff_params(context)
+    with bearer_session(token) as session:
+        if targets is None:
+            value = get_json_object(session, url, params=params)
+            _validate_diff(value, subject="commit")
+            return value
+        return [
+            _read_commit_file_diff(session, url, segments, params=params)
+            for segments in targets
+        ]
+
+
+def get_commit_diff_text(
+    base_url: str,
+    repo: str,
+    sha: str,
+    *,
+    token: str,
+    paths: Sequence[str] | None = None,
+    context: int = 3,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return a terminal-safe review view of one commit diff.
+
+    Requests, path rules and declared truncation checks are inherited from
+    [get_commit_diff][atlawire.bitbucket.get_commit_diff]. The header names the
+    commit request rather than a pull request, every explicit path response is
+    rendered in input order under that one header, and an empty response gets an
+    explicit no-textual-hunks marker. The result is a readable review view, not
+    an applyable Git patch, and it is built completely before it is returned.
+    """
+    value = get_commit_diff(
+        base_url,
+        repo,
+        sha,
+        token=token,
+        paths=paths,
+        context=context,
+        allow_http_loopback=allow_http_loopback,
+    )
+    values = [value] if isinstance(value, dict) else value
+    return _render_diff_text(values, context=context, subject=_DIFF_SUBJECT_COMMIT)
+
+
+def _read_commit_file_diff(
+    session: requests.Session,
+    url: str,
+    segments: tuple[str, ...],
+    *,
+    params: Mapping[str, str | int],
+) -> dict[str, object]:
+    """Request and validate one explicit commit file diff."""
+    value = get_json_object(session, f"{url}/{_encoded_path(segments)}", params=params)
+    _validate_diff(value, subject="commit")
+    return value
+
+
 def _pull_request_target(
     base_url: str,
     repo: str,
@@ -588,6 +717,48 @@ def _commit_params(at: str | None, path: str | None) -> dict[str, str]:
             raise AtlaWireError("Expected a path filter without control characters.")
         params["path"] = path
     return params
+
+
+def _commit_id(value: str) -> str:
+    """Accept only a 7-40 character ASCII hexadecimal commit ID."""
+    if not isinstance(value, str) or not _COMMIT_ID.fullmatch(value):
+        raise AtlaWireError("Expected a commit ID as 7 to 40 hexadecimal characters.")
+    return value
+
+
+def _commit_diff_targets(
+    paths: Sequence[str] | None,
+) -> tuple[tuple[str, ...], ...] | None:
+    """Validate every explicit path before I/O; empty selects the whole diff."""
+    if paths is None:
+        return None
+    if not isinstance(paths, Sequence) or isinstance(paths, (str, bytes)):
+        raise AtlaWireError("Expected commit diff paths as a sequence.")
+    if not paths:
+        return None
+    if len(paths) > _COMMIT_DIFF_PATH_MAX:
+        raise AtlaWireError("At most 100 commit diff paths are supported.")
+    return tuple(_file_segments(path) for path in paths)
+
+
+def _diff_params(context: int) -> dict[str, str | int]:
+    """Build the fixed diff query shared by pull request and commit requests."""
+    return {
+        "contextLines": context,
+        "whitespace": "ignore-all",
+        "withComments": "false",
+    }
+
+
+def _diff_context(value: int) -> int:
+    """Accept an exact integer context from 0 to 100."""
+    if (
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or not 0 <= value <= _DIFF_CONTEXT_MAX
+    ):
+        raise AtlaWireError("The diff context must be an integer from 0 to 100.")
+    return value
 
 
 def _split_repo(repo: str) -> tuple[str, str]:
@@ -657,8 +828,12 @@ def _browse_url(repository_url: str, segments: tuple[str, ...]) -> str:
     """Build the browse URL with each safe segment encoded exactly once."""
     if not segments:
         return f"{repository_url}/browse"
-    encoded = "/".join(quote(segment, safe="") for segment in segments)
-    return f"{repository_url}/browse/{encoded}"
+    return f"{repository_url}/browse/{_encoded_path(segments)}"
+
+
+def _encoded_path(segments: tuple[str, ...]) -> str:
+    """Join literal relative segments, encoding each exactly once."""
+    return "/".join(quote(segment, safe="") for segment in segments)
 
 
 def _require_encodable(value: str, label: str) -> str:
@@ -670,9 +845,14 @@ def _require_encodable(value: str, label: str) -> str:
     return value
 
 
+def _optional_encodable(value: str | None, label: str) -> str | None:
+    """Reject an optional text field that UTF-8 cannot encode."""
+    return None if value is None else _require_encodable(value, label)
+
+
 def _raw_file_url(base: str, project: str, slug: str, segments: tuple[str, ...]) -> str:
     """Build a repository raw URL with each safe segment encoded once."""
-    encoded = "/".join(quote(segment, safe="") for segment in segments)
+    encoded = _encoded_path(segments)
     return (
         f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
         f"/repos/{quote(slug, safe='')}/raw/{encoded}"
@@ -740,7 +920,7 @@ def _validate_pull_request(value: dict[str, object], pr_id: int) -> None:
         raise AtlaWireError("Invalid pull request identity or fields.")
 
 
-def _pull_request_files(page: dict[str, object]) -> list[PullRequestFile]:
+def _pull_request_files(page: dict[str, object]) -> list[ChangedFile]:
     """Validate the single 5.10 changes envelope and project its rows."""
     values = page.get("values")
     if not isinstance(values, list):
@@ -773,20 +953,25 @@ def _pull_request_files(page: dict[str, object]) -> list[PullRequestFile]:
             "The pull request changes reached the reported limit; "
             "the result may be truncated."
         )
-    return [_pull_request_file(value) for value in values]
+    return [_changed_file(value) for value in values]
 
 
-def _pull_request_file(value: object) -> PullRequestFile:
+def _changed_file(value: object) -> ChangedFile:
+    """Project one change, rejecting text that UTF-8 cannot encode."""
     if not isinstance(value, dict):
         raise AtlaWireError("Expected a Bitbucket change object.")
-    path = _change_path(value.get("path"))
+    path = _require_encodable(_change_path(value.get("path")), "change path")
     change_type = value.get("type")
     node = value.get("nodeType")
     if (change_type is not None and not isinstance(change_type, str)) or (
         node is not None and not isinstance(node, str)
     ):
         raise AtlaWireError("Invalid fields in a Bitbucket change.")
-    return PullRequestFile(path=path, type=change_type, node=node)
+    return ChangedFile(
+        path=path,
+        type=_optional_encodable(change_type, "change type"),
+        node=_optional_encodable(node, "change node"),
+    )
 
 
 def _change_path(value: object) -> str:
@@ -864,49 +1049,49 @@ def _children_envelope(page: dict[str, object]) -> dict[str, object]:
     return children
 
 
-def _validate_pull_request_diff(value: dict[str, object]) -> None:
+def _validate_diff(value: dict[str, object], *, subject: str) -> None:
     """Reject declared truncation and malformed truncation-bearing collections.
 
     Only the documented envelope, file, hunk, segment and line nodes are
     inspected; unknown metadata is left untouched and is not searched for
-    flags.
+    flags. ``subject`` only names the request in diagnostics.
     """
-    _check_diff_truncation(value)
+    _check_diff_truncation(value, subject=subject)
     diffs = value.get("diffs")
     if not isinstance(diffs, list):
         raise AtlaWireError("Expected a Bitbucket diffs array.")
     for diff in diffs:
         if not isinstance(diff, dict):
             raise AtlaWireError("Expected a Bitbucket diff object.")
-        _check_diff_truncation(diff)
+        _check_diff_truncation(diff, subject=subject)
         if "hunks" not in diff:
             continue
         hunks = diff["hunks"]
         if not isinstance(hunks, list):
             raise AtlaWireError("Invalid hunks in a Bitbucket diff.")
         for hunk in hunks:
-            _check_diff_hunk(hunk)
+            _check_diff_hunk(hunk, subject=subject)
 
 
-def _check_diff_hunk(hunk: object) -> None:
+def _check_diff_hunk(hunk: object, *, subject: str) -> None:
     """Validate one file hunk and its segments, if declared."""
     if not isinstance(hunk, dict):
         raise AtlaWireError("Expected a Bitbucket diff hunk object.")
-    _check_diff_truncation(hunk)
+    _check_diff_truncation(hunk, subject=subject)
     if "segments" not in hunk:
         return
     segments = hunk["segments"]
     if not isinstance(segments, list):
         raise AtlaWireError("Invalid segments in a Bitbucket diff hunk.")
     for segment in segments:
-        _check_diff_segment(segment)
+        _check_diff_segment(segment, subject=subject)
 
 
-def _check_diff_segment(segment: object) -> None:
+def _check_diff_segment(segment: object, *, subject: str) -> None:
     """Validate one hunk segment and its lines, if declared."""
     if not isinstance(segment, dict):
         raise AtlaWireError("Expected a Bitbucket diff segment object.")
-    _check_diff_truncation(segment)
+    _check_diff_truncation(segment, subject=subject)
     if "lines" not in segment:
         return
     lines = segment["lines"]
@@ -915,10 +1100,10 @@ def _check_diff_segment(segment: object) -> None:
     for line in lines:
         if not isinstance(line, dict):
             raise AtlaWireError("Expected a Bitbucket diff line object.")
-        _check_diff_truncation(line)
+        _check_diff_truncation(line, subject=subject)
 
 
-def _check_diff_truncation(value: dict[str, object]) -> None:
+def _check_diff_truncation(value: dict[str, object], *, subject: str) -> None:
     """Accept an omitted or exact false flag; reject true and any other value.
 
     Server 5.10 emits both bare booleans and the lowercase strings ``"true"``
@@ -930,29 +1115,59 @@ def _check_diff_truncation(value: dict[str, object]) -> None:
         return
     flag = value["truncated"]
     if flag is True or flag == "true":
-        raise AtlaWireError("Bitbucket reported a truncated pull request diff.")
+        raise AtlaWireError(f"Bitbucket reported a truncated {subject} diff.")
     if flag is False or flag == "false":
         return
     raise AtlaWireError("Invalid Bitbucket diff truncation flag.")
 
 
-def _render_pull_request_diff_text(value: dict[str, object], *, context: int) -> str:
+def _check_changes_truncation(page: dict[str, object]) -> None:
+    """Reject a declared true changes-page flag; malformed values also fail."""
+    if "truncated" not in page:
+        return
+    flag = page["truncated"]
+    if flag is True or flag == "true":
+        raise AtlaWireError("Bitbucket reported truncated commit changes.")
+    if flag is False or flag == "false":
+        return
+    raise AtlaWireError("Invalid Bitbucket changes truncation flag.")
+
+
+def _commit_changes_page(page: dict[str, object]) -> dict[str, object]:
+    """Validate a commit changes page and return it unchanged."""
+    _check_changes_truncation(page)
+    return page
+
+
+def _render_diff_text(
+    values: Sequence[dict[str, object]], *, context: int, subject: str
+) -> str:
     """Build the full review view without I/O or partial output.
 
     The view is deliberately not an applyable Git patch. Declared numeric ranges
     are printed exactly as integers, including zero, and are never derived from
     per-line positions. Hunk and segment counts are never assumed to agree.
+    Each response without file diffs gets an explicit marker rather than a claim
+    that nothing changed.
     """
-    diffs = value.get("diffs")
-    if not isinstance(diffs, list):
-        raise AtlaWireError("Expected a Bitbucket diffs array.")
-    lines = [_DIFF_REVIEW_HEADER.format(context=context), ""]
-    if not diffs:
-        lines.append(_DIFF_NO_HUNKS)
-        return "\n".join(lines) + "\n"
-    for diff in diffs:
-        lines.extend(_diff_text_file(diff))
+    lines = [_DIFF_REVIEW_HEADER.format(subject=subject, context=context), ""]
+    for value in values:
+        diffs = value.get("diffs")
+        if not isinstance(diffs, list):
+            raise AtlaWireError("Expected a Bitbucket diffs array.")
+        if not diffs:
+            lines.append(_DIFF_NO_HUNKS)
+            continue
+        for diff in diffs:
+            lines.extend(_diff_text_file(diff))
     return "\n".join(lines) + "\n"
+
+
+def _render_pull_request_diff_text(value: dict[str, object], *, context: int) -> str:
+    """Render one pull request diff review under the PR label."""
+    return _render_diff_text(
+        [value], context=context, subject=_DIFF_SUBJECT_PULL_REQUEST
+    )
 
 
 def _diff_text_file(value: object) -> list[str]:
@@ -1130,7 +1345,7 @@ def _read_pages[RowT](
     project: Callable[[object], RowT | None],
     params: Mapping[str, str] | None = None,
     limit: int | None = None,
-    children: bool = False,
+    transform: Callable[[dict[str, object]], dict[str, object]] | None = None,
 ) -> list[RowT]:
     """Read cursor pages, optionally stopping after ``limit`` projected rows.
 
@@ -1139,9 +1354,8 @@ def _read_pages[RowT](
     ``isLastPage`` boolean. With a row ``limit`` each request asks for no more
     than the rows still missing, a wider page is rejected, and the call returns
     at the row cap without needing the unused next-page hint. Otherwise each
-    nonterminal page is followed through its own ``nextPageStart``. When
-    ``children`` is set, the nested browse ``children`` page supplies those
-    fields while the outer browse metadata is ignored.
+    nonterminal page is followed through its own ``nextPageStart``. An optional
+    ``transform`` replaces the fetched page before its cursor and rows are read.
     """
     extras = {} if params is None else dict(params)
     start = 0
@@ -1152,8 +1366,8 @@ def _read_pages[RowT](
         page = get_json_object(
             session, url, params={**extras, "start": start, "limit": size}
         )
-        if children:
-            page = _children_envelope(page)
+        if transform is not None:
+            page = transform(page)
         values = page.get("values")
         if not isinstance(values, list):
             raise AtlaWireError("Expected a Bitbucket values array.")
@@ -1170,15 +1384,20 @@ def _read_pages[RowT](
             return rows
         if last:
             return rows
-        next_start = page.get("nextPageStart")
-        if (
-            not isinstance(next_start, int)
-            or isinstance(next_start, bool)
-            or next_start <= start
-        ):
-            raise AtlaWireError("Invalid or non-advancing Bitbucket nextPageStart.")
-        start = next_start
+        start = _next_page_start(page, start)
     raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+
+
+def _next_page_start(page: dict[str, object], start: int) -> int:
+    """Return an advancing cursor, rejecting a missing or malformed one."""
+    next_start = page.get("nextPageStart")
+    if (
+        not isinstance(next_start, int)
+        or isinstance(next_start, bool)
+        or next_start <= start
+    ):
+        raise AtlaWireError("Invalid or non-advancing Bitbucket nextPageStart.")
+    return next_start
 
 
 def _project(value: object) -> Project:

@@ -12,16 +12,19 @@ import click
 from atlawire import __version__
 from atlawire.bitbucket import (
     Branch,
+    ChangedFile,
     Commit,
     DirectoryEntry,
     PullRequestComment,
-    PullRequestFile,
+    get_commit_diff,
+    get_commit_diff_text,
     get_pull_request,
     get_pull_request_diff,
     get_pull_request_diff_text,
     get_pull_request_file,
     get_repository_file,
     list_branches,
+    list_commit_changes,
     list_commits,
     list_directory,
     list_projects,
@@ -271,6 +274,91 @@ def commits(
     _print_commits(rows, as_json=as_json)
 
 
+@cli.command("commit-changes")
+@click.argument("repo")
+@click.argument("sha")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def commit_changes_command(
+    repo: str,
+    sha: str,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List the files changed by one commit (SHA is 7-40 hex characters)."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = list_commit_changes(
+            base_url,
+            repo,
+            sha,
+            token=token,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    _print_changed_files(rows, as_json=as_json)
+
+
+@cli.command("commit-diff")
+@click.argument("repo")
+@click.argument("sha")
+@click.argument("paths", nargs=-1)
+@click.option(
+    "--context",
+    type=click.IntRange(0, 100),
+    default=3,
+    show_default=True,
+    help="Diff context lines (0-100; default 3).",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print raw JSON instead of review text."
+)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def commit_diff_command(
+    repo: str,
+    sha: str,
+    paths: tuple[str, ...],
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    context: int,
+    allow_http_loopback: bool,
+) -> None:
+    """Show a commit diff, whole or for explicit relative paths."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        _run_commit_diff_action(
+            repo,
+            sha,
+            paths,
+            base_url=base_url,
+            token=token,
+            as_json=as_json,
+            context=context,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+
+
 @cli.command("file")
 @click.argument("repo")
 @click.argument("path")
@@ -385,7 +473,7 @@ def ls_command(
     _print_directory_entries(rows, as_json=as_json)
 
 
-def _print_pull_request_files(rows: list[PullRequestFile], *, as_json: bool) -> None:
+def _print_changed_files(rows: list[ChangedFile], *, as_json: bool) -> None:
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -473,6 +561,43 @@ def _run_pr_diff_action(
         click.echo(json.dumps(result))
 
 
+def _run_commit_diff_action(
+    repo: str,
+    sha: str,
+    paths: tuple[str, ...],
+    *,
+    base_url: str,
+    token: str,
+    as_json: bool,
+    context: int,
+    allow_http_loopback: bool,
+) -> None:
+    """Fetch and print a whole or per-path commit diff after it fully succeeds."""
+    selected_paths = paths or None
+    if as_json:
+        result = get_commit_diff(
+            base_url,
+            repo,
+            sha,
+            token=token,
+            paths=selected_paths,
+            context=context,
+            allow_http_loopback=allow_http_loopback,
+        )
+        click.echo(json.dumps(result))
+        return
+    text = get_commit_diff_text(
+        base_url,
+        repo,
+        sha,
+        token=token,
+        paths=selected_paths,
+        context=context,
+        allow_http_loopback=allow_http_loopback,
+    )
+    click.echo(text, nl=False)
+
+
 def _run_pr_action(
     selected: str,
     repo: str,
@@ -502,7 +627,7 @@ def _run_pr_action(
             token=token,
             allow_http_loopback=allow_http_loopback,
         )
-        _print_pull_request_files(files, as_json=as_json)
+        _print_changed_files(files, as_json=as_json)
     elif selected == "diff":
         _run_pr_diff_action(
             repo,

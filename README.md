@@ -127,6 +127,19 @@ requested count (default 15) and prints UTC dates. The TSV message matches the l
 `bbk` summary; JSON keeps the full message. An HTTP or pagination failure before completion
 or the requested row limit produces no partial rows.
 
+## Review a Bitbucket commit
+
+```shell
+atlawire commit-changes DEMO/widgets abc1234 --token-from-env --json
+atlawire commit-diff DEMO/widgets abc1234 src/app.py --token-from-env
+```
+
+`commit-changes` follows the server cursor for changed paths. `commit-diff` shows a review
+view, not a patch to apply. It takes a 7–40 character hexadecimal commit ID and optional
+relative paths. With `--json`, the whole diff is an object; explicit paths give an array in
+request order. A declared truncation or a later request failure produces no output. The
+command does not detect unflagged server caps or attempt automatic fallback.
+
 ## Browse a Bitbucket repository
 
 ```shell
