@@ -7,7 +7,7 @@ import re
 import click
 
 from atlawire import __version__
-from atlawire.bitbucket import list_projects, list_repositories
+from atlawire.bitbucket import get_pull_request, list_projects, list_repositories
 from atlawire.confluence import (
     CHILD_LIMIT_DEFAULT,
     CHILD_LIMIT_MAX,
@@ -142,6 +142,40 @@ def projects(
     for row in rows:
         values = (row["key"], row["name"], row["public"])
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command()
+@click.argument("repo")
+@click.argument("pr_id")
+@click.argument("show", required=False)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def pr(
+    repo: str,
+    pr_id: str,
+    show: str | None,
+    base_url: str,
+    token_from_env: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Get one Bitbucket pull request as raw JSON by PROJECT/slug and ID."""
+    if show is not None and show != "show":
+        raise click.UsageError('The optional third argument must be "show".')
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        result = get_pull_request(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(result))
 
 
 @cli.command()

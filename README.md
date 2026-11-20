@@ -6,9 +6,10 @@ Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server*
 product scope is deliberately these three products; the design should make independently
 maintained adapters for other products possible without promising them in the initial release.
 
-> **Status: early implementation.** The CLI lists Bitbucket projects and repositories, retrieves
-> and searches Jira issues, and retrieves Confluence pages, searches with CQL, and lists spaces
-> and direct child pages. These workflows are tested offline, not yet verified on live instances.
+> **Status: early implementation.** The CLI lists Bitbucket projects and repositories and
+> gets PR details. It also retrieves and searches Jira issues, reads Confluence pages, runs
+> CQL searches, and lists spaces and direct child pages. These workflows are tested offline,
+> not yet verified on live instances.
 > See [TODO.md](TODO.md) for the next steps.
 
 ## Install from source
@@ -56,6 +57,17 @@ outputs the original field values as a JSON array. AtlaWire follows the server's
 rows if any page fails or the page limit is reached. This first command uses bearer credentials
 and HTTPS without redirects. Keyring and custom proxy/CA configuration are not wired yet.
 See the [Bitbucket Server 5.10 REST reference](https://docs.atlassian.com/bitbucket-server/rest/5.10.0/bitbucket-rest.html).
+
+## Retrieve a Bitbucket pull request
+
+```shell
+atlawire pr DEMO/widgets 123 --token-from-env
+```
+
+Use the same Bitbucket settings as for `repos`. `show` is an optional third argument. Unlike
+`bbk pr show`, AtlaWire returns the server's JSON object without compacting it. It verifies the
+returned PR ID and does not request any links in the response. Changed files, diffs, and
+comments are not implemented yet.
 
 ## Retrieve a Jira issue
 

@@ -13,6 +13,10 @@ from atlawire.http import (
     normalize_base_url,
 )
 
+_PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
+_REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
+_PULL_REQUEST_ID_MAX = 2**63 - 1
+
 
 class Repository(TypedDict):
     slug: str
@@ -59,13 +63,90 @@ def list_repositories(
 ) -> list[Repository]:
     """List repositories in server order or raise without returning a partial list."""
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    if not re.fullmatch(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*", project):
+    if not _PROJECT_KEY.fullmatch(project):
         raise AtlaWireError("Expected a Bitbucket project key or ~user project.")
     if not 1 <= max_pages <= 1000:
         raise AtlaWireError("The page limit must be between 1 and 1000.")
     url = f"{base}/rest/api/1.0/projects/{project}/repos"
     with bearer_session(token) as session:
         return _read_pages(session, url, max_pages, project=_repository)
+
+
+def get_pull_request(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one pull request exactly as the server sent it.
+
+    ``repo`` is ``PROJECT/slug``. ``pr_id`` accepts a canonical positive decimal
+    string or ``int``; the request carries its canonical decimal form. The result
+    is the decoded server object, so unknown and nested fields are preserved, and
+    links in it are never followed.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    project, slug = _split_repo(repo)
+    identifier = _pull_request_id(pr_id)
+    url = (
+        f"{base}/rest/api/1.0/projects/{project}/repos/{slug}"
+        f"/pull-requests/{identifier}"
+    )
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+    _validate_pull_request(value, identifier)
+    return value
+
+
+def _split_repo(repo: str) -> tuple[str, str]:
+    """Split ``PROJECT/slug`` into two safe path segments."""
+    project, separator, slug = repo.partition("/")
+    if (
+        not separator
+        or "/" in slug
+        or not _PROJECT_KEY.fullmatch(project)
+        or not _REPOSITORY_SLUG.fullmatch(slug)
+        or slug in {".", ".."}
+    ):
+        raise AtlaWireError("Expected a repository as PROJECT/slug.")
+    return project, slug
+
+
+def _pull_request_id(value: str | int) -> int:
+    """Return a canonical positive signed 64-bit ID or reject before I/O."""
+    invalid = "Expected a pull request ID as a positive signed 64-bit integer."
+    if isinstance(value, bool):
+        raise AtlaWireError(invalid)
+    if isinstance(value, int):
+        identifier = value
+    elif isinstance(value, str):
+        # Length is checked before conversion so huge digit strings cannot stall
+        # or hit the interpreter's integer-string conversion limit.
+        if len(value) > 19 or not re.fullmatch(r"[1-9][0-9]*", value):
+            raise AtlaWireError(invalid)
+        identifier = int(value)
+    else:
+        raise AtlaWireError(invalid)
+    if not 1 <= identifier <= _PULL_REQUEST_ID_MAX:
+        raise AtlaWireError(invalid)
+    return identifier
+
+
+def _validate_pull_request(value: dict[str, object], pr_id: int) -> None:
+    """Require the identity requested and the fields this slice promises."""
+    identifier = value.get("id")
+    title = value.get("title")
+    state = value.get("state")
+    if (
+        not isinstance(identifier, int)
+        or isinstance(identifier, bool)
+        or identifier != pr_id
+        or not isinstance(title, str)
+        or not isinstance(state, str)
+    ):
+        raise AtlaWireError("Invalid pull request identity or fields.")
 
 
 def _read_pages[RowT](

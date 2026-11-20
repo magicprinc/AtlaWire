@@ -17,6 +17,7 @@ No version has been released yet.
   or JSON output. It follows server-provided pagination and fails without printing partial rows.
 - `atlawire projects` lists visible Bitbucket projects with `bbk`-compatible TSV or JSON
   including optional descriptions and server-provided links.
+- `atlawire pr PROJECT/SLUG PR_ID [show]` retrieves a pull request as raw Bitbucket JSON.
 - `atlawire issue KEY_OR_URL` retrieves Jira issue JSON, including rendered fields when returned.
 - `atlawire issue KEY_OR_URL --markdown` renders issue details and comments while keeping JSON
   as the default. Missing or ambiguous rendered comments fall back to raw text.

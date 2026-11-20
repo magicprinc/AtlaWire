@@ -7,18 +7,17 @@ open, and no product behavior or compatibility claim is made before it is tested
 
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
-- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `issue` and `page`
-  (JSON or Markdown), `jql`, `cql`, `spaces`, and `children`. The first implementation
-  milestone was verified against `53cee89` plus working-tree changes. Check `git status` before
-  resuming; preserve any local reference material and unrelated edits.
-- **Last verification:** 430 offline tests passed with subprocess coverage enabled. Ruff
-  lint/format/security, Pyright, lock, and diff checks passed. The Bitbucket project tests
-  distinguish server cursors from row offsets and error from successful truncation.
+- **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `pr` (show only),
+  `issue` and `page` (JSON or Markdown), `jql`, `cql`, `spaces`, and `children`. Check
+  `git status` before resuming; preserve local reference material and unrelated edits.
+- **Last verification:** 495 offline tests passed, including installed CLI subprocesses. Ruff
+  lint/format/security, Pyright, lock, and diff checks passed. The PR tests distinguish boolean
+  and mismatched IDs from valid integer IDs, and verify one configured-instance request.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **First implementation task on resume:** Bitbucket pull-request reads. Live verification
-  of `projects` and `repos` is still needed before relying on them for catalog caching.
-  The milestone checklist below tracks the remaining work in priority order.
+- **Next slice:** Bitbucket `pr PROJECT/SLUG PR_ID files`. Validate capped `/changes` responses
+  before presenting a file list. Verify `projects` and `repos` live before relying on them
+  for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
   and `tests/test_repos_e2e.py` as local-server test patterns. Compare the existing tool's
@@ -37,6 +36,11 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Milestone commits:** commit each completed, verified milestone locally with a message
   explaining what changed and how it was verified. Exclude unrelated work. Only the owner
   pushes.
+- **Milestone handoff:** a milestone commit is not the end of the task. Before ending a turn,
+  record the next action here. If the next slice is in scope and unblocked, start it and
+  report the actual dispatch. If work is waiting for review, permission, or a dependency,
+  state what it is waiting for. On resume, review completed work or recover the recorded
+  action before dispatching another worker; do not duplicate active work.
 - **Design review:** assign each rule to the component with the information to enforce it.
   Keep CLI formatting, product behavior, and credential/transport handling separate. Prefer
   composition and narrow interfaces; share code only when it enforces the same contract.
@@ -93,6 +97,12 @@ python -B -m pytest -p no:cacheprovider -q tests
       pagination regressions using the CQL pager.
 - [x] Port Confluence `children` with legacy TSV columns, a bounded limit, and adapted
       pagination regressions using the same pager and page-ID parser.
+- [x] Port Bitbucket PR lookup with one instance-bound request and response identity checks.
+      AtlaWire currently returns raw JSON; the legacy compact view remains open.
+- [ ] Port Bitbucket PR file listing. Server 5.10 documents `/changes` as a single capped
+      response even though it uses a page envelope. Do not apply the repository cursor pager
+      or treat a cap as a complete list. Test nested path objects and explicit or plausible
+      truncation using the versioned reference before claiming parity.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve
