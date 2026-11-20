@@ -278,6 +278,16 @@ atlawire statuses --token-from-env
 are not supported in the filter. It uses the same pagination and limit as `jql`.
 `statuses` prints sorted unique names, one per line; `--json` returns an array of names.
 
+## List available Jira transitions
+
+```shell
+atlawire transitions DEMO-42 --token-from-env --json
+```
+
+`transitions` lists the workflow actions Jira offers for an issue. It keeps the transition
+name separate from the destination status and never changes the issue. Pass an issue key
+or a browse URL; the request always goes to the configured Jira instance.
+
 ## Retrieve a Confluence page
 
 With `ATLAWIRE_CONFLUENCE_TOKEN` supplied by your secret provider, run:

@@ -35,6 +35,14 @@ class IssueRow(TypedDict):
     summary: str
 
 
+class TransitionRow(TypedDict):
+    """One workflow transition offered for a Jira issue."""
+
+    id: str
+    name: str
+    to_status: str | None
+
+
 class CurrentUser(TypedDict):
     """The authenticated caller's three legacy Jira identity fields."""
 
@@ -191,6 +199,71 @@ def list_statuses(
             raise AtlaWireError("Expected Jira statuses with valid Unicode names.")
         names.append(name)
     return sorted(set(names))
+
+
+def list_transitions(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[TransitionRow]:
+    """Return the workflow transitions offered for one issue in server order.
+
+    Only the key is taken from ``key_or_url``; every request goes to the
+    configured ``base_url``. The complete response is validated before anything
+    is returned, so a malformed late entry cannot yield a partial list. No
+    permission or target-status meaning is inferred beyond the returned fields.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        envelope = get_json_object(
+            session, f"{base}/rest/api/2/issue/{key}/transitions", params={}
+        )
+    values = envelope.get("transitions")
+    if not isinstance(values, list):
+        raise AtlaWireError("Expected a Jira transitions array.")
+    return [_project_transition(value) for value in values]
+
+
+def _project_transition(value: object) -> TransitionRow:
+    """Project one consumed transition, rejecting wrong shapes without coercion."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected Jira transition objects.")
+    return TransitionRow(
+        id=_transition_text(value.get("id"), "ID"),
+        name=_transition_text(value.get("name"), "name"),
+        to_status=_transition_status(value.get("to")),
+    )
+
+
+def _transition_status(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Jira transition target object.")
+    name = value.get("name")
+    return None if name is None else _transition_string(name, "target status")
+
+
+def _transition_text(value: object, label: str) -> str:
+    """Return one required field as non-blank text that UTF-8 output can encode."""
+    if not isinstance(value, str) or not value.strip():
+        raise AtlaWireError(f"Expected a Jira transition {label} as non-empty text.")
+    return _transition_string(value, label)
+
+
+def _transition_string(value: object, label: str) -> str:
+    """Return one consumed text field unchanged, including empty or whitespace."""
+    if not isinstance(value, str):
+        raise AtlaWireError(f"Expected a Jira transition {label} as text.")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        message = f"Expected a Jira transition {label} as valid UTF-8 text."
+        raise AtlaWireError(message) from None
+    return value
 
 
 def get_current_user(

@@ -81,6 +81,7 @@ from atlawire.jira import (
     get_issue,
     list_my_issues,
     list_statuses,
+    list_transitions,
     search_issues,
 )
 
@@ -91,6 +92,7 @@ _MINE_COLUMNS = "key\tstatus\ttype\tpriority\tupdated\tsummary"
 _CQL_COLUMNS = "id\tspace\ttype\ttitle\turl"
 _SPACE_COLUMNS = "key\tname\ttype"
 _CHILD_COLUMNS = "id\ttitle\tversion"
+_TRANSITION_COLUMNS = "id\tname\tto_status"
 _PROJECT_COLUMNS = "key\tname\tpublic"
 _FIND_REPOS_COLUMNS = "project\tslug\tname\tstate"
 _FILE_COLUMNS = "path\ttype\tnode"
@@ -1499,6 +1501,43 @@ def statuses(
         return
     for name in names:
         click.echo(_tsv_cell(name))
+
+
+@cli.command()
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def transitions(
+    key_or_url: str,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """List the workflow transitions available for a Jira issue."""
+    token = _environment_token("ATLAWIRE_JIRA_TOKEN", token_from_env)
+    try:
+        rows = list_transitions(
+            base_url,
+            key_or_url,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_TRANSITION_COLUMNS}")
+    for row in rows:
+        values = (row["id"], row["name"], row["to_status"])
+        click.echo("\t".join(map(_tsv_cell, values)))
 
 
 @cli.command("jira-me")
