@@ -30,6 +30,7 @@ from atlawire.bitbucket import (
     list_directory,
     list_projects,
     list_pull_request_comments,
+    list_pull_request_commits,
     list_pull_request_files,
     list_repositories,
     list_repository_files,
@@ -777,6 +778,40 @@ def _run_commit_diff_action(
     click.echo(text, nl=False)
 
 
+def _run_pr_list_action(
+    selected: str,
+    repo: str,
+    pr_id: str,
+    *,
+    base_url: str,
+    token: str,
+    as_json: bool,
+    page_limit: int,
+    allow_http_loopback: bool,
+) -> None:
+    """Read and print one paged pull request list (comments or commits)."""
+    if selected == "commits":
+        commits = list_pull_request_commits(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            max_pages=page_limit,
+            allow_http_loopback=allow_http_loopback,
+        )
+        _print_commits(commits, as_json=as_json)
+        return
+    comments = list_pull_request_comments(
+        base_url,
+        repo,
+        pr_id,
+        token=token,
+        max_pages=page_limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+    _print_pull_request_comments(comments, as_json=as_json)
+
+
 def _run_pr_action(
     selected: str,
     repo: str,
@@ -818,15 +853,16 @@ def _run_pr_action(
             allow_http_loopback=allow_http_loopback,
         )
     else:
-        comments = list_pull_request_comments(
-            base_url,
+        _run_pr_list_action(
+            selected,
             repo,
             pr_id,
+            base_url=base_url,
             token=token,
-            max_pages=page_limit,
+            as_json=as_json,
+            page_limit=page_limit,
             allow_http_loopback=allow_http_loopback,
         )
-        _print_pull_request_comments(comments, as_json=as_json)
 
 
 def _pr_arguments(
@@ -840,10 +876,10 @@ def _pr_arguments(
 ) -> tuple[str, str]:
     """Validate the selected PR action and return it with the file side."""
     selected = "show" if action is None else action
-    if selected not in {"show", "files", "comments", "diff", "file"}:
+    if selected not in {"show", "files", "comments", "commits", "diff", "file"}:
         raise click.UsageError(
             'The optional third argument must be "show", "files", "comments", '
-            '"diff", or "file".'
+            '"commits", "diff", or "file".'
         )
     if selected != "file" and path is not None:
         raise click.UsageError('PATH is only supported with "file".')
@@ -853,8 +889,10 @@ def _pr_arguments(
         raise click.UsageError('The "file" action requires PATH.')
     if selected == "file" and as_json:
         raise click.UsageError('"--json" is not supported with "file".')
-    if max_pages is not None and selected != "comments":
-        raise click.UsageError('"--max-pages" is only supported with "comments".')
+    if max_pages is not None and selected not in {"comments", "commits"}:
+        raise click.UsageError(
+            '"--max-pages" is only supported with "comments" or "commits".'
+        )
     if context is not None and selected != "diff":
         raise click.UsageError('"--context" is only supported with "diff".')
     return selected, "new" if side is None else side
@@ -893,7 +931,7 @@ def _run_pr_file_action(
     "--json",
     "as_json",
     is_flag=True,
-    help="Print files, comments, or the raw diff as JSON.",
+    help="Print files, comments, commits, or the raw diff as JSON.",
 )
 @click.option(
     "--side",
@@ -905,7 +943,7 @@ def _run_pr_file_action(
     "--max-pages",
     type=click.IntRange(1, 1000),
     default=None,
-    help="Maximum comment activity pages (1-1000; default 100).",
+    help="Maximum comment or commit pages (1-1000; default 100).",
 )
 @click.option(
     "--context",
@@ -929,11 +967,12 @@ def pr(
     context: int | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Get one pull request, its changed files, comments, diff, or one file.
+    """Get one pull request, its changed files, comments, commits, diff, or one file.
 
     The optional third argument is "show" (default raw JSON), "files",
-    "comments", "diff", or "file". "--max-pages" and "--context" apply only to
-    "comments" and "diff"; PATH and "--side" apply only to "file".
+    "comments", "commits", "diff", or "file". "--max-pages" applies to
+    "comments" and "commits"; "--context" applies only to "diff"; PATH and
+    "--side" apply only to "file".
     """
     selected, selected_side = _pr_arguments(
         action,

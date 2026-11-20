@@ -23,6 +23,7 @@ No version has been released yet.
 - `atlawire pr PROJECT/SLUG PR_ID files` lists changed paths and rejects responses that
   reach the server's reported cap.
 - `atlawire pr PROJECT/SLUG PR_ID comments` reads paginated comment activity as TSV or JSON.
+- `atlawire pr PROJECT/SLUG PR_ID commits` lists pull request commits as TSV or JSON.
 - `atlawire pr PROJECT/SLUG PR_ID diff --json` retrieves Bitbucket diff JSON and rejects
   declared truncation.
 - `atlawire pr PROJECT/SLUG PR_ID diff` shows a terminal-safe review, not a patch to apply.

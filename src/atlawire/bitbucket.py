@@ -503,6 +503,37 @@ def list_pull_request_comments(
         )
 
 
+def list_pull_request_commits(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[Commit]:
+    """List the commits of one pull request in server order.
+
+    ``repo`` is ``PROJECT/slug`` and ``pr_id`` follows the same canonical
+    positive decimal rules as [get_pull_request][atlawire.bitbucket.get_pull_request].
+    The fixed ``/commits`` endpoint is read from ``start=0`` with ``limit=100``
+    and every nonterminal page is followed through its own noncontiguous
+    ``nextPageStart`` until the exact ``isLastPage`` boolean. Unlike the
+    repository history view there is no implicit row cap, so every projected
+    commit is returned in server order.
+
+    No pull request metadata or count flags are sent and no additional route is
+    requested. A later malformed row, transport failure, or page-cap hit raises
+    without returning partial rows.
+    """
+    _validate_page_limit(max_pages)
+    _, url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        return _read_pages(session, f"{url}/commits", max_pages, project=_commit)
+
+
 def list_branches(
     base_url: str,
     repo: str,
@@ -1626,11 +1657,12 @@ def _commit(value: object) -> Commit:
         message = ""
     elif not isinstance(message, str):
         raise AtlaWireError("Invalid fields in a Bitbucket commit.")
+    author = _optional_encodable(_commit_author(value.get("author")), "commit author")
     return Commit(
-        hash=identifier,
+        hash=_require_encodable(identifier, "commit hash"),
         date=_commit_date(value.get("authorTimestamp")),
-        author=_commit_author(value.get("author")),
-        message=message,
+        author=author,
+        message=_require_encodable(message, "commit message"),
     )
 
 

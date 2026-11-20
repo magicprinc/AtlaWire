@@ -114,6 +114,14 @@ or merge repeated activities into threads. It reads up to 100 pages by default
 reached before the last page.
 
 ```shell
+atlawire pr DEMO/widgets 123 commits --token-from-env --json
+```
+
+`commits` lists all commits in the pull request in server order, subject to the page limit
+shared with `comments`. TSV shows a UTC date and a one-line message summary; JSON preserves
+the full message. A failed page produces no partial list.
+
+```shell
 atlawire pr DEMO/widgets 123 diff --token-from-env
 atlawire pr DEMO/widgets 123 diff --token-from-env --json
 ```

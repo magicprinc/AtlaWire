@@ -9,17 +9,16 @@ open, and no product behavior or compatibility claim is made before it is tested
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branches`, `commits`,
   `find-repos`, `search`, `file`, `files`, `ls`, `commit-changes`, `commit-diff`, `pr` (show, files,
-  comments, diff, and file), `issue` and `page` (JSON or Markdown), `jql`, `mine`, `statuses`,
-  `cql`, `spaces`, and `children`. Check `git status` before resuming; preserve local
+  comments, commits, diff, and file), `issue` and `page` (JSON or Markdown), `jql`, `mine`,
+  `statuses`, `cql`, `spaces`, and `children`. Check `git status` before resuming; preserve local
   references and unrelated edits.
-- **Last verification:** 1157 offline tests passed using Python 3.15 outside a venv, including
+- **Last verification:** 1163 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Indexed search tests checked the plugin cursor, highlight evidence, and no output on
-  malformed late results.
+  PR commit tests checked the cursor gap, page cap, and no output on a malformed later row.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** list Bitbucket PR commits through the documented paged endpoint. Keep live
-  code-search plugin validation separate.
+- **Next slice:** add explicit per-file PR diff requests, including the old path for a rename.
+  Keep automatic fallback and live code-search plugin validation separate.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -119,7 +118,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Bitbucket whole-PR diff JSON retrieval. Reject declared truncation at all known
       levels without attempting fallback.
 - [x] Render Bitbucket PR diff text as a readable review view, not a patch.
-- [ ] Add and verify per-file diff requests and fallback separately.
+- [ ] Add and verify explicit per-file PR diff requests, including rename source paths.
+- [ ] Design and verify capped PR diff fallback separately from explicit path requests.
 - [x] Port Bitbucket repository and PR-side file reads with one raw text transport,
       repository-relative path validation, and explicit tests for forked PRs.
 - [x] Port Bitbucket `branches` and `commits` using the repository cursor pager.
@@ -128,7 +128,7 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Bitbucket `commit-changes` and `commit-diff` with explicit server-cap behavior.
 - [x] Port Bitbucket `find-repos` with bounded fanout and the legacy match/failure regressions.
 - [x] Port Bitbucket indexed code `search` with the plugin cursor and explicit evidence labels.
-- [ ] Port Bitbucket PR commit lists; adapt the legacy cursor-gap and later-failure regressions.
+- [x] Port Bitbucket PR commit lists; adapt the legacy cursor-gap and later-failure regressions.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve
