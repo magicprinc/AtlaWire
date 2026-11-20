@@ -158,6 +158,19 @@ and assignee. `--limit` defaults to 50 and accepts 1–1000. AtlaWire follows mu
 Jira returns fewer results per page. A failed or inconsistent page produces an error without
 publishing partial rows. If Jira omits the total, a short page alone does not prove completion.
 
+## List your Jira issues and available statuses
+
+```shell
+atlawire mine --token-from-env
+atlawire mine --status "In Progress" --token-from-env --json
+atlawire statuses --token-from-env
+```
+
+`mine` lists your issues outside the Done category by default, newest updates first. With
+`--status`, it filters to one exact name. Double quotes, backslashes, and control characters
+are not supported in the filter. It uses the same pagination and limit as `jql`.
+`statuses` prints sorted unique names, one per line; `--json` returns an array of names.
+
 ## Retrieve a Confluence page
 
 With `ATLAWIRE_CONFLUENCE_TOKEN` supplied by your secret provider, run:

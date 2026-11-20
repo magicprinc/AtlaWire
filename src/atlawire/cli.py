@@ -48,12 +48,15 @@ from atlawire.jira import (
     SEARCH_LIMIT_MAX,
     SEARCH_LIMIT_MIN,
     get_issue,
+    list_my_issues,
+    list_statuses,
     search_issues,
 )
 
 _TSV_CONTROLS = re.compile(r"[\\\x00-\x1f\x7f-\x9f\u2028\u2029]")
 _TSV_ESCAPES = {"\\": r"\\", "\t": r"\t", "\r": r"\r", "\n": r"\n"}
 _JQL_COLUMNS = "key\tstatus\ttype\tpriority\tassignee\tupdated\tsummary"
+_MINE_COLUMNS = "key\tstatus\ttype\tpriority\tupdated\tsummary"
 _CQL_COLUMNS = "id\tspace\ttype\ttitle\turl"
 _SPACE_COLUMNS = "key\tname\ttype"
 _CHILD_COLUMNS = "id\ttitle\tversion"
@@ -645,6 +648,89 @@ def jql(
             row["summary"],
         )
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command()
+@click.option("--status", default=None, help="Return issues in this exact status name.")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(SEARCH_LIMIT_MIN, SEARCH_LIMIT_MAX),
+    default=50,
+    show_default=True,
+    help=f"Maximum rows to return ({SEARCH_LIMIT_MIN}-{SEARCH_LIMIT_MAX}).",
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def mine(
+    status: str | None,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    limit: int,
+    allow_http_loopback: bool,
+) -> None:
+    """List your Jira issues, optionally filtered to one status name."""
+    token = _environment_token("ATLAWIRE_JIRA_TOKEN", token_from_env)
+    try:
+        rows = list_my_issues(
+            base_url,
+            token=token,
+            status=status,
+            limit=limit,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    click.echo(f"# {len(rows)} row(s)\n{_MINE_COLUMNS}")
+    for row in rows:
+        values = (
+            row["key"],
+            row["status"],
+            row["type"],
+            row["priority"],
+            row["updated"],
+            row["summary"],
+        )
+        click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command()
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array of status names."
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def statuses(
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """List the sorted unique status names visible on the Jira instance."""
+    token = _environment_token("ATLAWIRE_JIRA_TOKEN", token_from_env)
+    try:
+        names = list_statuses(
+            base_url, token=token, allow_http_loopback=allow_http_loopback
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    if as_json:
+        click.echo(json.dumps(names))
+        return
+    for name in names:
+        click.echo(_tsv_cell(name))
 
 
 @cli.command()

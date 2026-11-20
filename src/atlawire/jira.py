@@ -9,12 +9,16 @@ import requests
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
+    get_json_array,
     get_json_object,
     normalize_base_url,
 )
 
 _ISSUE_KEY = r"[A-Z][A-Z0-9_]*-[0-9]+"
 _SEARCH_FIELDS = "summary,status,priority,issuetype,assignee,updated"
+_MY_ISSUES_QUERY = (
+    "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+)
 SEARCH_LIMIT_MIN = 1
 SEARCH_LIMIT_MAX = 1000
 
@@ -96,6 +100,89 @@ def search_issues(
     url = f"{base}/rest/api/2/search"
     with bearer_session(token) as session:
         return _read_search(session, url, query, limit)
+
+
+def _check_status_name(status: str) -> None:
+    """Reject characters that a quoted JQL literal cannot represent safely.
+
+    Status names are always inserted as one double-quoted literal. Quotes,
+    backslashes, raw controls, and lone surrogates have no proven escape
+    grammar here, so they fail instead of being passed through. The message is
+    static and never echoes the requested value.
+    """
+    for char in status:
+        code = ord(char)
+        if (
+            char in {'"', "\\"}
+            or code < 0x20
+            or 0x7F <= code <= 0x9F
+            or code in {0x2028, 0x2029}
+            or 0xD800 <= code <= 0xDFFF
+        ):
+            raise AtlaWireError(
+                "Unsupported status name; use plain text without quotes, "
+                "backslashes, or control characters."
+            )
+
+
+def list_my_issues(
+    base_url: str,
+    *,
+    token: str,
+    status: str | None = None,
+    limit: int = 50,
+    allow_http_loopback: bool = False,
+) -> list[IssueRow]:
+    """Return the caller's open issues, optionally narrowed to one status name.
+
+    A non-empty ``status`` is quoted as a literal JQL string; an empty value
+    selects every issue whose status category is not Done. The fixed query is
+    passed to :func:`search_issues`, so pagination and limits are identical.
+    """
+    if status is not None and not isinstance(status, str):
+        raise AtlaWireError("Expected the status name as text.")
+    if status:
+        _check_status_name(status)
+        query = (
+            f'assignee = currentUser() AND status = "{status}" ORDER BY updated DESC'
+        )
+    else:
+        query = _MY_ISSUES_QUERY
+    return search_issues(
+        base_url,
+        query,
+        token=token,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def list_statuses(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[str]:
+    """Return the sorted unique status names visible on the configured instance.
+
+    Jira Server and Data Center expose the instance-wide status list at
+    ``/rest/api/2/status``. The complete response is validated before anything
+    is returned, so a malformed late entry cannot yield a partial list.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        values = get_json_array(session, f"{base}/rest/api/2/status", params={})
+    names: list[str] = []
+    for value in values:
+        if not isinstance(value, dict):
+            raise AtlaWireError("Expected Jira status objects.")
+        name = value.get("name")
+        if not isinstance(name, str) or not name:
+            raise AtlaWireError("Expected Jira statuses with non-empty names.")
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in name):
+            raise AtlaWireError("Expected Jira statuses with valid Unicode names.")
+        names.append(name)
+    return sorted(set(names))
 
 
 def _read_search(

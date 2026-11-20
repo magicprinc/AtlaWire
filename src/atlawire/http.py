@@ -72,9 +72,10 @@ def _check_status(status: int) -> None:
         raise AtlaWireError(f"HTTP {status}: request failed.")
 
 
-def get_json_object(
+def _get_json(
     session: requests.Session, url: str, *, params: Mapping[str, str | int]
-) -> dict[str, object]:
+) -> object:
+    """Perform one JSON request with the existing timeouts and validation."""
     try:
         with session.get(
             url, params=params, timeout=(5, 30), allow_redirects=False
@@ -92,8 +93,24 @@ def get_json_object(
         raise AtlaWireError(
             "Request failed; check connectivity and TLS settings."
         ) from None
+    return data
+
+
+def get_json_object(
+    session: requests.Session, url: str, *, params: Mapping[str, str | int]
+) -> dict[str, object]:
+    data = _get_json(session, url, params=params)
     if not isinstance(data, dict):
         raise AtlaWireError("Expected a JSON object.")
+    return data
+
+
+def get_json_array(
+    session: requests.Session, url: str, *, params: Mapping[str, str | int]
+) -> list[object]:
+    data = _get_json(session, url, params=params)
+    if not isinstance(data, list):
+        raise AtlaWireError("Expected a JSON array.")
     return data
 
 

@@ -9,15 +9,15 @@ open, and no product behavior or compatibility claim is made before it is tested
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branches`, `commits`,
   `file`, `pr` (show, files, comments, diff, and file), `issue` and `page` (JSON or Markdown),
-  `jql`, `cql`, `spaces`, and `children`. Check `git status` before resuming; preserve local
-  references and unrelated edits.
-- **Last verification:** 899 offline tests passed, including installed CLI subprocesses.
-  Ruff lint/format/security, Pyright, lock, and diff checks passed. History regressions
-  checked fixed filters, cursor gaps, and malformed metadata at the commit row cap.
+  `jql`, `mine`, `statuses`, `cql`, `spaces`, and `children`. Check `git status` before resuming;
+  preserve local references and unrelated edits.
+- **Last verification:** 937 offline tests passed using Python 3.15 outside a venv, including
+  installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
+  Jira regressions checked literal status filters and all-or-nothing status list output.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Jira `mine` and `statuses`. Reuse the JQL pager; distinguish the status
-  name list from search-result objects.
+- **Next slice:** Bitbucket `files` and `ls`. Distinguish the recursive file list from
+  immediate directory children; reuse the repository cursor pager.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -53,8 +53,10 @@ open, and no product behavior or compatibility claim is made before it is tested
   composition and narrow interfaces; share code only when it enforces the same contract.
   Review callers for knowledge of internals and test observable behavior at real boundaries.
   Use a design pattern only when it solves a concrete problem more simply.
-- **Constraints:** use the existing Python 3.15 user installation, no project venv. Do not
-  read secret files, run live writes, publish, or rewrite history while resuming this work.
+- **Constraints:** use the existing Python 3.15 user installation, no project venv.
+  Run tests directly with that interpreter and verify `sys.prefix == sys.base_prefix`;
+  do not use `uv run` or `uv sync` for this checkout. Do not read secret files, run live
+  writes, publish, or rewrite history while resuming this work.
 
 [jira-rest]: https://docs.atlassian.com/software/jira/docs/api/REST/8.22.0/
 
@@ -119,7 +121,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Bitbucket repository and PR-side file reads with one raw text transport,
       repository-relative path validation, and explicit tests for forked PRs.
 - [x] Port Bitbucket `branches` and `commits` using the repository cursor pager.
-- [ ] Port Jira `mine` and `statuses` with legacy output and offline tests for scoped status filters.
+- [x] Port Jira `mine` and `statuses` with legacy output and offline tests for scoped status filters.
+- [ ] Port Bitbucket `files` and `ls`, including capped directory pages without partial output.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve
