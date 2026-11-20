@@ -39,6 +39,32 @@ RELEASE = {
     "latestCommit": None,
     "isDefault": None,
 }
+EXACT_NAME = "Feature/Ü +&?"
+LOWER_BRANCH = {
+    "id": "refs/heads/lower",
+    "displayId": "feature/ü +&?",
+    "latestCommit": "b" * 40,
+    "isDefault": False,
+}
+PREFIX_BRANCH = {
+    "id": "refs/heads/prefix",
+    "displayId": "Feature/Ü +&?-old",
+    "latestCommit": None,
+    "isDefault": None,
+}
+EXACT_BRANCH = {
+    "id": "refs/heads/exact",
+    "displayId": EXACT_NAME,
+    "latestCommit": "c" * 40,
+    "isDefault": True,
+}
+BRANCH_FIRST_PAGE = {
+    "size": 1,
+    "limit": 100,
+    "isLastPage": False,
+    "nextPageStart": 7,
+    "values": [EXACT_BRANCH],
+}
 
 COMMIT_ONE = {
     "id": "a" * 40,
@@ -198,6 +224,151 @@ def test_branches_tsv_keeps_the_legacy_columns_and_server_order() -> None:
         f"# 2 row(s)\nname\tcommit\tdefault\nmain\t{'a' * 40}\tTrue\nrelease/ü+&?\t\t\n"
     )
     assert seen == [branch_request(0, filter_text=None)]
+    assert extra == []
+
+
+def test_branch_returns_the_exact_name_after_two_pages() -> None:
+    responses = [
+        (
+            200,
+            {
+                "size": 2,
+                "limit": 100,
+                "isLastPage": False,
+                "nextPageStart": 7,
+                "values": [LOWER_BRANCH, PREFIX_BRANCH],
+            },
+        ),
+        (
+            200,
+            {"size": 1, "limit": 100, "isLastPage": True, "values": [EXACT_BRANCH]},
+        ),
+    ]
+
+    result, seen, extra = run_history("branch", EXACT_NAME, responses=responses)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert json.loads(result.stdout) == {
+        "name": EXACT_NAME,
+        "id": "refs/heads/exact",
+        "commit": "c" * 40,
+        "default": True,
+    }
+    assert seen == [
+        branch_request(0, filter_text=EXACT_NAME),
+        branch_request(7, filter_text=EXACT_NAME),
+    ]
+    assert extra == []
+
+
+@pytest.mark.parametrize(
+    "candidate", [LOWER_BRANCH, PREFIX_BRANCH], ids=["case-only", "prefix-only"]
+)
+def test_branch_returns_null_for_a_case_or_prefix_only_candidate(
+    candidate: dict[str, object],
+) -> None:
+    responses = [
+        (
+            200,
+            {"size": 1, "limit": 100, "isLastPage": True, "values": [candidate]},
+        )
+    ]
+
+    result, seen, extra = run_history("branch", EXACT_NAME, responses=responses)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert json.loads(result.stdout) is None
+    assert result.stdout == "null\n"
+    assert seen == [branch_request(0, filter_text=EXACT_NAME)]
+    assert extra == []
+
+
+@pytest.mark.parametrize(
+    ("responses", "arguments", "detail"),
+    [
+        (
+            [
+                (200, BRANCH_FIRST_PAGE),
+                (200, {"values": [], "isLastPage": "true"}),
+            ],
+            (),
+            "isLastPage",
+        ),
+        (
+            [
+                (200, BRANCH_FIRST_PAGE),
+                (200, {"values": [], "isLastPage": False, "nextPageStart": 7}),
+            ],
+            (),
+            "nextPageStart",
+        ),
+        ([(200, BRANCH_FIRST_PAGE)], ("--max-pages", "1"), "page limit"),
+    ],
+    ids=["malformed-page", "non-advancing-cursor", "page-cap"],
+)
+def test_branch_fails_after_a_match_when_the_traversal_cannot_complete(
+    responses: list[tuple[int, object]],
+    arguments: tuple[str, ...],
+    detail: str,
+) -> None:
+    result, seen, extra = run_history(
+        "branch", EXACT_NAME, *arguments, responses=responses
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert detail in result.stderr
+    expected = [branch_request(0, filter_text=EXACT_NAME)]
+    if not arguments:
+        expected.append(branch_request(7, filter_text=EXACT_NAME))
+    assert seen == expected
+    assert extra == []
+
+
+def test_branch_fails_after_a_match_when_a_later_page_fails() -> None:
+    failure = (
+        503,
+        {"errors": [{"message": SENTINEL}], "token": TOKEN, "x": SENTINEL},
+    )
+
+    result, seen, extra = run_history(
+        "branch", EXACT_NAME, responses=[(200, BRANCH_FIRST_PAGE), failure]
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "HTTP 503" in result.stderr
+    for detail in (TOKEN, JIRA_TOKEN, CONFLUENCE_TOKEN, SENTINEL):
+        assert detail not in result.stderr
+    assert seen == [
+        branch_request(0, filter_text=EXACT_NAME),
+        branch_request(7, filter_text=EXACT_NAME),
+    ]
+    assert extra == []
+
+
+@pytest.mark.parametrize("name", ["", "   ", "\t\n"])
+def test_branch_rejects_a_blank_name_without_any_request(name: str) -> None:
+    result, seen, extra = run_history("branch", name, responses=[])
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr != ""
+    assert seen == []
+    assert extra == []
+
+
+@pytest.mark.parametrize("value", ["0", "1001"])
+def test_branch_page_count_outside_the_range_is_a_usage_error(value: str) -> None:
+    result, seen, extra = run_history(
+        "branch", EXACT_NAME, "--max-pages", value, responses=[]
+    )
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert seen == []
     assert extra == []
 
 

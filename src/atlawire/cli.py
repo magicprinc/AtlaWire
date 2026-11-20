@@ -20,6 +20,7 @@ from atlawire.bitbucket import (
     PullRequest,
     PullRequestComment,
     find_repositories,
+    get_branch,
     get_commit,
     get_commit_diff,
     get_commit_diff_text,
@@ -380,6 +381,41 @@ def branches(
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
     _print_branches(rows, as_json=as_json)
+
+
+@cli.command("branch")
+@click.argument("repo")
+@click.argument("name")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def branch_command(
+    repo: str,
+    name: str,
+    base_url: str,
+    token_from_env: bool,
+    max_pages: int,
+    allow_http_loopback: bool,
+) -> None:
+    """Print the branch with the exact display name NAME as JSON."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        row = get_branch(
+            base_url,
+            repo,
+            name,
+            token=token,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(row))
 
 
 @cli.command()

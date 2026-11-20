@@ -134,6 +134,63 @@ def test_a_non_encodable_branch_filter_is_rejected_before_the_session(
         )
 
 
+def test_get_branch_requires_an_exact_case_sensitive_display_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wanted = "Feature/Ü"
+    calls: list[tuple[str, str, str | None, int]] = []
+    rows = [
+        bitbucket.Branch(
+            name="feature/ü", id="refs/heads/lower", commit=None, default=None
+        ),
+        bitbucket.Branch(
+            name="Feature/Ü-old", id="refs/heads/prefix", commit=None, default=None
+        ),
+        bitbucket.Branch(
+            name=wanted, id="refs/heads/exact", commit="c" * 40, default=True
+        ),
+        bitbucket.Branch(
+            name=wanted, id="refs/heads/second", commit=None, default=None
+        ),
+    ]
+
+    def fake_list_branches(
+        base_url: str,
+        repo: str,
+        *,
+        token: str,
+        filter_text: str | None = None,
+        max_pages: int = 100,
+        allow_http_loopback: bool = False,
+    ) -> list[bitbucket.Branch]:
+        calls.append((base_url, repo, filter_text, max_pages))
+        return rows
+
+    monkeypatch.setattr(bitbucket, "list_branches", fake_list_branches)
+
+    row = bitbucket.get_branch(
+        BASE, "DEMO/widgets", wanted, token="fixture-only", max_pages=3
+    )
+
+    assert row == rows[2]
+    assert calls == [(BASE, "DEMO/widgets", wanted, 3)]
+
+
+@pytest.mark.parametrize("name", ["", "   ", "\t\n", 5, "x\x00", "\ud800"])
+def test_get_branch_rejects_an_invalid_name_before_the_session(
+    monkeypatch: pytest.MonkeyPatch, name: object
+) -> None:
+    def unexpected_session(token: str) -> object:
+        raise AssertionError("No session should be created.")
+
+    monkeypatch.setattr(bitbucket, "bearer_session", unexpected_session)
+
+    with pytest.raises(AtlaWireError):
+        bitbucket.get_branch(
+            BASE, "DEMO/widgets", cast(str, name), token="fixture-only"
+        )
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -155,6 +212,20 @@ def test_a_non_encodable_branch_filter_is_rejected_before_the_session(
 )
 def test_malformed_branch_metadata_is_rejected(value: object) -> None:
     with pytest.raises(AtlaWireError, match="branch"):
+        bitbucket._branch(value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"displayId": "\ud800", "id": "refs/heads/x"},
+        {"displayId": "x", "id": "\ud800"},
+        {"displayId": "x", "id": "refs/heads/x", "latestCommit": "\ud800"},
+    ],
+    ids=["name", "id", "commit"],
+)
+def test_a_non_encodable_projected_branch_field_is_rejected(value: object) -> None:
+    with pytest.raises(AtlaWireError, match="UTF-8"):
         bitbucket._branch(value)
 
 

@@ -756,6 +756,48 @@ def list_branches(
         )
 
 
+def get_branch(
+    base_url: str,
+    repo: str,
+    name: str,
+    *,
+    token: str,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> Branch | None:
+    """Return the branch whose display name is exactly ``name``.
+
+    ``name`` is one literal display name: it is never trimmed, lowercased, or
+    prefixed with ``refs/heads/``, because Git refs may differ only by case.
+    It must be non-blank UTF-8 text without control characters and is sent
+    verbatim as ``filterText`` on every page. The validated ``/branches`` route
+    is traversed to exhaustion through the shared pager, and the first
+    projected row whose ``displayId`` equals ``name`` byte for byte is
+    returned.
+
+    ``None`` means a complete successful traversal contained no exact match.
+    A malformed later page, a non-advancing cursor, a transport failure, or
+    the page cap still raises after an earlier candidate, so a partial walk is
+    never reported as the absence of a branch. No default-branch, metadata, or
+    link request is made.
+    """
+    wanted = _revision(name)
+    if not wanted.strip():
+        raise AtlaWireError("The branch name must be non-blank text.")
+    rows = list_branches(
+        base_url,
+        repo,
+        token=token,
+        filter_text=wanted,
+        max_pages=max_pages,
+        allow_http_loopback=allow_http_loopback,
+    )
+    for row in rows:
+        if row["name"] == wanted:
+            return row
+    return None
+
+
 def list_commits(
     base_url: str,
     repo: str,
@@ -2107,7 +2149,12 @@ def _branch(value: object) -> Branch:
         or (default is not None and not isinstance(default, bool))
     ):
         raise AtlaWireError("Invalid fields in a Bitbucket branch.")
-    return Branch(name=name, id=identifier, commit=commit, default=default)
+    return Branch(
+        name=_require_encodable(name, "branch name"),
+        id=_require_encodable(identifier, "branch ID"),
+        commit=_optional_encodable(commit, "branch commit"),
+        default=default,
+    )
 
 
 def _commit(value: object) -> Commit:

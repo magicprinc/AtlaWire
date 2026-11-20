@@ -34,6 +34,7 @@ No version has been released yet.
   the correct repository and commit for forked pull requests.
 - `atlawire branches` and `commits` list repository history with fixed filters across
   cursor requests and legacy-compatible TSV or JSON.
+- `atlawire branch` looks up one exact, case-sensitive branch display name.
 - `atlawire files` lists paths recursively; `atlawire ls` lists a directory's direct children.
 - `atlawire blame` lists the author, date, and commit for each line of a repository file.
 - `atlawire commit` retrieves one commit and checks its full ID against the requested ID or prefix.

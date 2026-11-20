@@ -183,6 +183,7 @@ not the paged file-content response. This response shape is verified offline onl
 
 ```shell
 atlawire branches DEMO/widgets --filter release --token-from-env
+atlawire branch DEMO/widgets release/next --token-from-env
 atlawire commits DEMO/widgets --at main --path src/app.py --limit 15 --token-from-env --json
 ```
 
@@ -190,6 +191,9 @@ Both commands follow the server cursor and preserve its order. `commits` returns
 requested count (default 15) and prints UTC dates. The TSV message matches the legacy
 `bbk` summary; JSON keeps the full message. An HTTP or pagination failure before completion
 or the requested row limit produces no partial rows.
+
+`branch` looks up the exact, case-sensitive display name. It prints a JSON object or `null`
+if no branch matches after all filtered pages are read.
 
 ## Review a Bitbucket commit
 
