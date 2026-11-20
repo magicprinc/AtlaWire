@@ -62,6 +62,18 @@ server page boundary. Independently read the expected IDs in server order, inclu
 the next page, and compare them with the CLI result. Use offline fixtures for induced
 later-page failure and cap exhaustion; those paths must fail without partial stdout.
 
+`find-repos` is deliberately bounded by `--limit`: it reads the visible project
+list in full first, then pages each project's repositories in server order and
+stops repository paging once the requested number of actual matches is reached.
+It neither reorders rows nor requests another repository page to prove that no
+later match exists. Treat a limited result as a prefix and report the limit; do
+not use it as evidence of absence.
+
+For cursor-paged Bitbucket reads, a present echoed `start` or `size` that
+disagrees with the requested cursor or returned row count is a failed read with
+no rows; an omitted echo is accepted. Cover that offline rather than assuming
+every 5.10 response echoes both fields.
+
 Record only the tested revision, sanitized command scope, fixed result labels, and
 counts. A single valid page is not evidence for all pagers. Use the
 [feedback template](FEEDBACK.md) for failures; do not attach payloads or raw logs.

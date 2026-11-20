@@ -42,6 +42,46 @@ SECOND = {
     "url": "/pages/viewpage.action?pageId=202",
     "_expandable": {"space": "/rest/api/space/IGNORED"},
 }
+OVERLAP_FIRST = {
+    "content": {
+        "id": "101",
+        "type": "page",
+        "title": "First",
+        "space": {"key": "DEMO"},
+    }
+}
+OVERLAP_SECOND = {
+    "content": {
+        "id": "202",
+        "type": "page",
+        "title": "Second",
+        "space": {"key": "DEMO"},
+    }
+}
+OVERLAP_SECOND_CHANGED = {
+    "content": {
+        "id": "202",
+        "type": "page",
+        "title": "Second with changed metadata",
+        "space": {"key": "DEMO"},
+    }
+}
+OVERLAP_THIRD = {
+    "content": {
+        "id": "303",
+        "type": "page",
+        "title": "Third",
+        "space": {"key": "DEMO"},
+    }
+}
+SURROGATE = {
+    "content": {
+        "id": "101",
+        "type": "page",
+        "title": "Cost \ud800",
+        "space": {"key": "DEMO"},
+    }
+}
 EXPECTED = [
     {
         "id": "101",
@@ -100,6 +140,36 @@ def fixture(
             "results": [FIRST],
             "_links": {"next": 5},
         }
+    if scenario == "overlap":
+        if start == 0:
+            return 200, {
+                "start": 0,
+                "size": 2,
+                "results": [OVERLAP_FIRST, OVERLAP_SECOND],
+            }
+        return 200, {
+            "start": start,
+            "size": 2,
+            "results": [OVERLAP_SECOND_CHANGED, OVERLAP_THIRD],
+        }
+    if scenario == "forgotten-total":
+        if start == 0:
+            return 200, {
+                "start": 0,
+                "size": 1,
+                "results": [FIRST],
+                "totalSize": 2,
+            }
+        return 200, {"start": start, "size": 0, "results": []}
+    if scenario == "surrogate":
+        if start == 0:
+            return 200, {
+                "start": 0,
+                "size": 1,
+                "results": [SURROGATE],
+                "totalSize": 1,
+            }
+        return 200, {"start": start, "size": 0, "results": [], "totalSize": 1}
     return 400, {"unexpectedStart": start}
 
 
@@ -183,6 +253,40 @@ def test_cql_projects_rows_and_pages_by_count(output: tuple[str, ...]) -> None:
             f"Bearer {TOKEN}",
         ),
     ]
+    assert intruder == []
+
+
+def test_cql_partial_overlap_fails_without_publishing_rows() -> None:
+    result, seen, intruder = run_cql("overlap", "--limit", "4", "--json")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "repeated" in result.stderr
+    assert len(seen) == 2
+    assert intruder == []
+
+
+def test_cql_empty_page_cannot_forget_a_known_total_size() -> None:
+    result, seen, intruder = run_cql("forgotten-total", "--limit", "3", "--json")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "empty page" in result.stderr
+    assert len(seen) == 2
+    assert intruder == []
+
+
+@pytest.mark.parametrize("output", [("--json",), ()], ids=["json", "tsv"])
+def test_cql_lone_surrogate_title_fails_without_partial_output(
+    output: tuple[str, ...],
+) -> None:
+    result, _seen, intruder = run_cql("surrogate", "--limit", "3", *output)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "content metadata" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert "UnicodeEncodeError" not in result.stderr
     assert intruder == []
 
 

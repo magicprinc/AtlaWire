@@ -89,7 +89,10 @@ from atlawire.jira import (
     search_issues,
 )
 
-_TSV_CONTROLS = re.compile(r"[\\\x00-\x1f\x7f-\x9f\u2028\u2029]")
+_TSV_CONTROLS = re.compile(
+    r"[\\\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e"
+    r"\u2028\u2029\u2066-\u2069\ud800-\udfff]"
+)
 _TSV_ESCAPES = {"\\": r"\\", "\t": r"\t", "\r": r"\r", "\n": r"\n"}
 _JQL_COLUMNS = "key\tstatus\ttype\tpriority\tassignee\tupdated\tsummary"
 _MINE_COLUMNS = "key\tstatus\ttype\tpriority\tupdated\tsummary"

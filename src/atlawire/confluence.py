@@ -3,6 +3,7 @@
 import json
 import re
 from collections.abc import Callable, Mapping
+from hashlib import sha256
 from typing import TypedDict
 from urllib.parse import parse_qs, urlsplit
 
@@ -176,7 +177,7 @@ def search_cql(
             label="search",
             empty_hint="narrow the query or retry.",
             project=_content_row,
-            identities=_content_identities,
+            identity=_content_identity,
         )
 
 
@@ -207,7 +208,7 @@ def list_spaces(
             label="space",
             empty_hint="retry the request.",
             project=_space_row,
-            identities=_space_identities,
+            identity=_space_identity,
         )
 
 
@@ -242,7 +243,7 @@ def list_children(
             label="child page",
             empty_hint="retry the request.",
             project=_child_row,
-            identities=_child_identities,
+            identity=_child_identity,
         )
 
 
@@ -264,10 +265,12 @@ def _read_rows[RowT](
     label: str,
     empty_hint: str,
     project: Callable[[dict[str, object]], RowT],
-    identities: Callable[[list[dict[str, object]]], list[str] | None],
+    identity: Callable[[dict[str, object]], str | None],
 ) -> list[RowT]:
     rows: list[RowT] = []
-    seen: set[str] = set()
+    seen_ids: set[str] = set()
+    seen_fallback_pages: set[bytes] = set()
+    known_total: int | None = None
     while len(rows) < limit:
         requested = limit - len(rows)
         page = get_json_object(
@@ -276,33 +279,61 @@ def _read_rows[RowT](
             params={**params, "start": len(rows), "limit": requested},
         )
         results, total = _page(page, len(rows), requested, label)
-        if not results:
-            # An empty page is the terminal signal of the count-based
-            # endpoints; a total that still owes rows means the answer is broken.
-            if total is not None and total > len(rows):
+        if total is not None:
+            # The endpoint may omit totalSize on a later page, but an earlier
+            # usable total is retained and a different value is a contradiction.
+            if known_total is not None and total != known_total:
                 raise AtlaWireError(
-                    f"Confluence {label} returned an empty page before all matches; "
-                    f"{empty_hint}"
+                    f"Confluence {label} totalSize changed between pages."
+                )
+            known_total = total
+        if known_total is not None and len(rows) + len(results) > known_total:
+            raise AtlaWireError(f"Inconsistent Confluence {label} pagination metadata.")
+        if not results:
+            if known_total is not None and known_total > len(rows):
+                raise AtlaWireError(
+                    f"Confluence {label} returned an empty page before all "
+                    f"matches; {empty_hint}"
                 )
             return rows
-        # The endpoint can cap a page or omit _links.next, so advance by what
-        # was actually read rather than by a link or a claimed total.
-        fingerprint = _page_fingerprint(results, identities)
-        if fingerprint in seen:
-            raise AtlaWireError(f"Confluence {label} returned a repeated page.")
-        seen.add(fingerprint)
+        _check_repeated_rows(results, identity, seen_ids, seen_fallback_pages, label)
+        # A server cap may shorten a page; the next offset uses the actual rows.
         rows.extend(project(result) for result in results)
     return rows
 
 
-def _page_fingerprint(
+def _check_repeated_rows(
     results: list[dict[str, object]],
-    identities: Callable[[list[dict[str, object]]], list[str] | None],
-) -> str:
-    stable = identities(results)
-    if stable is None:
-        return _raw_fingerprint(results)
-    return "ids:" + json.dumps(stable, ensure_ascii=True, separators=(",", ":"))
+    identity: Callable[[dict[str, object]], str | None],
+    seen_ids: set[str],
+    seen_fallback_pages: set[bytes],
+    label: str,
+) -> None:
+    has_anonymous = False
+    for result in results:
+        stable = identity(result)
+        if stable is None:
+            has_anonymous = True
+        elif stable in seen_ids:
+            raise AtlaWireError(f"Confluence {label} returned a repeated result.")
+        else:
+            seen_ids.add(stable)
+    if not has_anonymous:
+        return
+    # Matching visible fields alone do not identify an anonymous row; keep the
+    # whole-page fallback without retaining copies of earlier raw page bodies.
+    try:
+        canonical = json.dumps(
+            results, sort_keys=True, ensure_ascii=True, separators=(",", ":")
+        )
+    except RecursionError:
+        raise AtlaWireError(
+            f"Confluence {label} results are nested too deeply."
+        ) from None
+    fingerprint = sha256(canonical.encode("ascii")).digest()
+    if fingerprint in seen_fallback_pages:
+        raise AtlaWireError(f"Confluence {label} returned a repeated page.")
+    seen_fallback_pages.add(fingerprint)
 
 
 def _stable_id(value: object) -> str | None:
@@ -316,63 +347,36 @@ def _stable_id(value: object) -> str | None:
     return None
 
 
-def _content_identities(results: list[dict[str, object]]) -> list[str] | None:
-    """Identify a result page by every row's nonempty nested ``content.id``.
+def _content_identity(result: dict[str, object]) -> str | None:
+    """Identify one search result by its nonempty nested ``content.id``.
 
-    A repeated page may arrive with different presentation metadata, so a page
-    whose rows all carry stable identities is compared by the ordered list.
-    ``None`` asks for the raw-equality fallback when any identity is unavailable;
-    distinct identities never collapse.
+    The nested content ID is the only evidence used here; a result without it
+    falls back to raw equality so unrelated entity types never share an ID
+    namespace.
     """
-    identities: list[str] = []
-    for result in results:
-        content = result.get("content")
-        if not isinstance(content, dict):
-            return None
-        stable_id = _stable_id(content.get("id"))
-        if stable_id is None:
-            return None
-        identities.append(stable_id)
-    return identities
+    content = result.get("content")
+    if not isinstance(content, dict):
+        return None
+    stable_id = _stable_id(content.get("id"))
+    if stable_id is None:
+        return None
+    return "content-id:" + stable_id
 
 
-def _space_identities(results: list[dict[str, object]]) -> list[str] | None:
-    """Identify a space page by every row's nonempty top-level ``key``.
-
-    Keys are the space endpoint's stable identity. ``None`` asks for the
-    raw-equality fallback, and equal names never merge distinct spaces.
-    """
-    identities: list[str] = []
-    for result in results:
-        key = result.get("key")
-        if isinstance(key, str) and key:
-            identities.append(key)
-        else:
-            return None
-    return identities
+def _space_identity(result: dict[str, object]) -> str | None:
+    """Identify one space by its nonempty top-level ``key``, else raw equality."""
+    key = result.get("key")
+    if not isinstance(key, str) or not key:
+        return None
+    return "space-key:" + key
 
 
-def _child_identities(results: list[dict[str, object]]) -> list[str] | None:
-    """Identify a child page by every row's nonempty top-level ``id``.
-
-    ``id`` is the child endpoint's stable identity, so a repeated page is still
-    detected when its title or version changes; string and integer forms of the
-    same ID compare equal. ``None`` asks for the raw-equality fallback when any
-    identity is unavailable, and equal titles never merge distinct children.
-    """
-    identities: list[str] = []
-    for result in results:
-        stable_id = _stable_id(result.get("id"))
-        if stable_id is None:
-            return None
-        identities.append(stable_id)
-    return identities
-
-
-def _raw_fingerprint(results: list[dict[str, object]]) -> str:
-    return "raw:" + json.dumps(
-        results, sort_keys=True, ensure_ascii=True, separators=(",", ":")
-    )
+def _child_identity(result: dict[str, object]) -> str | None:
+    """Identify one child page by its nonempty top-level ``id``, else raw equality."""
+    stable_id = _stable_id(result.get("id"))
+    if stable_id is None:
+        return None
+    return "child-id:" + stable_id
 
 
 def _page(
@@ -410,6 +414,8 @@ def _page(
         not isinstance(total, int) or isinstance(total, bool) or total < 0
     ):
         raise AtlaWireError(f"Invalid Confluence {label} totalSize.")
+    if total is not None and total < offset + len(results):
+        raise AtlaWireError(f"Inconsistent Confluence {label} pagination metadata.")
     links = page.get("_links", {})
     if not isinstance(links, dict):
         raise AtlaWireError(f"Invalid Confluence {label} links.")
@@ -439,6 +445,15 @@ def _check_next(link: object, count: int, offset: int, label: str) -> None:
         raise AtlaWireError(f"Invalid Confluence {label} continuation offset.")
 
 
+def _valid_utf8(value: str) -> bool:
+    """Return whether output text can be encoded as strict UTF-8."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def _space_row(value: object) -> SpaceRow:
     if not isinstance(value, dict):
         raise AtlaWireError(_INVALID_SPACE)
@@ -453,7 +468,7 @@ def _space_text(item: dict[str, object], key: str) -> str | None:
     value = item.get(key)
     if value is None:
         return None
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not _valid_utf8(value):
         raise AtlaWireError(_INVALID_SPACE)
     return value
 
@@ -474,6 +489,8 @@ def _child_id(item: dict[str, object]) -> str | int | None:
         return None
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         raise AtlaWireError(_INVALID_CHILD)
+    if isinstance(value, str) and not _valid_utf8(value):
+        raise AtlaWireError(_INVALID_CHILD)
     return value
 
 
@@ -481,7 +498,7 @@ def _child_text(item: dict[str, object], key: str) -> str | None:
     value = item.get(key)
     if value is None:
         return None
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not _valid_utf8(value):
         raise AtlaWireError(_INVALID_CHILD)
     return value
 
@@ -527,6 +544,8 @@ def _content_id(
         return None
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         raise AtlaWireError(_INVALID_RESULT)
+    if isinstance(value, str) and not _valid_utf8(value):
+        raise AtlaWireError(_INVALID_RESULT)
     return value
 
 
@@ -536,7 +555,7 @@ def _text_value(
     value = content.get(key)
     if value is None:
         return _string(item, key)
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not _valid_utf8(value):
         raise AtlaWireError(_INVALID_RESULT)
     return value
 
@@ -550,7 +569,7 @@ def _space_key(content: dict[str, object], item: dict[str, object]) -> str | Non
         key = container.get("key")
         if key is None:
             continue
-        if not isinstance(key, str):
+        if not isinstance(key, str) or not _valid_utf8(key):
             raise AtlaWireError(_INVALID_RESULT)
         return key
     expandable = item.get("_expandable")
@@ -561,7 +580,7 @@ def _space_key(content: dict[str, object], item: dict[str, object]) -> str | Non
     path = expandable.get("space")
     if path is None:
         return None
-    if not isinstance(path, str):
+    if not isinstance(path, str) or not _valid_utf8(path):
         raise AtlaWireError(_INVALID_RESULT)
     return path.rsplit("/", 1)[-1] or None
 
@@ -588,6 +607,6 @@ def _string(container: dict[str, object], key: str) -> str | None:
     value = container.get(key)
     if value is None:
         return None
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not _valid_utf8(value):
         raise AtlaWireError(_INVALID_RESULT)
     return value

@@ -139,6 +139,12 @@ def test_project_issue_keeps_an_explicit_empty_link_name_as_empty_text() -> None
         ({}, "issue key"),
         ({"key": 1, "fields": {}}, "issue key"),
         ({"key": "", "fields": {}}, "issue key"),
+        ({"key": "demo-1", "fields": {}}, "issue key"),
+        ({"key": "DEMO", "fields": {}}, "issue key"),
+        ({"key": "DEMO-", "fields": {}}, "issue key"),
+        ({"key": " DEMO-1", "fields": {}}, "issue key"),
+        ({"key": "DEMO-1 extra", "fields": {}}, "issue key"),
+        ({"key": "DEMO-\ud800", "fields": {}}, "issue key"),
         ({"key": "DEMO-1"}, "issue fields"),
         ({"key": "DEMO-1", "fields": []}, "issue fields"),
         ({"key": "DEMO-1", "fields": {"summary": 1}}, "summary"),
@@ -152,6 +158,50 @@ def test_project_issue_keeps_an_explicit_empty_link_name_as_empty_text() -> None
     ],
 )
 def test_project_issue_rejects_malformed_rows(value: object, message: str) -> None:
+    with pytest.raises(AtlaWireError, match=message):
+        jira._project_issue(value)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        (
+            {"key": "DEMO-1", "fields": {"summary": "Cost \ud800"}},
+            "summary",
+        ),
+        (
+            {"key": "DEMO-1", "fields": {"updated": "2024-\ud800"}},
+            "updated",
+        ),
+        (
+            {"key": "DEMO-1", "fields": {"status": {"name": "\ud800"}}},
+            "status",
+        ),
+        (
+            {"key": "DEMO-1", "fields": {"issuetype": {"name": "\ud800"}}},
+            "type",
+        ),
+        (
+            {"key": "DEMO-1", "fields": {"priority": {"name": "\ud800"}}},
+            "priority",
+        ),
+        (
+            {"key": "DEMO-1", "fields": {"assignee": {"displayName": "\ud800"}}},
+            "assignee",
+        ),
+    ],
+    ids=[
+        "summary",
+        "updated",
+        "status",
+        "type",
+        "priority",
+        "assignee",
+    ],
+)
+def test_project_issue_rejects_lone_surrogates_in_output_text(
+    value: object, message: str
+) -> None:
     with pytest.raises(AtlaWireError, match=message):
         jira._project_issue(value)
 
@@ -239,6 +289,24 @@ def test_limit_is_enforced_when_server_returns_more_rows_than_requested(
     assert len(seen) == 1
 
 
+def test_duplicate_keys_beyond_the_requested_cap_are_deliberately_discarded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        page(
+            [issue("DEMO-1"), issue("DEMO-1")],
+            start=0,
+            max_results=50,
+            total=2,
+        )
+    ]
+
+    rows, seen = search(monkeypatch, pages, limit=1)
+
+    assert [row["key"] for row in rows] == ["DEMO-1"]
+    assert len(seen) == 1
+
+
 def test_page_larger_than_advertised_max_results_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -278,7 +346,19 @@ def test_empty_first_page_with_zero_total_is_success(
     assert len(seen) == 1
 
 
-def test_empty_page_after_a_shrinking_total_is_success(
+def test_a_later_total_that_contradicts_the_earlier_total_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        page([issue("DEMO-1")], start=0, max_results=50, total=3),
+        page([issue("DEMO-2")], start=1, max_results=50, total=2),
+    ]
+
+    with pytest.raises(AtlaWireError, match="total changed"):
+        search(monkeypatch, pages, limit=50)
+
+
+def test_a_terminal_total_that_contradicts_the_earlier_total_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pages = [
@@ -286,10 +366,58 @@ def test_empty_page_after_a_shrinking_total_is_success(
         page([], start=1, max_results=50, total=1),
     ]
 
-    rows, seen = search(monkeypatch, pages, limit=50)
+    with pytest.raises(AtlaWireError, match="total changed"):
+        search(monkeypatch, pages, limit=50)
 
-    assert [row["key"] for row in rows] == ["DEMO-1"]
-    assert [request["startAt"] for request in seen] == [0, 1]
+
+def test_an_empty_page_cannot_forget_a_previously_known_total(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        page([issue("DEMO-1")], start=0, max_results=50, total=3),
+        page([], start=1, max_results=50, include_total=False),
+    ]
+
+    with pytest.raises(AtlaWireError, match="empty page"):
+        search(monkeypatch, pages, limit=50)
+
+
+def test_row_cap_does_not_hide_a_page_that_contradicts_the_known_total(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        page([issue("DEMO-1")], start=0, max_results=1, total=3),
+        page(
+            [issue("DEMO-2"), issue("DEMO-3"), issue("DEMO-4")],
+            start=1,
+            max_results=3,
+            include_total=False,
+        ),
+    ]
+
+    with pytest.raises(AtlaWireError, match="Inconsistent"):
+        search(monkeypatch, pages, limit=2)
+
+
+def test_repeated_issue_keys_across_accepted_pages_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        page([issue("DEMO-1")], start=0, max_results=1, total=2),
+        page([issue("DEMO-1")], start=1, max_results=1, total=2),
+    ]
+
+    with pytest.raises(AtlaWireError, match="duplicate issue keys"):
+        search(monkeypatch, pages, limit=2)
+
+
+def test_repeated_issue_keys_within_one_page_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [page([issue("DEMO-1"), issue("DEMO-1")], max_results=2, total=2)]
+
+    with pytest.raises(AtlaWireError, match="duplicate issue keys"):
+        search(monkeypatch, pages, limit=2)
 
 
 def test_empty_page_with_outstanding_total_is_rejected(

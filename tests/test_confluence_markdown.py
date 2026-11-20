@@ -13,10 +13,21 @@ def page(storage: str, title: str = "Page") -> dict[str, object]:
     }
 
 
+BIDI_CONTROLS = (
+    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+BIDI_ESCAPES = "".join(f"\\u{ord(char):04x}" for char in BIDI_CONTROLS)
+
+
 def assert_no_raw_controls(text: str) -> None:
     for char in text:
         code = ord(char)
-        assert char in "\t\n" or not (code < 0x20 or 0x7F <= code <= 0x9F), repr(char)
+        assert char in "\t\n" or not (
+            code < 0x20
+            or 0x7F <= code <= 0x9F
+            or char in BIDI_CONTROLS
+            or 0xD800 <= code <= 0xDFFF
+        ), repr(char)
 
 
 def test_regular_structure_is_kept_without_active_links_or_images() -> None:
@@ -135,6 +146,33 @@ def test_code_macro_without_any_body_shows_marker_alone(name: str) -> None:
         "_Code conversion fallback: no plain-text code payload was available._\n"
     )
     assert "PARAM-SENTINEL" not in rendered
+
+
+def test_bidi_controls_and_surrogates_are_visibly_escaped() -> None:
+    storage = (
+        f"<p>Параграф {BIDI_CONTROLS} 日本語 ✓ 👨\u200d👩\u200d👧</p>"
+        '<ac:structured-macro ac:name="noformat"><ac:plain-text-body>'
+        f"<![CDATA[code {BIDI_CONTROLS}]]></ac:plain-text-body>"
+        "</ac:structured-macro>"
+    )
+
+    rendered = render_page_markdown(
+        page(storage, title=f"Résumé {BIDI_CONTROLS} \ud800")
+    )
+
+    assert_no_raw_controls(rendered)
+    for char in BIDI_CONTROLS:
+        assert char not in rendered
+        assert f"\\u{ord(char):04x}" in rendered
+    assert f"# Résumé {BIDI_ESCAPES} \\ud800" in rendered
+    assert f"Параграф {BIDI_ESCAPES} 日本語" in rendered
+    assert f"code {BIDI_ESCAPES}" in rendered
+    assert "\\ud800" in rendered
+    assert "Résumé" in rendered
+    assert "Параграф" in rendered
+    assert "日本語" in rendered
+    assert "✓" in rendered
+    assert "👨\u200d👩\u200d👧" in rendered
 
 
 def test_code_macro_escapes_controls_visibly() -> None:

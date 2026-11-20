@@ -15,21 +15,26 @@ open, and no product behavior or compatibility claim is made before it is tested
   and `children`.
   Check `git status` before resuming; preserve local references and unrelated edits.
 - **Last verification:** `C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests`
-  passed 1,433 offline tests with no failures or skips, including installed CLI
-  subprocesses and 47 cases for the live runner. Ruff lint/format/security, Pyright,
-  offline lock, and diff checks passed. The HTTP 206 regression requires a static
-  error with empty stdout. Runtime tests used installed `markdownify` 1.2.3; the
-  lock resolves 1.2.4.
+  passed 1,562 offline tests with no failures or skips, including installed CLI
+  regressions for paging, decoded response limits, invalid UTF-8, and safe output.
+  Ruff lint/format/security, Pyright, offline lock, and diff checks passed. The
+  independent reviewer found no blocker in the inspected flows but could not
+  independently verify the complete diff or rerun tests.
 - **Live evidence on this machine:** the existing BBK credentials authenticated to all
   three products. Independent read comparisons passed for Jira issue search and comments,
   Confluence search and page retrieval, and Bitbucket indexed Java search, PR inspection,
-  exact source bytes at a fixed commit, and two-page commit history. Empty Jira results
-  and missing objects on all three products also behaved as expected. This does not prove
-  other versions, proxies, or pagers.
+  exact source bytes at a fixed commit, and two-page commit history. The nine-check
+  live runner and the Bitbucket two-page comparison also passed after the audit fixes.
+  Earlier negative checks covered empty Jira results and missing objects across all
+  three products. This does not prove other versions, proxies, or pagers.
 - **Next:** use the [quickstart](docs/AGENT-QUICKSTART.md) on real Java tasks and
   capture practical blockers in the [feedback template](docs/FEEDBACK.md). Recheck the
   [live gate](docs/LIVE-READ-ONLY.md) on another deployment before relying on it. Do
   not add profiles, cross-issue comments, writes, or caching without practical evidence.
+- **BBK test coverage:** AtlaWire's `tests/` includes adapted read-only regressions
+  and independently authored checks. Passing it is not a full BBK test port or a
+  run of BBK's original suites; writes, unrelated integrations, and manual probes
+  are not part of this gate.
 - **Local credentials:** prefer `~/.config/AtlaWire/` for owner-managed settings.
   AtlaWire currently reads credentials from the process environment, not from a file.
   The approved live run reused BBK's existing store in memory; no credential migration.
@@ -240,12 +245,11 @@ workflow is exercised on the target and explicitly migrated.
       Python/platform compatibility and pin the build version when creating the project.
 - [ ] Decide non-secret configuration precedence (CLI options > environment > per-user config);
       never accept credentials as command-line arguments.
-- [x] Use the OS keyring by default for interactive credentials; allow explicit
-      environment/secret-provider overrides for non-interactive use. Fail clearly rather than
-      silently falling back to plaintext storage when a secure backend is unavailable.
-- [ ] Wire keyring and per-user profiles for both implemented commands. They currently require
-      explicit environment credentials. Verify corporate CA/proxy configuration and whether
-      each target instance needs an authentication mode other than bearer.
+- [x] Use explicit environment credentials for the read-only commands and live checks.
+      Keyring and per-user profiles are not implemented; revisit them only if real
+      work shows that the current secret-provider setup is a blocker.
+- [ ] Verify corporate CA/proxy configuration and other authentication modes if needed
+      for an intended deployment. Do not silently fall back from bearer authentication.
 - [ ] Decide the raw passthrough policy: which methods are allowed, how paths are validated
       against the configured base URL, and what exactly `--write` unlocks.
 - [ ] Decide the pagination contract: default page cap, `--all`, and the machine-readable
@@ -285,10 +289,9 @@ workflow is exercised on the target and explicitly migrated.
 - [ ] Specify cache policy before caching private API responses: profile/principal isolation,
       short TTL, bypass, write invalidation, and no credential headers or secret-bearing request
       bodies in the cache. Default to no response caching until these rules are tested.
-- [ ] Do not load `.env` implicitly in library or CLI code. For explicitly enabled live tests,
-      allow the developer's ignored local `.env` to be loaded by the test command (for example,
-      uv's explicit `--env-file` option); CI uses protected environment variables. Offline tests
-      must need no credentials.
+- [x] The library, CLI, and live runner do not load `.env` files. Use process
+      environment credentials for explicitly enabled live tests; offline tests need
+      no real credentials.
 - [ ] Keep credentials out of fixtures, logs, recordings, and command-line arguments.
 - [ ] Validate configuration on load with actionable errors and no secret echo.
 

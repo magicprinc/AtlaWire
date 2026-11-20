@@ -33,6 +33,12 @@ def fixture(scenario: str, path: str, start: int) -> tuple[int, dict[str, object
             }
         if scenario == "second-page":
             return 503, secret_error()
+        if scenario == "match-cap" and start == 0:
+            return 200, {
+                "values": ALPHA_ROWS,
+                "isLastPage": False,
+                "nextPageStart": 5,
+            }
         if scenario == "later-project":
             return 200, {
                 "values": [{"slug": "match", "name": "Match", "state": "AVAILABLE"}],
@@ -109,6 +115,20 @@ def test_find_repos_tsv_keeps_legacy_order_and_stops_at_the_exact_cap() -> None:
         "# 2 row(s)\nproject\tslug\tname\tstate\n"
         "ALPHA\twidgets\tWidgets UI\tAVAILABLE\n"
         "ALPHA\ttools\tWidget Utilities\tAVAILABLE\n"
+    )
+    assert seen == expected([(PROJECTS_PATH, 0), (ALPHA_PATH, 0)])
+
+
+def test_find_repos_stops_repository_paging_at_the_match_cap() -> None:
+    # The first repository page already holds the one requested match even though
+    # it is nonterminal; a second page would exceed the two-page budget.
+    result, seen = run_find("match-cap", "widget", "--limit", "1", "--max-pages", "2")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout == (
+        "# 1 row(s)\nproject\tslug\tname\tstate\n"
+        "ALPHA\twidgets\tWidgets UI\tAVAILABLE\n"
     )
     assert seen == expected([(PROJECTS_PATH, 0), (ALPHA_PATH, 0)])
 

@@ -122,6 +122,28 @@ def test_pull_requests_repeat_the_exact_filters_and_follow_the_server_cursor(
     ]
 
 
+def test_a_reached_row_cap_still_validates_the_echoed_page_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The cap returns before the next hint is needed, but not before the page it
+    # already consumed was checked as a whole.
+    page = {
+        "values": [FULL],
+        "isLastPage": True,
+        "size": 2,
+        "start": 0,
+    }
+
+    with pytest.raises(AtlaWireError, match="page size"):
+        call_pages(
+            monkeypatch,
+            [page],
+            lambda: bitbucket.list_pull_requests(
+                BASE, "DEMO/widgets", token="fixture-only", limit=1
+            ),
+        )
+
+
 def test_an_unspecified_order_is_omitted_and_the_default_state_is_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

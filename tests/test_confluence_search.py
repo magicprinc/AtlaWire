@@ -502,6 +502,144 @@ def test_repeated_page_without_nested_ids_falls_back_to_raw_equality(
         search(monkeypatch, pages, limit=2)
 
 
+def test_equal_anonymous_rows_do_not_establish_duplicate_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    anonymous = {"title": "Anonymous"}
+    pages = [
+        {"results": [anonymous, dict(anonymous)], "start": 0, "size": 2},
+        {"results": [dict(anonymous), ROW], "start": 2, "size": 2, "totalSize": 4},
+    ]
+
+    rows, seen = search(monkeypatch, pages, limit=4)
+
+    assert [row["id"] for row in rows] == [None, None, None, "1"]
+    assert len(seen) == 2
+
+
+def test_partially_overlapping_content_pages_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "results": nested_rows(["101", "102"], note="first"),
+            "start": 0,
+            "size": 2,
+        },
+        {
+            "results": nested_rows(["102", "103"], note="second"),
+            "start": 2,
+            "size": 2,
+        },
+    ]
+
+    with pytest.raises(AtlaWireError, match="repeated"):
+        search(monkeypatch, pages, limit=4)
+
+
+def test_repeated_content_id_within_one_page_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "results": nested_rows(["101", "101"], note="same"),
+            "start": 0,
+            "size": 2,
+        }
+    ]
+
+    with pytest.raises(AtlaWireError, match="repeated"):
+        search(monkeypatch, pages, limit=2)
+
+
+def test_an_empty_page_cannot_forget_a_known_total_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {"results": [ROW], "start": 0, "size": 1, "totalSize": 2},
+        {"results": [], "start": 1, "size": 0},
+    ]
+
+    with pytest.raises(AtlaWireError, match="empty page"):
+        search(monkeypatch, pages, limit=25)
+
+
+def test_rows_beyond_a_known_total_size_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {"results": [ROW], "start": 0, "size": 1, "totalSize": 1},
+        {
+            "results": nested_rows(["2", "3"], note="second"),
+            "start": 1,
+            "size": 2,
+        },
+    ]
+
+    with pytest.raises(AtlaWireError, match="Inconsistent"):
+        search(monkeypatch, pages, limit=3)
+
+
+def test_a_changed_total_size_between_pages_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {"results": [ROW], "start": 0, "size": 1, "totalSize": 3},
+        {"results": [BACKGROUND], "start": 1, "size": 1, "totalSize": 3},
+        {"results": [], "start": 2, "size": 0, "totalSize": 2},
+    ]
+
+    with pytest.raises(AtlaWireError, match="totalSize changed"):
+        search(monkeypatch, pages, limit=25)
+
+
+def test_a_known_total_size_still_allows_an_empty_page_that_omits_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {"results": [ROW], "start": 0, "size": 1, "totalSize": 2},
+        {"results": [BACKGROUND], "start": 1, "size": 1},
+        {"results": [], "start": 2, "size": 0},
+    ]
+
+    rows, seen = search(monkeypatch, pages, limit=25)
+
+    assert [row["id"] for row in rows] == ["1", "2"]
+    assert len(seen) == 3
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        {"content": {"id": "\ud800"}},
+        {"content": {"title": "\ud800"}},
+        {"content": {"type": "\ud800"}},
+        {"content": {"space": {"key": "\ud800"}}},
+        {"content": {"_links": {"webui": "\ud800"}}},
+        {"content": {}, "id": "\ud800"},
+        {"content": {}, "url": "\ud800"},
+        {"content": {}, "space": {"key": "\ud800"}},
+        {"content": {}, "_expandable": {"space": "/rest/api/space/\ud800"}},
+    ],
+    ids=[
+        "nested-id",
+        "title",
+        "type",
+        "nested-space",
+        "nested-webui",
+        "top-level-id",
+        "top-level-url",
+        "top-level-space",
+        "expandable-space",
+    ],
+)
+def test_content_rows_reject_lone_surrogates_in_output_text(
+    item: dict[str, object],
+) -> None:
+    with pytest.raises(AtlaWireError, match="content metadata"):
+        confluence._content_row(item)
+
+
 def test_a_later_request_failure_raises_instead_of_returning_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

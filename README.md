@@ -1,17 +1,28 @@
 # AtlaWire
 
-AtlaWire is a command-line interface and Python library under development for working with self-hosted
+AtlaWire is a read-only command-line interface and Python library for self-hosted
 Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server** and
-**Data Center** deployments that many agent integrations do not target. Its first supported
-product scope is deliberately these three products; the design should make independently
-maintained adapters for other products possible without promising them in the initial release.
+**Data Center** deployments. Commands are flat (for example `atlawire issue`,
+`atlawire pr`, `atlawire page`), not grouped into product subcommands.
 
-> **Status: local read-only use.** Core discovery and retrieval passed end-to-end
-> checks on one self-hosted Jira, Confluence, and Bitbucket setup. This is not a
-> general compatibility guarantee or a replacement for every `bbk` workflow.
-> Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), rerun the
-> [read-only checks](docs/LIVE-READ-ONLY.md) on another setup, and report practical
-> gaps using the [local feedback template](docs/FEEDBACK.md).
+## Status and verified scope
+
+- 28 read-only commands are implemented. There are no write, transition-execution,
+  raw-REST passthrough, profile/keyring, cache, or MCP features.
+- The package is unpublished and installed editably from this checkout. CPython 3.15
+  is the only tested runtime.
+- Offline unit, adapter-boundary, and installed-CLI loopback tests pass on this
+  machine. Some checks are run locally with `ruff` and `pyright`; no CI workflow is
+  configured and no project-wide quality threshold is claimed.
+- Core read-only workflows passed on one self-hosted setup. Recheck bearer
+  authentication, permissions, TLS, and the relevant reads on any other deployment;
+  no supported-version matrix is published.
+- Use JSON for exact values. TSV keeps the documented column order but escapes
+  text for display; Markdown is for reading.
+
+Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), verify a deployment
+with the [read-only runbook](docs/LIVE-READ-ONLY.md), and report practical gaps with
+the [feedback template](docs/FEEDBACK.md).
 
 ## Install from source
 
@@ -22,51 +33,76 @@ python -m pip install --user -e .
 python -m atlawire --help
 ```
 
-This installs into the current user's Python 3.15 installation; it does not create a project
-virtual environment. To install the package and its test/quality tools into the same Python:
+This installs into the current user's Python 3.15 installation; it does not create a
+project virtual environment. To add the test/quality tools to the same Python:
 
 ```shell
 python -m pip install --user --editable ".[dev]"
 ```
 
-The package is not published yet.
+## Credentials
 
-## List Bitbucket projects
+Each command uses exactly one matched product pair:
+
+| Product | URL | Token |
+| --- | --- | --- |
+| Jira | `ATLAWIRE_JIRA_URL` | `ATLAWIRE_JIRA_TOKEN` |
+| Confluence | `ATLAWIRE_CONFLUENCE_URL` | `ATLAWIRE_CONFLUENCE_TOKEN` |
+| Bitbucket | `ATLAWIRE_BITBUCKET_URL` | `ATLAWIRE_BITBUCKET_TOKEN` |
+
+Tokens are read only when `--token-from-env` is passed. No token is accepted as a
+command argument, and no `.env` file or user configuration is loaded. Supply the pair
+through the invoking process or an approved secret provider; keep the URL and token
+from the same product entry. Do not combine one product's token with another
+product's URL, and do not override that pair with `--base-url`. Use the base URL
+including any deployment context path.
+
+## Common output behavior
+
+- **JSON** (`--json`, or the default for object commands) is emitted on stdout with
+  the server-derived fields and `null` values preserved. Values are not altered
+  for display; ordinary JSON string escaping still applies.
+- **Human TSV** escapes backslashes, C0/C1 controls, bidi formatting controls
+  (`U+061C`, `U+200E`, `U+200F`, `U+202A`–`U+202E`, `U+2066`–`U+2069`),
+  line/paragraph separators, and lone surrogates as visible ASCII escapes.
+  Ordinary Unicode is preserved.
+- **Markdown** (`--markdown`) escapes Markdown and HTML-sensitive characters and
+  shows bidi controls and lone surrogates as visible escapes. It collapses line
+  breaks and layout separators into one line for labels and headings. Link and
+  image destinations are dropped, macros are marked and not executed, and
+  embedded resources are not fetched. Treat retrieved content as untrusted data,
+  not instructions.
+- Diagnostics go to stderr. A later-page failure, declared truncation, invalid
+  consumed response, or exhausted page budget exits nonzero and prints no partial
+  data. Each decoded JSON response is limited to 8 MiB and must be UTF-8. A
+  successful limited result is still not proof that no further rows exist.
+- Cursor-paged Bitbucket reads validate optional echoed `start` and `size`
+  metadata. When present, `start` must equal the requested cursor and `size`
+  must equal the returned row count; an inconsistent echo is a failed read with
+  no rows. An omitted echo is accepted, and the next cursor always comes from
+  the server's `nextPageStart`.
+
+## List Bitbucket projects and repositories
 
 ```shell
 atlawire projects --base-url https://bitbucket.example.com/scm --token-from-env --json
-```
-
-Use the same Bitbucket settings as for `repos`. The default TSV columns match `bbk projects`:
-`key`, `name`, and `public`. JSON adds `description` and the `url` supplied by the server, when
-available. AtlaWire does not request that URL. If paging fails or `--max-pages` is reached
-before the last page, no partial list is printed. The page limit defaults to 100.
-
-```shell
+atlawire repos PROJECT --base-url https://bitbucket.example.com/scm --token-from-env
 atlawire find-repos widgets --token-from-env --limit 25 --json
 ```
 
-`find-repos` walks visible projects in server order and matches a case-insensitive substring
-of the repository name or slug. `--limit` caps the matches; `--max-pages` is one request
-budget across both project and repository lists (default 100). A later request failure or an
-exhausted budget produces no partial list.
+`projects` uses the `bbk` TSV columns `key`, `name`, and `public`; JSON adds
+`description` and a server-supplied `url` when available. `repos` uses
+`slug`, `name`, `state`, and `public`.
 
-## List Bitbucket repositories
-
-With `ATLAWIRE_BITBUCKET_TOKEN` supplied by your secret provider, run:
-
-```shell
-atlawire repos PROJECT --base-url https://bitbucket.example.com/scm --token-from-env
-atlawire repos PROJECT --base-url https://bitbucket.example.com/scm --token-from-env --json
-```
-
-Use the actual base URL, including any deployment context path. It can also come from
-`ATLAWIRE_BITBUCKET_URL`. The default output uses the same TSV columns as `bbk repos` but
-escapes backslashes and control characters so every repository stays on one row. `--json`
-outputs the original field values as a JSON array. AtlaWire follows the server's `nextPageStart` and returns no
-rows if any page fails or the page limit is reached. This first command uses bearer credentials
-and HTTPS without redirects. Keyring and custom proxy/CA configuration are not wired yet.
-See the [Bitbucket Server 5.10 REST reference](https://docs.atlassian.com/bitbucket-server/rest/5.10.0/bitbucket-rest.html).
+`find-repos` reads the visible project list in full first, then pages each
+project's repositories in server order and matches a case-insensitive substring
+of the repository name or slug. Repository paging stops once `--limit` matches
+are found: it does not reorder the server's rows, request another repository
+page, or start another project after that cap. `--limit` caps matches (default
+25); `--max-pages` is one request budget shared by the project list and every
+repository page (default 100). A later request failure, or an exhausted budget
+before the limit is reached, produces no partial list. Reaching the limit does
+not prove that no further matches exist.
 
 ## Search indexed Bitbucket code
 
@@ -75,419 +111,189 @@ atlawire search 'WidgetService' --repo DEMO/widgets --token-from-env
 atlawire search 'WidgetService' --project DEMO --all --limit 50 --token-from-env --json
 ```
 
-`search` uses the Bitbucket Search plugin and makes one read-only search request by default
-(`--limit` defaults to 20). `--all` follows the plugin cursor for up to 20 requests and at
-most 999 files. A failed request or invalid page produces no partial results. JSON
-distinguishes server-highlighted lines (`hits`) from surrounding `context` and reports
+`search` makes one read-only search request by default (`--limit` defaults to 20).
+`--all` follows the plugin cursor for up to 20 requests and at most 999 files. A
+failed request or invalid page produces no partial results. JSON distinguishes
+server-highlighted lines (`hits`) from surrounding `context` and reports
 `matchEvidence` as `highlight`, `context-only`, or `none`.
 
-This searches indexed content, typically on the default branch, not every file or branch.
-It is not a regex search. Repository-scoped Java identifier discovery passed on the
-tested live plugin instance; other deployments may differ.
+The index typically covers the default branch, matches exact terms, and has no regex
+or extension filter. This is not a content search of every file or branch.
 
-## Retrieve a Bitbucket pull request
+## Retrieve Bitbucket pull requests
 
 ```shell
 atlawire prs DEMO/widgets --state ALL --order OLDEST --limit 25 --token-from-env
-```
-
-`prs` lists a repository's pull requests in server order. It defaults to open requests,
-up to 25 rows. Use `--json` for the same fields as TSV with nulls preserved. The command
-follows the server cursor with the same filters on every page and prints no partial list
-if a page fails or the page budget is exhausted before completion.
-
-```shell
 atlawire my-prs --role REVIEWER --state OPEN --participant-status NEEDS_WORK --token-from-env
-```
-
-`my-prs` uses the authenticated user's dashboard, not a repository listing. It defaults
-to `OPEN` and `AUTHOR` and does not accept `ALL`. The repository is the PR's target
-repository, even for a fork. Inactive reviewer and participant names are deduplicated;
-TSV prints them as a JSON array in one cell.
-
-```shell
 atlawire pr DEMO/widgets 123 --token-from-env
 ```
 
-Use the same Bitbucket settings as for `repos`. `show` is an optional third argument. Unlike
-`bbk pr show`, AtlaWire returns the server's JSON object without compacting it. It verifies the
-returned PR ID and does not request any links in the response.
+`prs` lists a repository's pull requests in server order, defaults to open requests
+with up to 25 rows, and prints no partial list if a later page fails or the page
+budget is exhausted. `my-prs` uses the authenticated user's dashboard, defaults to
+`OPEN` and `AUTHOR`, and does not accept `ALL`; inactive reviewer names are
+deduplicated and printed in one TSV cell as a JSON array.
+
+`pr` returns the server JSON object and verifies the returned PR ID. It does not
+request links found in the response.
+
+### Pull request files, comments, commits, and diffs
 
 ```shell
 atlawire pr DEMO/widgets 123 files --token-from-env --json
-```
-
-For `files`, the default TSV columns are `path`, `type`, and `node`; `--json` returns those
-fields as an array of objects. Bitbucket 5.10 can cap the list in one response. If the response
-reaches the reported cap or otherwise indicates truncation, AtlaWire fails without printing
-partial rows. This can also reject a list that happens to fit the cap exactly.
-
-```shell
 atlawire pr DEMO/widgets 123 comments --token-from-env --json
-```
-
-`comments` reads PR comment activity. TSV uses the legacy columns `id`, `author`, `path`,
-`line`, and `text`, and collapses whitespace in the text. JSON keeps the original text and
-adds `created` in the units supplied by the server. The command does not flatten replies
-or merge repeated activities into threads. It reads up to 100 pages by default
-(`--max-pages` accepts 1–1000) and prints no partial results if a page fails or the cap is
-reached before the last page.
-
-```shell
 atlawire pr DEMO/widgets 123 commits --token-from-env --json
-```
-
-`commits` lists all commits in the pull request in server order, subject to the page limit
-shared with `comments`. TSV shows a UTC date and a one-line message summary; JSON preserves
-the full message. A failed page produces no partial list.
-
-```shell
 atlawire pr DEMO/widgets 123 diff --token-from-env
-atlawire pr DEMO/widgets 123 diff --token-from-env --json
 atlawire pr DEMO/widgets 123 diff src/new.py --source-path src/old.py --token-from-env
-```
-
-`diff` prints a text review view; use `--json` for the decoded Bitbucket response. The text
-view ignores whitespace differences, shows markers where no textual hunks were provided, and
-is not a patch to apply. Use `--context` for 0–100 lines of context (default 3). Pass a
-repository-relative path to review one file, and supply `--source-path` with its old path if
-the file was renamed, moved, or copied. Both formats reject declared truncation, including
-nested flags. AtlaWire cannot detect an unflagged server cap and does not attempt automatic
-per-file fallback.
-
-## Read a Bitbucket source file
-
-```shell
-atlawire file DEMO/widgets src/app.py --at main --token-from-env
 atlawire pr DEMO/widgets 123 file src/app.py --side old --token-from-env
 ```
 
-`file` defaults to the `master` ref. `pr … file` defaults to `new` (source); `old` selects
-the target. AtlaWire uses the selected side's repository and full commit ID, including for
-forks on the configured instance. Paths must be repository-relative. Dot segments,
-backslashes, and percent-escape spellings are rejected before any request.
+`files` uses the TSV columns `path`, `type`, and `node`; a response that may be
+capped is rejected without partial rows. `comments` uses `id`, `author`, `path`,
+`line`, and `text`, and does not merge replies into threads. `commits` lists PR
+commits in server order. Both page up to 100 pages by default (`--max-pages`
+accepts 1–1000).
 
-These commands accept UTF-8 `text/plain` up to 1 MiB after decompression. They preserve
-LF, CRLF, and trailing whitespace, reject unsafe terminal controls, and add no newline.
-Oversized, partial, or invalid responses produce no file output.
+`diff` prints a review view, not an applyable patch. It ignores whitespace
+differences, shows markers where no textual hunks were provided, accepts 0–100
+context lines (default 3), and can select one repository-relative path with an
+optional previous path for a rename or move. `--json` returns the decoded server
+diff. Declared truncation is rejected at every known level; an unflagged server cap
+cannot be detected and no automatic per-file fallback is attempted. `pr … file`
+defaults to the `new` side; `old` selects the target.
 
-## Attribute lines in a Bitbucket file
+## Read Bitbucket files, branches, and commits
 
 ```shell
+atlawire file DEMO/widgets src/app.py --at main --token-from-env
+atlawire files DEMO/widgets --at main --token-from-env
+atlawire ls DEMO/widgets src --at main --token-from-env --json
 atlawire blame DEMO/widgets src/app.py --at main --token-from-env
-```
-
-`blame` lists line numbers, authors, UTC dates, and commits. `--json` also includes email
-addresses when the server supplies them. It expects the blame-only array used by `bbk`,
-not the paged file-content response. This response shape is verified offline only.
-
-## List Bitbucket branches and commits
-
-```shell
 atlawire branches DEMO/widgets --filter release --token-from-env
 atlawire branch DEMO/widgets release/next --token-from-env
 atlawire commits DEMO/widgets --at main --path src/app.py --limit 15 --token-from-env --json
-```
-
-Both commands follow the server cursor and preserve its order. `commits` returns up to the
-requested count (default 15) and prints UTC dates. The TSV message matches the legacy
-`bbk` summary; JSON keeps the full message. An HTTP or pagination failure before completion
-or the requested row limit produces no partial rows.
-
-`branch` looks up the exact, case-sensitive display name. It prints a JSON object or `null`
-if no branch matches after all filtered pages are read.
-
-## Review a Bitbucket commit
-
-```shell
 atlawire commit DEMO/widgets abc1234 --token-from-env
 atlawire commit-changes DEMO/widgets abc1234 --token-from-env --json
 atlawire commit-diff DEMO/widgets abc1234 src/app.py --token-from-env
 ```
 
-`commit` returns the server's JSON for a 7–40 character hexadecimal commit ID. It checks
-that the returned full ID matches the requested ID or abbreviation.
+`file` prints one file exactly as stored, up to 1 MiB of UTF-8 `text/plain` after
+decompression. It preserves line endings and trailing whitespace, rejects unsafe
+terminal controls, and adds no newline. Paths must be repository-relative; dot
+segments, backslashes, and percent-escape spellings are rejected before any request.
 
-`commit-changes` follows the server cursor for changed paths. `commit-diff` shows a review
-view, not a patch to apply. It takes a 7–40 character hexadecimal commit ID and optional
-relative paths. With `--json`, the whole diff is an object; explicit paths give an array in
-request order. A declared truncation or a later request failure produces no output. The
-command does not detect unflagged server caps or attempt automatic fallback.
+`files` recursively lists paths, one escaped path per line. `ls` lists the immediate
+children of a directory, or the repository root when no path is supplied. `blame`
+prints line, author, UTC date, and commit; JSON also includes email addresses when
+the server supplies them. It expects the blame-only array shape used by `bbk`.
 
-## Browse a Bitbucket repository
+`branches` and `commits` follow the server cursor and preserve server order.
+`commits` returns up to the requested count (default 15) and prints UTC dates; JSON
+keeps the full message. `branch` looks up the exact, case-sensitive display name and
+prints a JSON object or `null` if no match is found after all filtered pages.
 
-```shell
-atlawire files DEMO/widgets --at main --token-from-env
-atlawire ls DEMO/widgets src --at main --token-from-env --json
-```
+`commit` accepts a 7–40 character hexadecimal commit ID and verifies the returned
+full ID. `commit-changes` lists changed paths. `commit-diff` prints a review view,
+not a patch. In JSON mode it returns one object for a whole commit or an array
+in request order for explicit paths. Declared truncation or a later failure
+produces no output.
 
-`files` recursively lists file paths, one escaped path per line. `ls` lists only the
-immediate children of the requested directory, or the repository root if no path is supplied.
-Its default TSV columns are `path`, `type`, and `size`. Both support `--json`, use the
-server's default branch if `--at` is omitted, and print no partial list on failure.
-
-## Retrieve a Jira issue
-
-With `ATLAWIRE_JIRA_TOKEN` supplied by your secret provider, run:
+## Retrieve Jira issues and comments
 
 ```shell
 atlawire issue DEMO-42 --base-url https://jira.example.com/jira --token-from-env
-```
-
-The command accepts a key or a Jira browse URL and returns issue JSON by default, with
-`renderedFields` requested. The destination comes only from `--base-url` or
-`ATLAWIRE_JIRA_URL`; a pasted browse URL provides the key, not the server.
-
-Add `--markdown` for a readable issue summary, description, and comments. AtlaWire matches
-rendered comments by ID and falls back to fenced raw text where needed. It reports known
-incomplete comment lists instead of making more requests. Converted HTML keeps link labels
-and image alt text, not their destinations. Treat the Markdown as untrusted content.
-
-See the [Jira Server 8.22 REST reference](https://docs.atlassian.com/software/jira/docs/api/REST/8.22.0/).
-
-## Read comments on a Jira issue
-
-```shell
+atlawire issue DEMO-42 --token-from-env --markdown
 atlawire issue-comments DEMO-42 --token-from-env
-```
-
-`issue-comments` returns the comments visible to your Jira account as JSON. It preserves
-the original body text and follows Jira's offsets, even when the server caps a page.
-It prints no partial thread on pagination errors, duplicate IDs, or a failed request.
-Change the default 100-page budget with `--max-pages`.
-
-## Check your Jira identity
-
-```shell
 atlawire jira-me --token-from-env
 ```
 
-`jira-me` reads the current user from the configured Jira instance and prints `name`,
-`displayName`, and `email` as JSON. Jira may omit the display name or email; missing values
-are returned as `null`. The command does not look up other users or check permissions.
+`issue` accepts a key or a Jira browse URL and returns issue JSON with
+`renderedFields` requested. A pasted browse URL supplies the key, not the request
+destination; the destination comes only from `--base-url` or `ATLAWIRE_JIRA_URL`.
+`--markdown` renders a summary, description, and comments, matches rendered comments
+by ID, falls back to fenced raw text where needed, and reports known incomplete
+comment lists instead of making more requests.
 
-## Search Jira with JQL
+`issue-comments` returns the visible comments as JSON, preserving body text and
+following Jira offsets even when the server caps a page. It prints no partial thread
+on pagination errors, duplicate IDs, or a failed request. The page budget defaults to
+100 and is set with `--max-pages`.
+
+`jira-me` prints `name`, `displayName`, and `email` as JSON; missing values are
+`null`. It does not look up other users or check permissions.
+
+## Search Jira and list your work
 
 ```shell
 atlawire jql "assignee = currentUser() ORDER BY updated DESC" --token-from-env --limit 25 --json
-```
-
-Use the same Jira URL and credentials as for `issue`. The default is TSV with the same columns
-as `bbk jql`; `--json` emits an array and preserves `null` for missing status, type, priority,
-and assignee. `--limit` defaults to 50 and accepts 1–1000. AtlaWire follows multiple pages when
-Jira returns fewer results per page. A failed or inconsistent page produces an error without
-publishing partial rows. If Jira omits the total, a short page alone does not prove completion.
-
-## List your Jira issues and available statuses
-
-```shell
 atlawire mine --token-from-env
 atlawire mine --status "In Progress" --token-from-env --json
 atlawire statuses --token-from-env
-```
-
-`mine` lists your issues outside the Done category by default, newest updates first. With
-`--status`, it filters to one exact name. Double quotes, backslashes, and control characters
-are not supported in the filter. It uses the same pagination and limit as `jql`.
-`statuses` prints sorted unique names, one per line; `--json` returns an array of names.
-
-## List available Jira transitions
-
-```shell
 atlawire transitions DEMO-42 --token-from-env --json
 ```
 
-`transitions` lists the workflow actions Jira offers for an issue. It keeps the transition
-name separate from the destination status and never changes the issue. Pass an issue key
-or a browse URL; the request always goes to the configured Jira instance.
+`jql` uses the `bbk` TSV columns and preserves `null` for missing status, type,
+priority, and assignee in JSON. `--limit` defaults to 50 and accepts 1–1000. A
+failed or inconsistent page produces an error without partial rows; if Jira omits
+the total, a short page alone does not prove completion. `mine` lists your issues
+outside the Done category by default, newest updates first; `--status` filters to
+one exact name and does not support double quotes, backslashes, or control
+characters. `statuses` prints sorted unique names, one per line.
 
-## Retrieve a Confluence page
+`transitions` lists the workflow actions Jira offers for an issue, keeping the
+transition name separate from the destination status. It never changes the issue.
 
-With `ATLAWIRE_CONFLUENCE_TOKEN` supplied by your secret provider, run:
+## Read Confluence pages and spaces
 
 ```shell
 atlawire page 12345 --base-url https://wiki.example.com/confluence --token-from-env
-```
-
-You can also set `ATLAWIRE_CONFLUENCE_URL`. The command returns page JSON, including
-`body.storage.value` (XHTML). A pasted absolute page link with one `pageId` parameter supplies
-the ID only; credentials go to the configured instance.
-
-Add `--markdown` for readable text, simple tables, and code blocks. Unsupported macros are
-marked, not executed, and no embedded resources are fetched.
-
-## Search Confluence with CQL
-
-```shell
+atlawire page 12345 --token-from-env --markdown
 atlawire cql "type = page AND space = DEMO" --token-from-env --limit 25 --json
-```
-
-Use the same Confluence settings as for `page`. The default is TSV with the `bbk cql` columns
-`id`, `space`, `type`, `title`, and `url`; `--json` outputs an array. The limit defaults to 25
-and accepts 0–1000. AtlaWire keeps the original query and configured endpoint for every page,
-including when a server sends a continuation link. A failed or invalid page produces no
-partial output.
-
-## List Confluence spaces
-
-```shell
 atlawire spaces --token-from-env
-```
-
-Use the same Confluence settings as for `page`. The default output is TSV with the `bbk spaces`
-columns `key`, `name`, and `type`; add `--json` for an array. The limit defaults to 100 and
-accepts 0–1000. A failed or invalid page produces no partial output.
-
-## List direct Confluence child pages
-
-```shell
 atlawire children 12345 --token-from-env --json
 ```
 
-Pass a parent page ID or a pasted page URL containing one `pageId`. The URL supplies only
-the ID. The default TSV columns are `id`, `title`, and `version`; `--json` preserves missing
-versions as `null`. The limit defaults to 100 and accepts 0–1000. This lists direct children
-only and does not print partial results on failure.
+`page` returns page JSON including `body.storage.value` (XHTML). A pasted page link
+with one `pageId` parameter supplies the ID only; credentials go to the configured
+instance. `--markdown` renders readable text, simple tables, and code blocks.
+Unsupported macros are marked, not executed, and no embedded resources are fetched.
 
-## Problem
+`cql` uses the `bbk` columns `id`, `space`, `type`, `title`, and `url`; `--limit`
+defaults to 25 and accepts 0–1000. `spaces` uses `key`, `name`, and `type`; it
+defaults to 100. `children` lists direct children with `id`, `title`, and `version`;
+it defaults to 100. These limits accept 0–1000. A zero limit is an explicit empty
+request. A failed or invalid page produces no partial output.
 
-Agent tooling for Atlassian usually assumes the newest Cloud API, a fixed set of operations, or
-an extra service such as an MCP server. Corporate installations are often older, self-hosted,
-and reachable only from inside a private network. The goal is direct, scriptable access to what
-the installed version actually supports, with output that is safe to parse and failures that are
-explicit rather than guessed.
+## Not implemented
 
-## Design goals (not implemented)
-
-- **One tool, two entry points.** A single CLI plus an importable Python library built on the
-  same core, so interactive use, scripts, and agents share behavior instead of drifting apart.
-- **Legacy versions are a first-class target.** Compatibility with Server and Data Center
-  releases is established by a documented, test-backed version matrix — not by assuming one
-  modern API response generalizes to every installation.
-- **Machine-safe output.** JSON on stdout, diagnostics on stderr, documented exit codes, and no
-  banners, color codes, progress bars, or prompts in machine-readable mode.
-- **Bounded, honest pagination.** Page limits by default, an explicit full-fetch mode only when
-  requested, and partial results reported as partial instead of silently truncated.
-- **No daemon.** The tool runs, does its work, and exits: no background service or listening
-  port. Any persistent cache or working data belongs in a standard per-user data/cache
-  directory, never in the source checkout by default.
-- **Works with the current user's setup.** Configuration, cache, and working data use standard
-  per-user locations for the operating system, with explicit overrides for users and agent
-  deployments. Credentials remain in the user's OS credential store, not in the cache.
-- **Safe writes by default.** Generic REST access is read-only unless a mutating request is
-  explicitly authorized; destructive convenience commands require explicit confirmation.
-- **Clear trust boundaries.** TLS verification stays on; credentials stay out of plaintext
-  files, command arguments, logs, and URLs; requests stay constrained to the configured
-  instance so a crafted path cannot leak credentials elsewhere.
-- **Reproducible checks.** Linting, typing, and tests run from a clean checkout; a live-instance
-  suite is opt-in and never required for ordinary CI.
-
-## Current non-goals
-
-- Claiming Cloud or self-hosted feature parity before publishing version-specific test evidence.
-- Cloud support in the initial release; the initial target is self-hosted Jira, Confluence, and
-  Bitbucket.
-- An MCP server or any always-running component.
-- Bulk administration, migration, or backup tooling.
-- Storing credentials in plaintext configuration files.
-- Publishing a package or claiming supported versions before the version matrix and tests
-  exist.
-
-## Planned shape
-
-Commands are expected to be grouped by product (`jira`, `confluence`, `bitbucket`) around a
-shared configuration, credential, and HTTP core, with a generic REST passthrough for endpoints
-that have no dedicated command. That passthrough is the practical form of broad API coverage:
-it can reach documented endpoints, but it cannot make an endpoint exist on a server version
-that does not provide it, and it does not turn undedicated endpoints into typed commands.
-
-Product command names, flags, and output schemas are not fixed yet. Examples for Atlassian
-operations will be added once those commands exist and have been run.
-
-Third-party client libraries, including
-[`atlassian-python-api`](https://github.com/atlassian-api/atlassian-python-api), are candidates
-to evaluate rather than adopted dependencies. Requests is the planned synchronous HTTP transport;
-product behavior will live in AtlaWire adapters rather than being coupled to an upstream client.
-The project does not claim endorsement by or affiliation with any upstream library.
-
-## Compatibility
-
-Atlassian products differ across Server, Data Center, and Cloud in authentication options,
-endpoint availability, pagination shape, and response fields. AtlaWire intends to handle those
-differences in explicit adapters covered by contract tests, and to publish a version matrix
-listing which product versions were actually tested, with which authentication method.
-
-Right now that matrix is empty: no version, product, or authentication mode is claimed as
-supported. The initial product scope is self-hosted Jira, Confluence, and Bitbucket; exact
-product versions and authentication modes will be listed only after they are tested.
-
-## Security boundaries
-
-These are requirements for the implementation, not current behavior:
-
-- Credentials should come from the operating system credential store by default, or an
-  explicitly configured environment/secret provider. They are never written to plaintext
-  configuration, passed as ordinary positional arguments, or echoed in logs or error payloads.
-- An ignored local `.env` may supply credentials only to an explicitly invoked live-test suite;
-  ordinary CLI/library use must not load it implicitly.
-- Sensitive request and response headers are redacted before any diagnostic output.
-- TLS certificate verification is enabled by default; disabling it requires a deliberate,
-  visible opt-out.
-- The raw REST passthrough validates method, path, and target host against the configured
-  instance so that a supplied path cannot redirect a credential to another origin.
-- Mutating HTTP methods are gated behind an explicit write flag, and retries apply only to
-  operations that are safe to retry.
-
-## Quality plan
-
-The tools are listed in the development extra, but their project rules and CI checks are not
-configured yet. The intended baseline:
-
-| Area | Intended choice |
-| --- | --- |
-| Formatting and linting | Ruff, configured to one line-length and rule set |
-| Static typing | Pyright, strict on the public API and external-data boundaries |
-| Tests | pytest, with CLI-level and HTTP-boundary tests rather than mock-only unit tests |
-| Edge-case input | Hypothesis for pagination, path, URL, and encoding invariants |
-| HTTP simulation | `responses` for focused Requests-boundary tests; a local HTTP server for CLI end-to-end tests |
-| Feedback | `coverage.py` to find untested changed behavior; no arbitrary project-wide threshold |
-| CI checks | Dependency and secret checks on the normal offline test job |
-
-Mutation testing can be added later for critical behavior if ordinary tests leave meaningful
-uncertainty. No test count or percentage is a substitute for checking the important failure
-cases.
+Writes and transition execution, a raw REST passthrough, product-grouped
+subcommands, profiles/keyring, `.env` loading, response caches, an MCP server, CI,
+and published packages are not part of the current read-only tool. Full `bbk`
+parity, cross-issue Jira comment search, a cross-product `whoami`/doctor command,
+and automatic PR diff fallback are also deferred. Use an existing command or
+`bbk` for those workflows and record the gap in the feedback template.
 
 ## Testing
 
-The current offline tests cover installed-CLI startup, list and search pagination, JSON and
-TSV output, Markdown rendering, and failure behavior across all three adapters.
-The broader plan has two test suites:
+Run the offline tests with the installed CPython 3.15 and no project virtual
+environment:
 
-1. **Offline suite (default).** Deterministic unit, integration, and end-to-end tests run on
-   every commit and in CI. At least one end-to-end path must invoke the installed CLI against a
-   local test HTTP server, exercising the real command, configuration, credential selection,
-   transport, adapter, and output boundaries without depending on internal services. Additional
-   fixture/contract tests cover version-specific responses.
-2. **Live suite (opt-in).** Runs against explicitly configured, preferably disposable
-    Server/Data Center instances with least-privilege credentials. It must never touch production
-    data and must never be a prerequisite for ordinary CI. A developer may keep a local,
-    Git-ignored `.env` for this suite, loaded only by an explicit test command; the library and
-    CLI must not load `.env` implicitly.
+```shell
+C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests
+```
 
-## Roadmap
-
-See [TODO.md](TODO.md) for the prioritized checklist. It is the authoritative plan; this
-README intentionally does not duplicate it.
+The suite includes unit, adapter-boundary, and installed-CLI loopback tests. It
+does not contact a real Jira, Confluence, or Bitbucket instance; the opt-in live
+runbook is separate.
 
 ## License
 
-The repository currently ships an Apache-2.0 `LICENSE` file. The copyright holder and the
-provenance of the code and documentation still need to be confirmed before any public release;
-that open item is tracked in [TODO.md](TODO.md). This note records repository state, not a legal
-opinion.
+The repository ships an Apache-2.0 `LICENSE` file. The copyright holder and code
+provenance still need confirmation before any public release. This is a record of
+repository state, not legal advice.
 
 ## Trademarks
 
-Jira, Confluence, Bitbucket, and Atlassian are trademarks or registered trademarks of Atlassian.
-AtlaWire is an independent project and is not affiliated with, endorsed by, or sponsored by
-Atlassian.
+Jira, Confluence, Bitbucket, and Atlassian are trademarks or registered trademarks
+of Atlassian. AtlaWire is an independent project and is not affiliated with,
+endorsed by, or sponsored by Atlassian.

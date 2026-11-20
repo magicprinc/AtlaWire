@@ -69,6 +69,40 @@ def test_supported_status_is_one_exact_quoted_literal(
     ]
 
 
+def test_mine_rejects_duplicate_issue_keys_across_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "startAt": 0,
+            "maxResults": 1,
+            "total": 2,
+            "issues": [{"key": "DEMO-1", "fields": {}}],
+        },
+        {
+            "startAt": 1,
+            "maxResults": 1,
+            "total": 2,
+            "issues": [{"key": "DEMO-1", "fields": {}}],
+        },
+    ]
+    calls = 0
+
+    def fake_get_json_object(
+        session: object, url: str, *, params: dict[str, str | int]
+    ) -> dict[str, object]:
+        nonlocal calls
+        page = pages[calls]
+        calls += 1
+        return page
+
+    monkeypatch.setattr(jira, "bearer_session", lambda token: nullcontext(None))
+    monkeypatch.setattr(jira, "get_json_object", fake_get_json_object)
+
+    with pytest.raises(AtlaWireError, match="duplicate issue keys"):
+        jira.list_my_issues(BASE, token="fixture-only", limit=2)
+
+
 @pytest.mark.parametrize(
     "status",
     [

@@ -168,6 +168,65 @@ def test_a_repeated_page_without_ids_falls_back_to_raw_equality(
         children(monkeypatch, pages, limit=2)
 
 
+def test_partially_overlapping_child_pages_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "results": [{"id": "7", "title": "One"}, {"id": "8", "title": "Two"}],
+            "start": 0,
+            "size": 2,
+        },
+        {
+            "results": [{"id": "8", "title": "Two"}, {"id": "9", "title": "Three"}],
+            "start": 2,
+            "size": 2,
+        },
+    ]
+
+    with pytest.raises(AtlaWireError, match="repeated"):
+        children(monkeypatch, pages, limit=4)
+
+
+def test_repeated_child_id_within_one_page_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "results": [{"id": "7", "title": "One"}, {"id": 7, "title": "Again"}],
+            "start": 0,
+            "size": 2,
+        }
+    ]
+
+    with pytest.raises(AtlaWireError, match="repeated"):
+        children(monkeypatch, pages, limit=2)
+
+
+def test_an_empty_child_page_cannot_forget_a_known_total_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {"results": [ROW], "start": 0, "size": 1, "totalSize": 2},
+        {"results": [], "start": 1, "size": 0},
+    ]
+
+    with pytest.raises(AtlaWireError, match="empty page"):
+        children(monkeypatch, pages, limit=5)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [{"id": "\ud800"}, {"title": "\ud800"}],
+    ids=["id", "title"],
+)
+def test_child_rows_reject_lone_surrogates_in_output_text(
+    value: dict[str, object],
+) -> None:
+    with pytest.raises(AtlaWireError, match="child page metadata"):
+        confluence._child_row(value)
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

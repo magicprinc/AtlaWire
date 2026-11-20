@@ -19,10 +19,27 @@ def issue(**overrides: object) -> dict[str, object]:
     return value
 
 
+BIDI_CONTROLS = (
+    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+BIDI_ESCAPES = "".join(f"\\u{ord(char):04x}" for char in BIDI_CONTROLS)
+
+
 def assert_no_raw_controls(text: str) -> None:
     for char in text:
         code = ord(char)
-        assert char in "\t\n" or not (code < 0x20 or 0x7F <= code <= 0x9F), repr(char)
+        assert char in "\t\n" or not (
+            code < 0x20
+            or 0x7F <= code <= 0x9F
+            or char in BIDI_CONTROLS
+            or 0xD800 <= code <= 0xDFFF
+        ), repr(char)
+
+
+def assert_visible_controls(text: str, controls: str) -> None:
+    for char in controls:
+        assert char not in text, repr(char)
+        assert f"\\u{ord(char):04x}" in text, repr(char)
 
 
 DEEP_HTML = (
@@ -277,6 +294,61 @@ def test_rendered_body_controls_are_visibly_escaped_and_unicode_is_kept() -> Non
     assert "2J" in rendered
     assert "\\x07" in rendered
     assert "31m" in rendered
+    assert "✓" in rendered
+
+
+def test_bidi_controls_are_visibly_escaped_in_metadata_and_bodies() -> None:
+    value = issue(
+        fields={
+            "summary": f"Résumé {BIDI_CONTROLS} ✓ 👨\u200d👩\u200d👧",
+            "status": {"name": f"St{BIDI_CONTROLS}atus"},
+            "assignee": {"displayName": f"Привет{BIDI_CONTROLS}"},
+            "comment": {
+                "comments": [
+                    {
+                        "id": "1",
+                        "author": {"displayName": f"Bob{BIDI_CONTROLS}"},
+                        "body": f"raw {BIDI_CONTROLS} 日本語",
+                    }
+                ]
+            },
+        },
+        renderedFields={
+            "description": f"<p>rendered {BIDI_CONTROLS} ✓</p>",
+        },
+    )
+
+    rendered = render_issue_markdown(value)
+
+    assert_no_raw_controls(rendered)
+    assert_visible_controls(rendered, BIDI_CONTROLS)
+    assert f"# DEMO-42: Résumé {BIDI_ESCAPES} ✓" in rendered
+    assert f"**Status:** St{BIDI_ESCAPES}atus" in rendered
+    assert f"**Assignee:** Привет{BIDI_ESCAPES}" in rendered
+    assert f"rendered {BIDI_ESCAPES} ✓" in rendered
+    assert f"raw {BIDI_ESCAPES} 日本語" in rendered
+    assert f"### Comment 1 · Bob{BIDI_ESCAPES}" in rendered
+    assert "Résumé" in rendered
+    assert "Привет" in rendered
+    assert "日本語" in rendered
+    assert "✓" in rendered
+    assert "👨\u200d👩\u200d👧" in rendered
+
+
+def test_lone_surrogates_are_visibly_escaped_without_losing_ordinary_text() -> None:
+    value = issue(
+        fields={
+            "summary": "surrogate \ud800 ✓",
+            "description": "raw \udfff",
+        },
+        renderedFields={},
+    )
+
+    rendered = render_issue_markdown(value)
+
+    assert_no_raw_controls(rendered)
+    assert "\\ud800" in rendered
+    assert "\\udfff" in rendered
     assert "✓" in rendered
 
 

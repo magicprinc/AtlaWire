@@ -26,6 +26,7 @@ def read(
     seen: list[tuple[str, int]],
     *,
     max_pages: int = 100,
+    limit: int = 25,
 ) -> list[bitbucket.RepositoryMatch]:
     def fake_get_json_object(
         session: object, url: str, *, params: dict[str, str | int]
@@ -41,7 +42,9 @@ def read(
 
     monkeypatch.setattr(bitbucket, "bearer_session", lambda token: nullcontext(None))
     monkeypatch.setattr(bitbucket, "get_json_object", fake_get_json_object)
-    return bitbucket.find_repositories(BASE, "match", token=TOKEN, max_pages=max_pages)
+    return bitbucket.find_repositories(
+        BASE, "match", token=TOKEN, limit=limit, max_pages=max_pages
+    )
 
 
 @pytest.mark.parametrize(
@@ -147,3 +150,90 @@ def test_invalid_server_project_key_builds_no_repository_path(
         bitbucket.find_repositories(BASE, "match", token=TOKEN)
 
     assert seen == [(PROJECTS_URL, 0)]
+
+
+def test_the_match_cap_stops_repository_paging_within_the_shared_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Before the early stop the first repository page was paged to exhaustion,
+    # so a budget spent on the project page left no room for the next cursor
+    # even though this page already held the only requested match.
+    pages = {
+        (PROJECTS_URL, 0): {"values": [{"key": "A"}], "isLastPage": True},
+        (A_REPOS, 0): {
+            "values": [{"slug": "match"}],
+            "isLastPage": False,
+            "nextPageStart": 100,
+        },
+    }
+    seen: list[tuple[str, int]] = []
+
+    rows = read(monkeypatch, pages, seen, max_pages=2, limit=1)
+
+    assert rows == [{"project": "A", "slug": "match", "name": None, "state": None}]
+    assert seen == [(PROJECTS_URL, 0), (A_REPOS, 0)]
+
+
+def test_paging_continues_until_the_match_cap_is_actually_reached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = {
+        (PROJECTS_URL, 0): {"values": [{"key": "A"}], "isLastPage": True},
+        (A_REPOS, 0): {
+            "values": [{"slug": "match"}],
+            "isLastPage": False,
+            "nextPageStart": 5,
+        },
+        (A_REPOS, 5): {
+            "values": [{"slug": "other"}, {"slug": "match-two"}],
+            "isLastPage": False,
+            "nextPageStart": 9,
+        },
+    }
+    seen: list[tuple[str, int]] = []
+
+    rows = read(monkeypatch, pages, seen, limit=2)
+
+    assert [row["slug"] for row in rows] == ["match", "match-two"]
+    assert seen == [(PROJECTS_URL, 0), (A_REPOS, 0), (A_REPOS, 5)]
+
+
+def test_the_project_list_is_still_read_in_full_before_the_match_cap_stops(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = {
+        (PROJECTS_URL, 0): {
+            "values": [{"key": "A"}],
+            "isLastPage": False,
+            "nextPageStart": 1,
+        },
+        (PROJECTS_URL, 1): {"values": [{"key": "B"}], "isLastPage": True},
+        (A_REPOS, 0): {"values": [{"slug": "match"}], "isLastPage": True},
+    }
+    seen: list[tuple[str, int]] = []
+
+    rows = read(monkeypatch, pages, seen, limit=1)
+
+    assert [row["project"] for row in rows] == ["A"]
+    assert seen == [(PROJECTS_URL, 0), (PROJECTS_URL, 1), (A_REPOS, 0)]
+
+
+def test_a_fetched_page_is_fully_validated_before_the_match_cap_stops(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Every row of an already fetched page is projected, so a malformed tail is
+    # not hidden by a match found earlier in the same page.
+    pages = {
+        (PROJECTS_URL, 0): {"values": [{"key": "A"}], "isLastPage": True},
+        (A_REPOS, 0): {
+            "values": [{"slug": "match"}, {"slug": 7}],
+            "isLastPage": False,
+            "nextPageStart": 100,
+        },
+    }
+    seen: list[tuple[str, int]] = []
+
+    with pytest.raises(AtlaWireError, match="repository"):
+        read(monkeypatch, pages, seen, max_pages=2, limit=1)
+
+    assert seen == [(PROJECTS_URL, 0), (A_REPOS, 0)]

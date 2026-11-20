@@ -211,13 +211,16 @@ def find_repositories(
     and only ``project``, ``slug``, ``name`` and ``state`` are projected.
 
     The legacy visible-project walk is reproduced: the project list is read to
-    exhaustion first, then each project's repositories are fully paged in
-    order, and no further project is started once ``limit`` rows are found.
-    ``max_pages`` is one total request-attempt budget shared by the project list
-    and every repository page, not a per-project allowance. Any later cursor,
-    transport, or budget failure raises without returning partial rows. Server
-    project keys are validated before a repository path is built and response
-    links are never followed.
+    exhaustion first in server order, then each project's repositories are paged
+    in order and paging stops as soon as ``limit`` matching rows have been
+    projected, so a repository list is not read past the match cap and no
+    further project is started. Every row of a fetched page is still projected
+    and validated before that early stop, and the unused next-page hint of the
+    final page is never requested. ``max_pages`` is one total request-attempt
+    budget shared by the project list and every repository page, not a
+    per-project allowance. Any later cursor, transport, or budget failure raises
+    without returning partial rows. Server project keys are validated before a
+    repository path is built and response links are never followed.
     """
     needle = _repository_needle(name)
     _validate_row_limit(limit)
@@ -1071,15 +1074,20 @@ def _find_in_projects(
             session,
             f"{projects_url}/{quote(key, safe='')}/repos",
             take_pages(),
-            project=_repository,
+            project=lambda value: _matching_repository(value, needle),
+            limit=limit - len(found),
+            read_full_pages=True,
             on_page=spent_page,
         )
-        for repository in repositories:
-            if _repository_matches(repository, needle):
-                found.append(_repository_match(key, repository))
-                if len(found) >= limit:
-                    return found
+        found.extend(_repository_match(key, repository) for repository in repositories)
+        if len(found) == limit:
+            return found
     return found
+
+
+def _matching_repository(value: object, needle: str) -> Repository | None:
+    repository = _repository(value)
+    return repository if _repository_matches(repository, needle) else None
 
 
 def _server_project_key(value: str) -> str:
@@ -1852,6 +1860,7 @@ def _read_pages[RowT](
     project: Callable[[object], RowT | None],
     params: Mapping[str, str] | None = None,
     limit: int | None = None,
+    read_full_pages: bool = False,
     transform: Callable[[dict[str, object]], dict[str, object]] | None = None,
     on_page: Callable[[], None] | None = None,
 ) -> list[RowT]:
@@ -1860,18 +1869,26 @@ def _read_pages[RowT](
     ``params`` are fixed filters repeated on every request; ``start`` and
     ``limit`` are always set here. Every page must carry an exact
     ``isLastPage`` boolean. With a row ``limit`` each request asks for no more
-    than the rows still missing, a wider page is rejected, and the call returns
-    at the row cap without needing the unused next-page hint. Otherwise each
-    nonterminal page is followed through its own ``nextPageStart``. An optional
-    ``transform`` replaces the fetched page before its cursor and rows are read,
-    and an optional ``on_page`` observes each completed request so callers can
+    than the rows still missing and a wider page is rejected. A filtering
+    projector can opt into ``read_full_pages`` to request normal-sized pages
+    even if only one match remains. Every fetched page is validated, and the
+    call returns at the projected row cap without needing the unused next-page
+    hint. An optional ``transform`` replaces the fetched page before its cursor
+    and rows are read. ``on_page`` observes completed requests so callers can
     share one page budget across several calls.
+
+    A present ``start`` echo must equal the cursor requested for that page and a
+    present ``size`` echo must equal the number of values; an omitted echo is not
+    required. Both are validated for every consumed page, including a terminal
+    one, before any row is projected. The next cursor is always the server's
+    opaque ``nextPageStart``, never arithmetic on the requested start or the
+    echoed page size.
     """
     extras = {} if params is None else dict(params)
     start = 0
     rows: list[RowT] = []
     for _ in range(max_pages):
-        remaining = None if limit is None else limit - len(rows)
+        remaining = None if limit is None or read_full_pages else limit - len(rows)
         size = _PAGE_SIZE if remaining is None else min(_PAGE_SIZE, remaining)
         page = get_json_object(
             session, url, params={**extras, "start": start, "limit": size}
@@ -1883,7 +1900,8 @@ def _read_pages[RowT](
         values = page.get("values")
         if not isinstance(values, list):
             raise AtlaWireError("Expected a Bitbucket values array.")
-        if limit is not None and len(values) > size:
+        _check_page_echo(page, start=start, rows=len(values))
+        if remaining is not None and len(values) > size:
             raise AtlaWireError("Bitbucket returned more rows than requested.")
         last = page.get("isLastPage")
         if not isinstance(last, bool):
@@ -1893,11 +1911,30 @@ def _read_pages[RowT](
             if row is not None:
                 rows.append(row)
         if limit is not None and len(rows) >= limit:
-            return rows
+            return rows[:limit] if len(rows) > limit else rows
         if last:
             return rows
         start = _next_page_start(page, start)
     raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+
+
+def _check_page_echo(page: dict[str, object], *, start: int, rows: int) -> None:
+    """Validate optional echoed cursor metadata before the page is consumed.
+
+    Server 5.10 responses may omit ``start`` and ``size``; a present value must
+    describe the page just requested: ``start`` equals this request's own cursor
+    (never a value derived from the previous page) and ``size`` equals the
+    number of values. Booleans are rejected explicitly because ``bool`` is an
+    ``int`` subclass.
+    """
+    if "start" in page:
+        echoed = page["start"]
+        if not isinstance(echoed, int) or isinstance(echoed, bool) or echoed != start:
+            raise AtlaWireError("Invalid Bitbucket page start.")
+    if "size" in page:
+        echoed = page["size"]
+        if not isinstance(echoed, int) or isinstance(echoed, bool) or echoed != rows:
+            raise AtlaWireError("Invalid Bitbucket page size.")
 
 
 def _next_page_start(page: dict[str, object], start: int) -> int:

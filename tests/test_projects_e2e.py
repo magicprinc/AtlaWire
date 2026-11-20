@@ -27,6 +27,23 @@ SECOND = {"key": "OPS", "public": True}
 
 
 def fixture(scenario: str, start: int, self_url: str) -> tuple[int, dict[str, object]]:
+    if scenario == "echo-start":
+        if start == 0:
+            return 200, {
+                "values": [FIRST_BASE],
+                "isLastPage": False,
+                "nextPageStart": 100,
+                "start": 0,
+                "size": 1,
+            }
+        return 200, {
+            "values": [FIRST_BASE],
+            "isLastPage": True,
+            "start": 0,
+            "size": 1,
+        }
+    if scenario == "echo-size":
+        return 200, {"values": [FIRST_BASE], "isLastPage": True, "size": 2}
     if scenario in {"paged", "later-failure"}:
         if start == 0:
             return 200, {
@@ -171,6 +188,30 @@ def test_projects_failures_publish_nothing_and_hide_request_details(
     assert result.stdout == ""
     assert expected in result.stderr
     for detail in (TOKEN, PROJECT_PATH, "fixture-query", "RESPONSE-SENTINEL"):
+        assert detail not in result.stderr
+    assert seen == expected_seen(starts)
+    assert intruder == []
+
+
+@pytest.mark.parametrize(
+    ("scenario", "expected", "starts"),
+    [
+        ("echo-start", "Invalid Bitbucket page start", [0, 100]),
+        ("echo-size", "Invalid Bitbucket page size", [0]),
+    ],
+    ids=["stale-terminal-cursor", "inflated-terminal-size"],
+)
+def test_projects_reject_page_metadata_that_does_not_describe_the_request(
+    scenario: str, expected: str, starts: list[int]
+) -> None:
+    # Both scenarios used to succeed: a stale cursor silently repeated a row and
+    # an inflated size was never compared with the values that were published.
+    result, seen, intruder, _self_url = run_projects(scenario)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert expected in result.stderr
+    for detail in (TOKEN, PROJECT_PATH, "RESPONSE-SENTINEL"):
         assert detail not in result.stderr
     assert seen == expected_seen(starts)
     assert intruder == []

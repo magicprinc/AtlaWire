@@ -307,6 +307,76 @@ def test_the_page_cap_after_a_nonterminal_page_raises(
         )
 
 
+def test_ls_checks_the_nested_children_echo_not_the_outer_browse_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The echoed cursor is validated on the transformed page actually consumed;
+    # conflicting outer browse metadata is irrelevant and must be ignored.
+    pages = [
+        {
+            "children": {
+                "start": 0,
+                "size": 1,
+                "values": [{"path": "README.md", "type": "FILE", "size": 0}],
+                "isLastPage": False,
+                "nextPageStart": 9,
+            },
+            "start": 77,
+            "size": 999,
+            "isLastPage": True,
+        },
+        {
+            "children": {
+                "start": 9,
+                "size": 1,
+                "values": [{"path": "src", "type": "DIRECTORY"}],
+                "isLastPage": True,
+            }
+        },
+    ]
+
+    rows, seen = call_pages(
+        monkeypatch,
+        pages,
+        lambda: bitbucket.list_directory(BASE, "DEMO/widgets", token=TOKEN),
+    )
+
+    assert [row["path"] for row in rows] == ["README.md", "src"]
+    assert seen == [
+        {"url": BROWSE_URL, "start": 0, "limit": 100},
+        {"url": BROWSE_URL, "start": 9, "limit": 100},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("echo", "message"),
+    [
+        ({"start": 8}, "page start"),
+        ({"start": False}, "page start"),
+        ({"size": 2}, "page size"),
+        ({"size": True}, "page size"),
+    ],
+    ids=["start-mismatch", "start-false", "size-mismatch", "size-true"],
+)
+def test_ls_rejects_mismatched_nested_children_echoes(
+    monkeypatch: pytest.MonkeyPatch, echo: dict[str, object], message: str
+) -> None:
+    page = {
+        "children": {
+            "values": [{"path": "a.txt"}],
+            "isLastPage": True,
+            **echo,
+        }
+    }
+
+    with pytest.raises(AtlaWireError, match=message):
+        call_pages(
+            monkeypatch,
+            [page],
+            lambda: bitbucket.list_directory(BASE, "DEMO/widgets", token=TOKEN),
+        )
+
+
 @pytest.mark.parametrize(
     "value",
     [

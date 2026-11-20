@@ -59,6 +59,15 @@ No version has been released yet.
 
 - JSON reads reject HTTP 206 partial responses instead of returning an incomplete body
   as a successful result.
+- JSON responses are limited to 8 MiB after decompression and must decode as UTF-8.
+  Refused redirects are no longer read or followed.
+- Bitbucket list commands reject contradictory page offsets or sizes. `find-repos`
+  stops repository paging when it reaches the requested match count.
+- Jira and Confluence search reject known duplicate identities and contradictory
+  totals instead of publishing incomplete rows. Jira issue reads reject malformed
+  return keys while allowing a valid canonical key after an issue move.
+- Jira and Confluence listings reject malformed Unicode before output. TSV and
+  Markdown show bidirectional formatting controls as visible escapes.
 - Repository TSV escapes data that would otherwise split a row or change terminal output.
 
 ### Changed
@@ -71,6 +80,7 @@ No version has been released yet.
 
 ### Removed
 
+- Removed unused direct runtime dependencies on `keyring` and `platformdirs`.
 - Marketing-style README claims, non-executable quickstart commands, duplicated quality gates,
   and a "License TBD" statement that contradicted the Apache-2.0 `LICENSE` file present in the
   repository.

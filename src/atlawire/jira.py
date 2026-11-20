@@ -1,7 +1,7 @@
 """Read operations for self-hosted Jira."""
 
 import re
-from typing import TypedDict
+from typing import TypedDict, TypeGuard
 from urllib.parse import urlsplit
 
 import requests
@@ -65,8 +65,13 @@ class CurrentUser(TypedDict):
     email: str | None
 
 
+def _valid_issue_key(value: object) -> TypeGuard[str]:
+    """Return whether a value is one syntactically valid Jira issue key."""
+    return isinstance(value, str) and re.fullmatch(_ISSUE_KEY, value) is not None
+
+
 def _issue_key(key_or_url: str) -> str:
-    if re.fullmatch(_ISSUE_KEY, key_or_url):
+    if _valid_issue_key(key_or_url):
         return key_or_url
     message = "Expected a Jira issue key or a Jira browse URL."
     try:
@@ -96,8 +101,11 @@ def get_issue(
             f"{base}/rest/api/2/issue/{key}",
             params={"expand": "renderedFields"},
         )
-    returned_key = issue.get("key")
-    if not isinstance(returned_key, str) or not isinstance(issue.get("fields"), dict):
+    # The returned key can legitimately differ from the requested one after a
+    # move, so only its own syntax is checked; equality is not pinned.
+    if not _valid_issue_key(issue.get("key")) or not isinstance(
+        issue.get("fields"), dict
+    ):
         raise AtlaWireError("Expected a Jira issue with a key and fields.")
     return issue
 
@@ -477,9 +485,11 @@ def _read_search(
     session: requests.Session, url: str, query: str, limit: int
 ) -> list[IssueRow]:
     rows: list[IssueRow] = []
-    start = 0
+    seen_keys: set[str] = set()
+    known_total: int | None = None
     while len(rows) < limit:
-        requested = limit - len(rows)
+        start = len(rows)
+        requested = limit - start
         page = get_json_object(
             session,
             url,
@@ -490,28 +500,43 @@ def _read_search(
                 "maxResults": requested,
             },
         )
-        issues, total = _search_page(page, start)
+        issues, reported_total = _search_page(page, start)
+        if reported_total is not None:
+            # A page may omit the total, but a known total is never forgotten
+            # and a different later value proves the result set is unstable.
+            if known_total is not None and reported_total != known_total:
+                raise AtlaWireError("Jira search total changed between pages.")
+            known_total = reported_total
+        if known_total is not None and start + len(issues) > known_total:
+            raise AtlaWireError("Inconsistent Jira search pagination metadata.")
         if not issues:
-            # An empty page proves exhaustion only when total is known and
-            # already accounts for everything read so far.
-            if total is None:
-                raise AtlaWireError(
-                    "Jira search ended without a total; narrow the query or retry."
-                )
-            if total > start:
-                raise AtlaWireError(
-                    "Jira search returned an empty page before all matches; "
-                    "narrow the query or retry."
-                )
+            _check_search_end(start, known_total)
             return rows
         # A server cap can return fewer rows than requested, so advance by what
-        # was actually read; every continuing page adds at least one row.
-        take = min(len(issues), requested)
-        rows.extend(_project_issue(issue) for issue in issues[:take])
-        start += take
-        if total is not None and start >= total:
+        # was actually read; every continuing page adds at least one row. Rows
+        # beyond the requested cap are deliberately discarded, so duplicate
+        # keys are checked only for rows accepted into the result.
+        for issue in issues[:requested]:
+            row = _project_issue(issue)
+            if row["key"] in seen_keys:
+                raise AtlaWireError("Jira search returned duplicate issue keys.")
+            seen_keys.add(row["key"])
+            rows.append(row)
+        if len(rows) == known_total:
             return rows
     return rows
+
+
+def _check_search_end(offset: int, known_total: int | None) -> None:
+    if known_total is None:
+        raise AtlaWireError(
+            "Jira search ended without a total; narrow the query or retry."
+        )
+    if known_total > offset:
+        raise AtlaWireError(
+            "Jira search returned an empty page before all matches; "
+            "narrow the query or retry."
+        )
 
 
 def _search_page(
@@ -549,6 +574,16 @@ def _search_page(
     return issues, total
 
 
+def _search_text(value: str, label: str) -> str:
+    """Return projected search text unchanged only when UTF-8 can encode it."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        message = f"Expected Jira {label} as valid UTF-8 text in search results."
+        raise AtlaWireError(message) from None
+    return value
+
+
 def _nested_name(value: object, label: str, property_name: str) -> str | None:
     if value is None:
         return None
@@ -559,15 +594,15 @@ def _nested_name(value: object, label: str, property_name: str) -> str | None:
         return None
     if not isinstance(name, str):
         raise AtlaWireError(f"Invalid Jira {label} in search results.")
-    return name
+    return _search_text(name, label)
 
 
 def _project_issue(value: object) -> IssueRow:
     if not isinstance(value, dict):
         raise AtlaWireError("Expected a Jira issue object in search results.")
     key = value.get("key")
-    if not isinstance(key, str) or not key:
-        raise AtlaWireError("Expected a non-empty Jira issue key in search results.")
+    if not _valid_issue_key(key):
+        raise AtlaWireError("Expected a valid Jira issue key in search results.")
     fields = value.get("fields")
     if not isinstance(fields, dict):
         raise AtlaWireError("Expected Jira issue fields in search results.")
@@ -575,14 +610,14 @@ def _project_issue(value: object) -> IssueRow:
     if summary_value is None:
         summary = ""
     elif isinstance(summary_value, str):
-        summary = " ".join(summary_value.split())
+        summary = _search_text(" ".join(summary_value.split()), "summary")
     else:
         raise AtlaWireError("Invalid Jira summary in search results.")
     updated_value = fields.get("updated")
     if updated_value is None:
         updated = ""
     elif isinstance(updated_value, str):
-        updated = updated_value[:10]
+        updated = _search_text(updated_value[:10], "updated timestamp")
     else:
         raise AtlaWireError("Invalid Jira updated timestamp in search results.")
     return IssueRow(

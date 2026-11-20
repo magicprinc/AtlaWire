@@ -132,6 +132,69 @@ def test_a_repeated_page_without_keys_falls_back_to_raw_equality(
         spaces(monkeypatch, pages, limit=2)
 
 
+def test_partially_overlapping_space_pages_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "results": [{"key": "DEMO", "name": "Demo"}, {"key": "OPS"}],
+            "start": 0,
+            "size": 2,
+        },
+        {
+            "results": [{"key": "OPS", "name": "Operations"}, {"key": "PROD"}],
+            "start": 2,
+            "size": 2,
+        },
+    ]
+
+    with pytest.raises(AtlaWireError, match="repeated"):
+        spaces(monkeypatch, pages, limit=4)
+
+
+def test_repeated_space_key_within_one_page_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "results": [{"key": "DEMO", "name": "One"}, {"key": "DEMO"}],
+            "start": 0,
+            "size": 2,
+        }
+    ]
+
+    with pytest.raises(AtlaWireError, match="repeated"):
+        spaces(monkeypatch, pages, limit=2)
+
+
+def test_an_empty_space_page_cannot_forget_a_known_total_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {"results": [ROW], "start": 0, "size": 1, "totalSize": 2},
+        {"results": [], "start": 1, "size": 0},
+    ]
+
+    with pytest.raises(AtlaWireError, match="empty page"):
+        spaces(monkeypatch, pages, limit=5)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"key": "\ud800"},
+        {"name": "\ud800"},
+        {"type": "\ud800"},
+    ],
+    ids=["key", "name", "type"],
+)
+def test_space_rows_reject_lone_surrogates_in_output_text(
+    value: dict[str, object],
+) -> None:
+    with pytest.raises(AtlaWireError, match="space metadata"):
+        confluence._space_row(value)
+
+
 @pytest.mark.parametrize(
     "page",
     [

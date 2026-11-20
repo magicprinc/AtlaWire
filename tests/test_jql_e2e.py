@@ -272,6 +272,45 @@ def fixture(
         return 200, {"startAt": 0, "maxResults": 50, "total": True, "issues": []}
     if scenario == "missing-max-results":
         return 200, {"startAt": 0, "total": 1, "issues": [FIRST]}
+    if scenario == "duplicate-key":
+        return 200, {
+            "startAt": start,
+            "maxResults": 1,
+            "total": 2,
+            "issues": [FIRST],
+        }
+    if scenario == "contradictory-total":
+        if start == 0:
+            return 200, {
+                "startAt": 0,
+                "maxResults": 1,
+                "total": 3,
+                "issues": [FIRST],
+            }
+        return 200, {"startAt": start, "maxResults": 1, "total": 1, "issues": []}
+    if scenario == "forgotten-total":
+        if start == 0:
+            return 200, {
+                "startAt": 0,
+                "maxResults": 1,
+                "total": 3,
+                "issues": [FIRST],
+            }
+        return 200, {"startAt": start, "maxResults": 1, "issues": []}
+    if scenario == "malformed-key":
+        return 200, {
+            "startAt": start,
+            "maxResults": 50,
+            "total": 1,
+            "issues": [{"key": "demo-1", "fields": {}}],
+        }
+    if scenario == "surrogate-summary":
+        return 200, {
+            "startAt": start,
+            "maxResults": 50,
+            "total": 1,
+            "issues": [{"key": "DEMO-1", "fields": {"summary": "Cost \ud800"}}],
+        }
     raise AssertionError(f"Unknown scenario {scenario}.")
 
 
@@ -413,6 +452,55 @@ def test_jql_invalid_metadata_fails_without_publishing_rows(
     assert message in result.stderr
     assert TOKEN not in result.stderr
     assert QUERY not in result.stderr
+
+
+def test_jql_duplicate_issue_keys_fail_without_publishing_rows() -> None:
+    result, seen = run_jql("duplicate-key", "--limit", "2", "--json")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "duplicate issue keys" in result.stderr
+    assert [request[2]["startAt"] for request in seen] == [["0"], ["1"]]
+
+
+@pytest.mark.parametrize(
+    ("scenario", "message"),
+    [
+        ("contradictory-total", "total changed"),
+        ("forgotten-total", "empty page"),
+    ],
+    ids=["contradictory-terminal-total", "terminal-page-omits-known-total"],
+)
+def test_jql_terminal_total_inconsistency_fails_without_rows(
+    scenario: str, message: str
+) -> None:
+    result, seen = run_jql(scenario, "--json")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert message in result.stderr
+    assert [request[2]["startAt"] for request in seen] == [["0"], ["1"]]
+
+
+def test_jql_malformed_search_key_fails_without_rows() -> None:
+    result, _ = run_jql("malformed-key", "--json")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "issue key" in result.stderr
+
+
+@pytest.mark.parametrize("options", [("--json",), ()], ids=["json", "tsv"])
+def test_jql_lone_surrogate_summary_fails_without_partial_output(
+    options: tuple[str, ...],
+) -> None:
+    result, _ = run_jql("surrogate-summary", *options)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "summary" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert "UnicodeEncodeError" not in result.stderr
 
 
 def test_jql_stops_at_the_limit_when_total_never_proves_exhaustion() -> None:

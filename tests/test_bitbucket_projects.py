@@ -212,3 +212,76 @@ def test_wrong_self_metadata_types_are_rejected_without_echoing_them(
         read(monkeypatch, [page])
 
     assert "127.0.0.1" not in str(error.value)
+
+
+def test_matching_echoed_start_and_size_describe_each_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [
+        {
+            "values": [FIRST],
+            "isLastPage": False,
+            "nextPageStart": 17,
+            "start": 0,
+            "size": 1,
+        },
+        {"values": [SECOND], "isLastPage": True, "start": 17, "size": 1},
+    ]
+
+    rows, calls = read(monkeypatch, pages)
+
+    assert rows == [EXPECTED_FIRST, EXPECTED_SECOND]
+    assert calls == [
+        {"url": PROJECTS_URL, "start": 0, "limit": 100},
+        {"url": PROJECTS_URL, "start": 17, "limit": 100},
+    ]
+
+
+def test_a_terminal_page_echoing_the_previous_cursor_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Before this check the stale cursor was ignored, so the repeated row was
+    # published twice as a successful result.
+    pages = [
+        {"values": [FIRST], "isLastPage": False, "nextPageStart": 100, "start": 0},
+        {"values": [FIRST], "isLastPage": True, "start": 0},
+    ]
+
+    with pytest.raises(AtlaWireError, match="page start"):
+        read(monkeypatch, pages)
+
+
+@pytest.mark.parametrize(
+    ("page", "message"),
+    [
+        ({"values": [], "isLastPage": True, "start": 1}, "page start"),
+        ({"values": [], "isLastPage": True, "start": False}, "page start"),
+        ({"values": [], "isLastPage": True, "start": True}, "page start"),
+        ({"values": [], "isLastPage": True, "start": 0.0}, "page start"),
+        ({"values": [], "isLastPage": True, "start": "0"}, "page start"),
+        ({"values": [FIRST], "isLastPage": True, "size": 2}, "page size"),
+        ({"values": [FIRST], "isLastPage": True, "size": 0}, "page size"),
+        ({"values": [], "isLastPage": True, "size": False}, "page size"),
+        ({"values": [FIRST], "isLastPage": True, "size": True}, "page size"),
+        ({"values": [FIRST], "isLastPage": True, "size": 1.0}, "page size"),
+        ({"values": [FIRST], "isLastPage": True, "size": "1"}, "page size"),
+    ],
+    ids=[
+        "start-mismatch",
+        "start-false",
+        "start-true",
+        "start-float",
+        "start-string",
+        "size-too-large",
+        "size-too-small",
+        "size-false",
+        "size-true",
+        "size-float",
+        "size-string",
+    ],
+)
+def test_a_malformed_echoed_cursor_metadata_value_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, page: dict[str, object], message: str
+) -> None:
+    with pytest.raises(AtlaWireError, match=message):
+        read(monkeypatch, [page])
