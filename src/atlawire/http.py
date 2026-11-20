@@ -10,6 +10,7 @@ import requests
 
 _TEXT_LIMIT = 1024 * 1024
 _TEXT_CHUNK = 64 * 1024
+_PARTIAL_RESPONSE_MESSAGE = "HTTP 206: partial content is not supported."
 _BIDI_CONTROLS = frozenset(
     "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 )
@@ -66,13 +67,19 @@ def _finite_float(value: str) -> float:
 
 
 def _check_status(status: int) -> None:
-    """Apply the shared read-only status policy without echoing the request."""
+    """Apply the shared read-only status policy without echoing the request.
+
+    A 206 carries only part of a representation, so it is never a successful
+    complete read for this client. Every caller consumes a complete document.
+    """
     if 300 <= status < 400:
         raise AtlaWireError(f"HTTP {status}: redirect refused; check the base URL.")
     if status == 401:
         raise AtlaWireError("HTTP 401: authentication rejected.")
     if status == 403:
         raise AtlaWireError("HTTP 403: access denied.")
+    if status == 206:
+        raise AtlaWireError(_PARTIAL_RESPONSE_MESSAGE)
     if not 200 <= status < 300:
         raise AtlaWireError(f"HTTP {status}: request failed.")
 
@@ -168,8 +175,6 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
             stream=True,
         ) as response:
             _check_status(response.status_code)
-            if response.status_code == 206:
-                raise AtlaWireError("HTTP 206: partial content is not supported.")
             _check_text_type(response.headers.get("Content-Type"))
             payload = _read_limited(response)
     except requests.Timeout:

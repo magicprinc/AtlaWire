@@ -124,7 +124,7 @@ def expected_requests() -> list[Request]:
 
 
 def run_comments(
-    pages: Sequence[dict[str, object] | int],
+    pages: Sequence[dict[str, object] | int | tuple[int, dict[str, object]]],
     *,
     argument: str = PASTED_URL,
     extra_args: tuple[str, ...] = (),
@@ -149,6 +149,9 @@ def run_comments(
             response = next(responses, 503)
             if isinstance(response, int):
                 send_json(self, response, {"message": SENTINEL})
+            elif isinstance(response, tuple):
+                status, body = response
+                send_json(self, status, body)
             else:
                 send_json(self, 200, response)
 
@@ -198,6 +201,25 @@ def test_installed_issue_comments_accepts_an_empty_initial_page(
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
     assert json.loads(result.stdout) == []
+    assert seen == expected_requests()[:1]
+    assert accepts == ["application/json"]
+
+
+def test_installed_issue_comments_rejects_a_partial_response() -> None:
+    partial = {
+        "startAt": 0,
+        "maxResults": 50,
+        "total": 1,
+        "comments": [FIRST_COMMENT],
+    }
+
+    result, seen, accepts = run_comments([(206, partial)])
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == "Error: HTTP 206: partial content is not supported.\n"
+    assert SENTINEL not in result.stderr
+    assert TOKEN not in result.stderr
     assert seen == expected_requests()[:1]
     assert accepts == ["application/json"]
 

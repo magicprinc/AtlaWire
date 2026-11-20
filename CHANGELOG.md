@@ -57,6 +57,8 @@ No version has been released yet.
 
 ### Fixed
 
+- JSON reads reject HTTP 206 partial responses instead of returning an incomplete body
+  as a successful result.
 - Repository TSV escapes data that would otherwise split a row or change terminal output.
 
 ### Changed

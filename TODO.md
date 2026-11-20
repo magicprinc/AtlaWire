@@ -13,13 +13,18 @@ open, and no product behavior or compatibility claim is made before it is tested
   (JSON or Markdown), `issue-comments`, `jql`, `mine`, `statuses`, `jira-me`, `transitions`, `cql`, `spaces`,
   and `children`.
   Check `git status` before resuming; preserve local references and unrelated edits.
-- **Last verification:** 1384 offline tests passed using Python 3.15 outside a venv, including
+- **Last verification:** 1386 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Jira issue comment tests checked capped pages, duplicate IDs, and failure without partial output.
+  The HTTP 206 regression produced exit 0 and a row before the fix and now requires a
+  static error with empty stdout. Jira issue comment tests checked capped pages, duplicate
+  IDs, and failure without partial output.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** design Jira cross-issue author search. Get a sanitized ChatGPT HIGH review
-  of exact identity versus fuzzy resolution before dispatching implementation.
+- **Next slice:** prepare the bounded Jira comment search and its live response-shape
+  check. The JSON readers now reject HTTP 206. See the
+  [implementation handoff](.development/review/2026-11-20_IMPLEMENTATION_HANDOFF.md)
+  and [design review](.development/review/2026-11-20_WEB_STUDY_APPLICATION.md).
+  Scope/contract changes and live checks need separate approval.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -36,6 +41,8 @@ open, and no product behavior or compatibility claim is made before it is tested
   V4.1 Flash HIGH implements the named tests and code, runs checks, fixes failures, and
   self-reviews. The primary agent reviews both production code and the tests' ability to catch
   defects, sends corrections back, and reruns affected checks. Test counts are not acceptance.
+  For difficult architectural decisions and critical reviews, ask the owner to switch the
+  primary agent to a more capable model. Optimize token use without weakening evidence.
 - **Verification cadence:** one assignment per usable workflow where practical. The worker runs
   focused tests and lint/type checks during implementation. The primary reviews the code and
   tests and runs the full regression suite once on the milestone candidate, not after every
@@ -139,7 +146,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Jira transition listing without changing issue state.
 - [x] Read all comments for one Jira issue with bounded offset paging and fail on
       incomplete or inconsistent results. Keep cross-issue author search separate.
-- [ ] Port cross-issue Jira comment search after deciding the author resolution contract.
+- [ ] Port cross-issue Jira comment search after approving the scoped identity, date, and
+      request-budget contract. Track fuzzy and transliterated discovery as separate parity work.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve
@@ -257,6 +265,8 @@ over more packaging or framework work.
 
 ## 4. Adapters, HTTP core, and CLI contract
 
+- [x] Reject HTTP 206 on complete-body JSON reads. The installed `issue-comments` CLI
+      regression runs a valid-looking 206 page and requires empty stdout.
 - [ ] Implement a shared HTTP core: timeouts, bounded retries with backoff, TLS verification,
       proxy support, redaction, and a single error taxonomy mapped to exit codes. The first
       read-only slice must disable automatic cross-origin redirects and test proxy/TLS behavior;

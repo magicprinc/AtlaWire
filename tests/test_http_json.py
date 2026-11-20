@@ -43,6 +43,27 @@ def test_post_json_object_refuses_a_redirect_without_following_it() -> None:
 
 
 @responses.activate
+def test_json_readers_reject_a_partial_response_before_decoding() -> None:
+    responses.get(URL, status=206, json={"ok": True})
+    responses.get(URL, status=206, body="not json", content_type="application/json")
+    responses.post(URL, status=206, json={"ok": True})
+
+    for _ in range(2):
+        with (
+            bearer_session(TOKEN) as session,
+            pytest.raises(AtlaWireError, match="HTTP 206"),
+        ):
+            get_json_object(session, URL, params={})
+    with (
+        bearer_session(TOKEN) as session,
+        pytest.raises(AtlaWireError, match="HTTP 206"),
+    ):
+        post_json_object(session, URL, body={"q": "x"})
+
+    assert [call.request.method for call in responses.calls] == ["GET", "GET", "POST"]
+
+
+@responses.activate
 def test_get_json_array_accepts_a_list_and_rejects_an_object() -> None:
     responses.get(URL, json=[{"name": "Open"}])
 
