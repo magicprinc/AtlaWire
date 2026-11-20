@@ -2,7 +2,8 @@
 
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from typing import cast
 from urllib.parse import urlsplit
 
 import requests
@@ -11,6 +12,10 @@ _TEXT_LIMIT = 1024 * 1024
 _TEXT_CHUNK = 64 * 1024
 _BIDI_CONTROLS = frozenset(
     "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+
+type _JsonValue = (
+    None | bool | int | float | str | Sequence[_JsonValue] | Mapping[str, _JsonValue]
 )
 
 
@@ -81,18 +86,47 @@ def _get_json(
             url, params=params, timeout=(5, 30), allow_redirects=False
         ) as response:
             _check_status(response.status_code)
-            try:
-                data: object = response.json(
-                    parse_constant=_reject_constant, parse_float=_finite_float
-                )
-            except ValueError, RecursionError:
-                raise AtlaWireError("Expected a valid JSON response.") from None
+            return _decode_json(response)
     except requests.Timeout:
         raise AtlaWireError("Request timed out.") from None
     except requests.RequestException:
         raise AtlaWireError(
             "Request failed; check connectivity and TLS settings."
         ) from None
+
+
+def _decode_json(response: requests.Response) -> object:
+    try:
+        return response.json(parse_constant=_reject_constant, parse_float=_finite_float)
+    except ValueError, RecursionError:
+        raise AtlaWireError("Expected a valid JSON response.") from None
+
+
+def post_json_object(
+    session: requests.Session, url: str, *, body: Mapping[str, object]
+) -> dict[str, object]:
+    """Perform one JSON POST with the shared read-request policy.
+
+    The body is sent once as JSON with the same timeouts, redirect refusal, and
+    finite-number parsing as [get_json_object][atlawire.http.get_json_object].
+    Diagnostics are generic, so a failed request never echoes the URL, payload,
+    query, or credentials.
+    """
+    try:
+        payload = cast(_JsonValue, dict(body))
+        with session.post(
+            url, json=payload, timeout=(5, 30), allow_redirects=False
+        ) as response:
+            _check_status(response.status_code)
+            data = _decode_json(response)
+    except requests.Timeout:
+        raise AtlaWireError("Request timed out.") from None
+    except requests.RequestException:
+        raise AtlaWireError(
+            "Request failed; check connectivity and TLS settings."
+        ) from None
+    if not isinstance(data, dict):
+        raise AtlaWireError("Expected a JSON object.")
     return data
 
 

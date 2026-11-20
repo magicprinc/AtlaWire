@@ -8,18 +8,18 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branches`, `commits`,
-  `find-repos`, `file`, `files`, `ls`, `commit-changes`, `commit-diff`, `pr` (show, files,
+  `find-repos`, `search`, `file`, `files`, `ls`, `commit-changes`, `commit-diff`, `pr` (show, files,
   comments, diff, and file), `issue` and `page` (JSON or Markdown), `jql`, `mine`, `statuses`,
   `cql`, `spaces`, and `children`. Check `git status` before resuming; preserve local
   references and unrelated edits.
-- **Last verification:** 1064 offline tests passed using Python 3.15 outside a venv, including
+- **Last verification:** 1157 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Repository search tests checked the shared request budget and a later project failure
-  after an earlier match.
+  Indexed search tests checked the plugin cursor, highlight evidence, and no output on
+  malformed late results.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** Bitbucket indexed code `search`. Use the plugin's read-only search endpoint;
-  distinguish server highlights from context and keep validation separate from live compatibility.
+- **Next slice:** list Bitbucket PR commits through the documented paged endpoint. Keep live
+  code-search plugin validation separate.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -127,7 +127,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Bitbucket `files` and `ls`, including directory cursor paging without partial output.
 - [x] Port Bitbucket `commit-changes` and `commit-diff` with explicit server-cap behavior.
 - [x] Port Bitbucket `find-repos` with bounded fanout and the legacy match/failure regressions.
-- [ ] Port Bitbucket indexed code `search` with the plugin cursor and explicit evidence labels.
+- [x] Port Bitbucket indexed code `search` with the plugin cursor and explicit evidence labels.
+- [ ] Port Bitbucket PR commit lists; adapt the legacy cursor-gap and later-failure regressions.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve

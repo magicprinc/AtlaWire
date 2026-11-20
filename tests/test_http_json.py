@@ -6,10 +6,40 @@ from atlawire.http import (
     bearer_session,
     get_json_array,
     get_json_object,
+    post_json_object,
 )
 
 URL = "https://jira.example.invalid/rest/api/2/status"
 TOKEN = "fixture-only"
+
+
+@responses.activate
+def test_post_json_object_keeps_the_shared_object_and_number_rules() -> None:
+    responses.post(URL, json={"ok": True})
+    responses.post(URL, body="[1e999]", content_type="application/json")
+    responses.post(URL, json=["not", "an", "object"])
+
+    with bearer_session(TOKEN) as session:
+        assert post_json_object(session, URL, body={"q": "x"}) == {"ok": True}
+    for match in ("valid JSON", "JSON object"):
+        with (
+            bearer_session(TOKEN) as session,
+            pytest.raises(AtlaWireError, match=match),
+        ):
+            post_json_object(session, URL, body={"q": "x"})
+
+
+@responses.activate
+def test_post_json_object_refuses_a_redirect_without_following_it() -> None:
+    responses.post(URL, status=302, headers={"Location": "https://evil.invalid/"})
+
+    with (
+        bearer_session(TOKEN) as session,
+        pytest.raises(AtlaWireError, match="redirect refused"),
+    ):
+        post_json_object(session, URL, body={"q": "x"})
+
+    assert len(responses.calls) == 1
 
 
 @responses.activate

@@ -67,6 +67,22 @@ rows if any page fails or the page limit is reached. This first command uses bea
 and HTTPS without redirects. Keyring and custom proxy/CA configuration are not wired yet.
 See the [Bitbucket Server 5.10 REST reference](https://docs.atlassian.com/bitbucket-server/rest/5.10.0/bitbucket-rest.html).
 
+## Search indexed Bitbucket code
+
+```shell
+atlawire search 'WidgetService' --repo DEMO/widgets --token-from-env
+atlawire search 'WidgetService' --project DEMO --all --limit 50 --token-from-env --json
+```
+
+`search` uses the Bitbucket Search plugin and makes one read-only search request by default
+(`--limit` defaults to 20). `--all` follows the plugin cursor for up to 20 requests and at
+most 999 files. A failed request or invalid page produces no partial results. JSON
+distinguishes server-highlighted lines (`hits`) from surrounding `context` and reports
+`matchEvidence` as `highlight`, `context-only`, or `none`.
+
+This searches indexed content, typically on the default branch, not every file or branch.
+It is not a regex search. The plugin workflow has been exercised offline only.
+
 ## Retrieve a Bitbucket pull request
 
 ```shell

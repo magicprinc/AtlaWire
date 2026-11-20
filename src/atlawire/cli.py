@@ -34,6 +34,20 @@ from atlawire.bitbucket import (
     list_repositories,
     list_repository_files,
 )
+from atlawire.bitbucket_search import (
+    SEARCH_LIMIT_DEFAULT as BB_SEARCH_LIMIT_DEFAULT,
+)
+from atlawire.bitbucket_search import (
+    SEARCH_LIMIT_MAX as BB_SEARCH_LIMIT_MAX,
+)
+from atlawire.bitbucket_search import (
+    SEARCH_LIMIT_MIN as BB_SEARCH_LIMIT_MIN,
+)
+from atlawire.bitbucket_search import (
+    SearchLine,
+    SearchRow,
+    search_code,
+)
 from atlawire.confluence import (
     CHILD_LIMIT_DEFAULT,
     CHILD_LIMIT_MAX,
@@ -75,6 +89,11 @@ _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
 _BRANCH_COLUMNS = "name\tcommit\tdefault"
 _COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
 _COMMIT_MESSAGE_MAX = 160
+_SEARCH_SNIPPET_MAX = 110
+_SEARCH_UNSAFE = re.compile(
+    r"[\\\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069"
+    r"\ud800-\udfff]"
+)
 
 
 @click.group(invoke_without_command=True)
@@ -239,6 +258,78 @@ def find_repos_command(
     for row in rows:
         values = (row["project"], row["slug"], row["name"], row["state"])
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command("search")
+@click.argument("query")
+@click.option("--project", default=None, help="Limit results to one project key.")
+@click.option("--repo", default=None, help="Limit results to one KEY/slug.")
+@click.option(
+    "--limit",
+    type=click.IntRange(BB_SEARCH_LIMIT_MIN, BB_SEARCH_LIMIT_MAX),
+    default=None,
+    help=(
+        f"Rows to return ({BB_SEARCH_LIMIT_MIN}-{BB_SEARCH_LIMIT_MAX}; "
+        f"{BB_SEARCH_LIMIT_DEFAULT}, or {BB_SEARCH_LIMIT_MAX} with --all)."
+    ),
+)
+@click.option(
+    "--all",
+    "every_page",
+    is_flag=True,
+    help="Follow result pages up to the row limit instead of one page.",
+)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print a JSON array instead of a summary."
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def search_command(
+    query: str,
+    project: str | None,
+    repo: str | None,
+    limit: int | None,
+    every_page: bool,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Search indexed Bitbucket code, optionally scoped to a project or repo.
+
+    Without --all only the first result page is read. With --all the call
+    follows pages up to the row limit or the server's terminal page.
+    """
+    if project is not None and repo is not None:
+        raise click.UsageError("Use --project or --repo, not both.")
+    if not query.strip():
+        raise click.UsageError("Provide a non-empty search query.")
+    row_limit = (
+        BB_SEARCH_LIMIT_MAX
+        if every_page and limit is None
+        else (BB_SEARCH_LIMIT_DEFAULT if limit is None else limit)
+    )
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        rows = search_code(
+            base_url,
+            query,
+            project=project,
+            repo=repo,
+            limit=row_limit,
+            every_page=every_page,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    if as_json:
+        click.echo(json.dumps(rows))
+        return
+    _print_search_results(rows, every_page=every_page)
 
 
 @cli.command()
@@ -591,6 +682,37 @@ def _print_commits(rows: list[Commit], *, as_json: bool) -> None:
         message = " ".join(row["message"].split())[:_COMMIT_MESSAGE_MAX]
         values = (row["hash"], row["date"], row["author"], message)
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _print_search_results(rows: list[SearchRow], *, every_page: bool) -> None:
+    suffix = "" if every_page else " (first page only; use --all for every page)"
+    click.echo(f"# {len(rows)} file(s){suffix}")
+    for row in rows:
+        where = f"{row['project']}/{row['repository']}:{row['file']}"
+        count = "unknown hits" if row["hitCount"] is None else f"{row['hitCount']} hits"
+        click.echo(f"{_search_cell(where)} ({count}) {_search_evidence(row)}")
+
+
+def _search_evidence(row: SearchRow) -> str:
+    """Label one highlighted line or one context line; never treat it as proof."""
+    if row["hits"]:
+        return _search_line("highlighted", row["hits"][0])
+    for group in row["context"]:
+        for line in group:
+            return _search_line("context", line)
+    return "no context"
+
+
+def _search_line(label: str, line: SearchLine) -> str:
+    location = "line unknown" if line["line"] is None else f"L{line['line']}"
+    text = _search_cell(" ".join(line["text"].split())[:_SEARCH_SNIPPET_MAX])
+    prefix = f"{label} {location}"
+    return f"{prefix}: {text}" if text else prefix
+
+
+def _search_cell(value: str) -> str:
+    """Escape controls, bidi formatting, and backslashes for one terminal line."""
+    return _SEARCH_UNSAFE.sub(lambda match: ascii(match[0])[1:-1], value)
 
 
 def _run_pr_diff_action(
