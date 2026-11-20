@@ -194,9 +194,13 @@ or the requested row limit produces no partial rows.
 ## Review a Bitbucket commit
 
 ```shell
+atlawire commit DEMO/widgets abc1234 --token-from-env
 atlawire commit-changes DEMO/widgets abc1234 --token-from-env --json
 atlawire commit-diff DEMO/widgets abc1234 src/app.py --token-from-env
 ```
+
+`commit` returns the server's JSON for a 7–40 character hexadecimal commit ID. It checks
+that the returned full ID matches the requested ID or abbreviation.
 
 `commit-changes` follows the server cursor for changed paths. `commit-diff` shows a review
 view, not a patch to apply. It takes a 7–40 character hexadecimal commit ID and optional

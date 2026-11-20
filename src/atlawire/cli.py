@@ -20,6 +20,7 @@ from atlawire.bitbucket import (
     PullRequest,
     PullRequestComment,
     find_repositories,
+    get_commit,
     get_commit_diff,
     get_commit_diff_text,
     get_file_blame,
@@ -430,6 +431,43 @@ def commits(
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
     _print_commits(rows, as_json=as_json)
+
+
+@cli.command()
+@click.argument("repo")
+@click.argument("sha")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL", required=True)
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Accepted for symmetry; JSON is always printed.",
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def commit_command(
+    repo: str,
+    sha: str,
+    base_url: str,
+    token_from_env: bool,
+    as_json: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Get one commit as JSON by full or abbreviated hexadecimal SHA."""
+    token = _environment_token("ATLAWIRE_BITBUCKET_TOKEN", token_from_env)
+    try:
+        result = get_commit(
+            base_url,
+            repo,
+            sha,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(result))
 
 
 @cli.command("commit-changes")

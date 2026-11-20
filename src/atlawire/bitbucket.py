@@ -794,6 +794,38 @@ def list_commits(
         )
 
 
+def get_commit(
+    base_url: str,
+    repo: str,
+    sha: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one commit exactly as the server sent it.
+
+    ``repo`` is ``PROJECT/slug`` and ``sha`` must be 7 to 40 ASCII hexadecimal
+    characters; symbolic refs are rejected and no ``path`` filter is sent,
+    because 5.10 documents that a path may return a different commit. Exactly
+    one GET targets the configured repository's ``/commits/{sha}`` route with no
+    query parameters, and no link carried by the response is followed.
+
+    The object must carry an ``id`` of exactly 40 ASCII hexadecimal characters
+    that equals the requested full ID or starts with the requested abbreviation,
+    compared case-insensitively. A wrong, missing, or malformed ID fails with a
+    static error. All other fields are returned unchanged: this is an exact
+    lookup, including an abbreviated ID resolved by the server, not a claim that
+    an abbreviation is unique outside the server's rules.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    requested = _commit_id(sha)
+    url = f"{_repository_url(base, repo)}/commits/{requested}"
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+    _validate_commit_response(value, requested)
+    return value
+
+
 def list_commit_changes(
     base_url: str,
     repo: str,
@@ -1071,6 +1103,17 @@ def _commit_id(value: str) -> str:
     if not isinstance(value, str) or not _COMMIT_ID.fullmatch(value):
         raise AtlaWireError("Expected a commit ID as 7 to 40 hexadecimal characters.")
     return value
+
+
+def _validate_commit_response(value: dict[str, object], requested: str) -> None:
+    """Require a full response ID matching the requested ID or abbreviation."""
+    identifier = value.get("id")
+    if (
+        not isinstance(identifier, str)
+        or not _COMMIT_SHA1.fullmatch(identifier)
+        or not identifier.lower().startswith(requested.lower())
+    ):
+        raise AtlaWireError("Invalid commit identity in the response.")
 
 
 def _commit_diff_targets(

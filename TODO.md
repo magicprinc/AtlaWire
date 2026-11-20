@@ -8,17 +8,17 @@ open, and no product behavior or compatibility claim is made before it is tested
 - **Goal:** replace `bbk` for daily self-hosted Atlassian work and demonstrate stronger
   regression coverage. Keep `bbk` unchanged and usable until the side-by-side checks pass.
 - **Saved work:** the editable Python 3.15 package has `projects`, `repos`, `branches`, `commits`,
-  `find-repos`, `search`, `file`, `files`, `ls`, `blame`, `commit-changes`, `commit-diff`,
+  `find-repos`, `search`, `file`, `files`, `ls`, `blame`, `commit`, `commit-changes`, `commit-diff`,
   `prs`, `my-prs`, `pr` (show, files, comments, commits, diff, and file), `issue` and `page`
   (JSON or Markdown), `jql`, `mine`, `statuses`, `cql`, `spaces`, and `children`. Check `git status` before
   resuming; preserve local references and unrelated edits.
-- **Last verification:** 1313 offline tests passed using Python 3.15 outside a venv, including
+- **Last verification:** 1320 offline tests passed using Python 3.15 outside a venv, including
   installed CLI subprocesses. Ruff lint/format/security, Pyright, lock, and diff checks passed.
-  Dashboard tests checked fixed filters, fork target selection, deduplication, and no partial output.
+  Commit lookup tests checked a matching abbreviation and rejection of a different full ID.
   Runtime tests used installed `markdownify` 1.2.3; the lock resolves 1.2.4.
   No live compatibility or corporate TLS/proxy proof.
-- **Next slice:** exact Bitbucket commit lookup, verifying the returned full ID against
-  the requested ID or prefix. Keep path-filtered history and PR diff fallback separate.
+- **Next slice:** exact Bitbucket branch lookup. Check case-sensitive branch names against
+  the paged filter results. Keep automatic PR diff fallback separate.
   Verify `projects` and `repos` live before relying on them for caching.
 - **Where to start:** `src/atlawire/jira.py` owns Jira endpoints, `http.py` owns the
   authenticated transport, and `cli.py` owns command output. Use `tests/test_jira_e2e.py`
@@ -132,7 +132,8 @@ python -B -m pytest -p no:cacheprovider -q tests
 - [x] Port Bitbucket `blame` with one indexed line per array entry and a verified legacy projection.
 - [x] Port Bitbucket repository PR listing with bounded paging and fixed filters.
 - [x] Port the Bitbucket current-user PR dashboard and preserve inactive participant names.
-- [ ] Port exact Bitbucket commit lookup with response identity verification.
+- [x] Port exact Bitbucket commit lookup with response identity verification.
+- [ ] Port exact Bitbucket branch lookup without treating case variants as the same ref.
 - [ ] Port Jira and Confluence comment/page changes and Bitbucket PR changes with explicit write
       approval. Verify each write offline before any separately authorized live test.
 - [ ] Run the same daily workflows with both tools on the self-hosted versions we use. Preserve
