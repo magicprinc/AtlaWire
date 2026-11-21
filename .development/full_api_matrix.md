@@ -31,23 +31,28 @@ Get server info — версия и базовые сведения об инс�
 Get current user (myself) — кто я: логин, имя, часовой пояс	✅A	✅A
 Get user — профиль пользователя по ключу или логину	❌N	✔P
 Search users — поиск пользователей по имени или логину	⌛D	✅A
+Search assignable users — кому можно назначить задачу	⌛D	❌N
 Get user groups — группы, в которых состоит пользователь	❌N	❌N
 Get issue — карточка задачи: поля, статус, исполнитель, описание	✅A	✅A
 Get edit metadata — какие поля можно менять у задачи	❌N	❌N
+Get create metadata — поля, обязательные при создании задачи	❌N	❌N
 Get issue transitions — доступные переходы статуса	✅A	✅A
+Get transition fields — обязательные поля и значения для перехода	⌛D	❌N
 Get issue changelog — история изменений полей и статусов	⌛D	❌N
 Read issue comments — полная лента комментариев задачи	✅A	✔P
 Search comments by author — комментарии человека по всем задачам	⌛D	✅A
 Get issue worklogs — учёт трудозатрат по задаче	⌛D	❌N
 Issue attachments (metadata) — вложения в составе карточки задачи	✔P	✔P
 Download attachment — скачать файл вложения	❌N	❌N
-Issue links and subtasks — связи и подзадачи в составе карточки	✔P	✔P
+Issue links and subtasks — связи, их типы и подзадачи в составе карточки	✔P	✔P
+Get remote links — ссылки задачи на Confluence, PR и внешние ресурсы	⌛D	❌N
 Watchers and votes — подписчики и голоса	❌N	❌N
 Search issues (JQL) — выборка задач запросом JQL	✅A	✅A
 JQL autocomplete — подсказки полей и значений JQL	❌N	❌N
 Get projects — проекты Jira	❌N	❌N
 Project versions and components — версии и компоненты проекта	❌N	❌N
 Project roles — роли проекта и участники	❌N	❌N
+Get my permissions — что мне разрешено в проекте или задаче	⌛D	❌N
 Get statuses — справочник статусов инстанса	✅A	✅A
 Status categories — категории статусов (To Do, In Progress, Done)	❌N	❌N
 Get resolutions — справочник резолюций	❌N	❌N
@@ -76,9 +81,11 @@ Page attachments — вложения страницы	❌N	❌N
 Page labels — метки страницы	❌N	❌N
 Page restrictions — ограничения доступа к странице	❌N	❌N
 Content properties — пользовательские свойства контента	❌N	❌N
+Convert content body — storage в view или экспорт (POST, без записи)	❌N	❌N
 Search with CQL — поиск страниц запросом CQL	✅A	✅A
 List spaces — пространства Confluence	✅A	✅A
 Get space — описание и метаданные пространства	❌N	❌N
+Get space content — страницы пространства списком	❌N	❌N
 Blogposts — блог-посты пространства	❌N	❌N
 Templates and blueprints — шаблоны страниц	❌N	❌N
 Confluence users and groups — пользователи и группы	❌N	❌N
@@ -92,19 +99,23 @@ Get project — один проект по ключу	❌N	❌N
 List repositories — репозитории проекта	✅A	✅A
 Get repository — метаданные одного репозитория	❌N	❌N
 Find repositories — поиск репозитория по имени или slug	✅A	✅A
-List branches — ветки репозитория	✅A	✅A
+List branches — ветки репозитория, включая признак основной	✅A	✅A
 Get branch — одна ветка по точному имени	✅A	✅A
 List commits — история коммитов с фильтром по пути	✅A	✅A
 Get commit — один коммит по хешу	✅A	✅A
+Last modified — когда последний раз менялся репозиторий или путь	⌛D	❌N
 Commit changes — файлы, изменённые коммитом	✅A	✅A
 Commit diff — diff коммита целиком или по путям	✅A	✅A
+Commit comments — комментарии к коммиту	❌N	❌N
 Compare refs — diff между двумя ветками или коммитами	❌N	❌N
 Get file at ref — точные байты файла на ветке или коммите	✅A	✅A
 List files — все пути файлов репозитория	✅A	✅A
 Browse directory — содержимое каталога	✅A	✅A
 Blame — автор и дата по строкам файла	✅A	✅A
+Repository participants — кто участвует в репозитории	⌛D	❌N
 List tags — теги репозитория	❌N	❌N
 Get tag — один тег	❌N	❌N
+Related repositories and forks — связанные репозитории и форки	⌛D	❌N
 Repository archive — архив репозитория на ref	❌N	✔P
 Search all projects — полный сквозной поиск по коду всех видимых проектов (плагин поиска, не core REST)	✅A	✅A
 Search in project — поиск по коду внутри одного проекта (плагин поиска)	✅A	✅A
@@ -120,6 +131,7 @@ PR diff (one file) — diff одного файла PR	✅A	✅A
 PR diff fallback — добор diff при заявленном усечении	⌛D	✅A
 PR comments — комментарии и треды PR	✅A	✅A
 PR commits — коммиты PR	✅A	✅A
+PR merge status — можно ли слить PR и какие есть конфликты	⌛D	❌N
 PR activity — лента активности PR	❌N	❌N
 PR participants — участники и роли PR	❌N	❌N
 PR tasks — задачи-блокеры PR	❌N	❌N
@@ -127,6 +139,7 @@ Build status — статусы сборки коммита	❌N	❌N
 Default reviewers — ревьюеры по умолчанию	❌N	❌N
 Repository attachments — вложения репозитория	❌N	✔P
 User profile — профиль пользователя Bitbucket	❌N	✔P
+Recent repositories — недавно открытые репозитории пользователя	❌N	❌N
 Inbox — входящие pull requests	❌N	❌N
 Markup preview — рендер разметки Bitbucket	❌N	❌N
 
@@ -142,7 +155,7 @@ Bearer/PAT authentication — токен из окружения, не из ар
 ## Сводка
 
 Раздел	Строк	AW ✅A	AW ✔P	AW ⌛D	AW ❌N	BBK ✅A	BBK ✔P	BBK ⌛D	BBK ❌N
-Jira	31	6	2	4	19	7	4	0	20
-Confluence	21	5	0	3	13	6	0	0	15
-Bitbucket	42	23	1	3	15	27	3	0	12
+Jira	36	6	2	8	20	7	4	0	25
+Confluence	23	5	0	3	15	6	0	0	17
+Bitbucket	48	23	1	7	17	27	3	0	18
 Cross-cutting and composite	5	2	0	1	2	4	1	0	0
