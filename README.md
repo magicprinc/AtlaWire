@@ -22,7 +22,10 @@ Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server*
 
 Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), verify a deployment
 with the [read-only runbook](docs/LIVE-READ-ONLY.md), and report practical gaps with
-the [feedback template](docs/FEEDBACK.md).
+the [feedback template](docs/FEEDBACK.md). See the [research coverage
+matrix](docs/RESEARCH-COVERAGE.md) for BBK replacement limits and the
+[historical write API reference](docs/DEFERRED-WRITES.md) for operations
+deliberately excluded from AtlaWire.
 
 ## Install from source
 

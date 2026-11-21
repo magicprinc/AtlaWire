@@ -11,6 +11,12 @@ change, prepare the material locally; the owner reviews and applies it. Human TS
 Markdown show bidi formatting and other unsafe controls as visible escapes; JSON
 keeps the server values.
 
+Use a read-only service identity where the deployment supports it. Keep write
+credentials and write-capable tools out of the agent session. This client does
+not constrain other tools or protect access to research output. Keep results
+with the same audience as the sources; do not add live output to a public repo.
+See [research coverage and evidence limits](RESEARCH-COVERAGE.md).
+
 ## On this machine
 
 The package is installed for the current user from this checkout. Run it without

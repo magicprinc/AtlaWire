@@ -9,6 +9,7 @@ build/
 dist/
 *.egg-info/
 .eggs/
+pip-wheel-metadata/
 wheels/
 *.whl
 
@@ -22,6 +23,7 @@ venv/
 .mypy_cache/
 .pyright/
 .hypothesis/
+.ipynb_checkpoints/
 .tox/
 .nox/
 htmlcov/
@@ -29,11 +31,15 @@ coverage.xml
 .coverage
 .coverage.*
 junit*.xml
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Local runtime state, including credentials intended for this machine only.
 # Never commit real tokens, keys, or captured requests.
 /.atlawire/
 /secrets/
+/.planning/
+.pypirc
 
 # Logs and scratch files
 *.log
