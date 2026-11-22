@@ -49,11 +49,11 @@ the installed CLI:
 
 | Example | Why it is in the slice |
 | --- | --- |
-| Jira project lookup; a Confluence content or space lookup; Bitbucket repository lookup | Three real product clients, three context paths and three credential pairs; known ID/key/slug in the returned object. Select an exact high-level method if its contract fits. |
+| `jira.project.get`, `confluence.space.get`, `bitbucket.repository.get` | Three real product clients, three context paths and three credential pairs; known ID/key/slug in the returned object. Select an exact high-level method if its contract fits. |
 | Bitbucket paged project listing | Detect an SDK helper that traverses internally, drops the wrapper, or calculates the next offset. |
 | One fixed SDK fallback for a documented route with no equivalent high-level method | Prove fallback is a supported named operation, not an arbitrary URL, and preserves output shape. |
 | Jira search by semantic-read POST | Prove that method, product, JSON body, and response schema are retained and that arbitrary POST is not enabled. |
-| One real authentication/authorization error **offline**, and one recovered network failure **offline** | Prove runtime mapping, automatic retry and output framing without a live fault injection. |
+| One synthetic HTTP 401/403 and one recovered loopback connection failure | Prove runtime mapping, automatic retry and output framing without a live fault injection. |
 
 In each batch: **unit first → installed CLI loopback → owner-run live
 validation**. Write a representative critical regression before the fix and
@@ -69,9 +69,9 @@ the harness; do not reproduce the whole boundary suite per route.
 
 | Scenario | Observable result and faulty implementation rejected |
 | --- | --- |
-| Fresh install, no credentials: root help, product help, command `--help`, `--catalog`, `--describe` a known operation | All work offline and show the expected command, usable parameters/defaults and result kind. Catalog has one row per supported ID and one canonical command per task. Unknown describe ID emits a structured error and does not echo the submitted value. A broken description, stale alias, browser launch, credential access or HTTP request fails the check. |
+| Fresh install, no credentials: root help, product help, command `--help`, `--catalog`, `--describe` a known operation | All work offline and show the expected command, usable parameters/defaults and result kind. Catalog retains its existing command metadata and has one `operations` row per supported ID. Unknown describe ID emits a structured error and does not echo the submitted value. Pair the installed test with in-process spies that fail on credential resolution or request dispatch; merely setting a missing credential path does not prove these were never attempted. |
 | Use only installed help/JSON to run a documented example on a synthetic fixture | Execute the advertised argv, not a corrected hand-written call. Assert documented required options, typed input, default behavior and exact returned object. Wrong ordering, missing options, invalid quoting and help/runtime drift fail. |
-| Agent distinguishes normal results from errors | Test JSON-only stdout and exact exit code for every new machine-facing entry point. Valid object, list, empty list, declared text and documented no-content success are distinguishable. Human `--help`/`--version` and documented legacy commands are the explicit exceptions. Test Python and CLI parity for a representative operation; a Python-only loopback case is not CLI evidence. |
+| Agent distinguishes normal results from errors | Test JSON-only stdout and exact exit code for each new machine-facing **entry point**, not a separate error matrix per operation. Verify canonical read/describe success and use malformed args, missing config and HTTP failure to distinguish exits 0/2/1. Valid object, list, empty list, declared text and documented no-content success are distinguishable. Help/version, existing catalog success format and documented legacy behavior follow the delivery plan's explicit rules. A Python-only loopback case is not CLI evidence. |
 
 ### B. One registered read really does what its description says
 
@@ -80,7 +80,7 @@ the harness; do not reproduce the whole boundary suite per route.
 | Every required ID, with independent synthetic request and response fixture | Capture the real method, context-prefixed route, parsed query/body, matched synthetic bearer and request count. Assert a meaningful response shape and fixture identity, including at least one extra field where valid. Use full payload comparison on representative raw responses. A correct status on the wrong resource, or discarded fields/envelopes, fails. |
 | Parameter boundaries | Cover a missing required argument, unknown argument, wrong type (including boolean as an integer), documented limits and enum members. For supported parameters, send Unicode, spaces, `+`, `&`, repeated names and an identifier/path that requires encoding. Check parsed query/body **and** the relevant exact wire spelling to catch double encoding and duplicate-key loss. Do not apply a restrictive generic key regex to a documented different identifier domain. |
 | Page 1 advertises page 2 | Fixture returns `nextPageStart=19` after a request with `start=5, limit=2`; assert the client emits the first envelope intact and sends exactly one request on a healthy transport. Explicitly request page 2 from the advertised continuation, then assert `start=19`. Also cover Jira offset and Confluence metadata where those adapters paginate. Reject fetching page 2 automatically, deriving `7`, stripping the cursor, or calling a bare array exhaustive. |
-| Response validation | A valid empty array is successful. A wrong object/array type, malformed late row required by the contract, login HTML for JSON, bad JSON, non-finite number, disallowed 206, unexpected 204 and missing mandatory field fail without partial stdout. A documented 204 maps to `data:null`; distinguish it from an undocumented 200 JSON `null`. Verify text and binary using declared endpoint kinds, not heuristics. |
+| Response validation | A valid empty array is successful. A wrong object/array type, malformed late row required by the contract, login HTML for JSON, bad JSON, non-finite number, disallowed 206, unexpected 204 and missing mandatory field fail with exactly one error JSON and no partial success data. A documented 204 maps to `data:null`; distinguish it from an undocumented 200 JSON `null`. Verify text and binary using declared endpoint kinds, not heuristics. |
 | Positive binary and interrupted download | Compare bytes or an independent SHA-256, not just a file name or byte count. Exercise size cap, interrupted stream, an existing output file and cleanup. Never overwrite an existing file or publish a completed receipt or partial output on failure. Test a non-UTF-8 binary fixture so replacing bytes with decoded text fails. |
 
 ### C. Read-only and credentials: prove the point of refusal
@@ -92,7 +92,7 @@ the harness; do not reproduce the whole boundary suite per route.
 | Redirect from GET and semantic POST | Refuse off-origin and wrong-context redirects before a second request. Test a redirect that would preserve POST as well as a normal login redirect. Verify both listener counts, not just the eventual error. |
 | Optional GET side effects | Verify the Jira issue read does not request activity-history updates. Verify listing transitions never invokes an actual transition. The first accepted request is inspected, not inferred from its response. |
 | Credential-safe results and logs | Synthetic response echoes a long fixture token in success and error paths (including JSON escaping where relevant). Safe ordinary bodies still keep their documented excerpt and parsed form; echoed credentials, authorization fields and unsafe diagnostics never reach stdout, stderr or log files. Test a valid non-secret control case to reject a catch-all that returns empty data/errors. |
-| Human setup, **if included in the candidate** | Synthetic browser, hidden terminal and private temp store. Correct product instructions, no visible fallback, no read of the clipboard, token verified against only the selected URL. Failed validation, canceled prompt, confirmed replacement and failed write must preserve preexisting data as specified. Test complete matched-pair replacement without dropping unrelated fields/products. A browser-consent path also needs valid/canceled callback, wrong state and no token output. Never mint, rotate or revoke live tokens as a release test. |
+| Human setup, required for handoff but not for the first read slice | Synthetic browser, hidden terminal and private temp store. Correct product instructions, no clipboard read, token verified against only the selected URL. A `GetPassWarning` or non-interactive invocation must stop before reading visible input. On failed validation, cancellation or failed write, the existing store is unchanged; on confirmed replacement, only the selected matched pair changes. Instructions go to terminal/stderr; stdout carries only the final safe JSON status. If optional browser consent is implemented, also test success, canceled callback, wrong state and no token output. Never mint, rotate or revoke live tokens as a release test. |
 
 ### D. Error and retry behavior
 
@@ -108,16 +108,18 @@ the harness; do not reproduce the whole boundary suite per route.
 - Verify the effective pinned retry owner, not just constructor attributes.
   A recoverable pre-response connection failure and a 503 followed by 200
   each produce one successful result and the expected attempt count. Test
-  429 followed by success within budget, and a `Retry-After` beyond budget
-  that does **not** induce the advertised wait or another call. Exhaustion
-  produces the right error with no extra attempt. A unit-level controlled
+  429 followed by success within budget, and a `Retry-After` beyond the
+  five-second cumulative wait budget that does **not** induce the advertised
+  wait or another call. Exhaustion stops after at most three total attempts
+  (the first attempt counts) and produces the right error. A unit-level controlled
   clock/sleeper checks delay and bounds; real loopback checks that the
   installed transport actually retries. Do not depend on wall-clock sleeps
   or purposely trigger throttling on the real service.
 - Prove no retries for non-retryable HTTP, redirect, invalid data, and
   semantic POST not explicitly declared retryable. Separate the healthy
   single-page request-count test from retry cases. After all paths assert
-  teardown, not unconditional cleanup that masks a leaked response/session.
+  that production code closes the response/session **before** fixture
+  cleanup. A closed test server by itself is not that evidence.
 - Run the CLI against a private scratch log directory with a small test
   rotation threshold, then induce a log-write failure. Check both active and
   rotated logs for safe event fields and absence of sensitive fields. Two
@@ -160,12 +162,12 @@ An empty result must not hide an unsupported or failed product.
    metadata, imported module location and console launcher. Run section A
    there plus the slice from section 2 over actual loopback transport.
    A passing editable install or `CliRunner` alone is not this evidence.
-4. **Real-server proof.** the owner runs the updated fixture-scoped live
+4. **Real-server proof.** The owner runs the updated fixture-scoped live
    read-only runner for the same installed artifact using the saved
    credentials. Record the observed server versions and a sanitized outcome
    per run. Require positive shape/identity checks for each product and
    representative distinct adapter/response kinds (including a real page
-   continuation, semantic POST if supported, and binary if mandatory), plus
+   continuation, semantic POST and binary where required by the scope), plus
    successful BBK comparisons for the workflows claimed. No read of real
    fixture values or tokens by the reviewer, no live failure injection. A
    gap in permission, fixture or availability remains visible in the matrix;
