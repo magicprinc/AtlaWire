@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from threading import Thread
 from urllib.parse import parse_qs, urlsplit
 
@@ -98,6 +99,7 @@ def run_page(
     token_flag: bool = True,
     explicit_base_url: bool = False,
     confluence_env_path: str = "/confluence/",
+    credentials_path: str | None = None,
 ) -> tuple[
     subprocess.CompletedProcess[str],
     list[tuple[str, str, dict[str, list[str]], str | None]],
@@ -146,6 +148,8 @@ def run_page(
             }
             if token is None:
                 env.pop("ATLAWIRE_CONFLUENCE_TOKEN", None)
+            if credentials_path is not None:
+                env["BBK_CREDENTIALS"] = credentials_path
             command = [script, "page", argument]
             if explicit_base_url:
                 command.extend(["--base-url", base_url])
@@ -307,12 +311,16 @@ def test_missing_confluence_token_does_not_use_other_product_tokens() -> None:
     assert seen == []
 
 
-def test_token_from_env_must_be_selected_explicitly() -> None:
-    result, seen = run_page("123", token_flag=False)
+def test_missing_saved_credentials_fail_without_reading_the_environment_pair(
+    tmp_path: Path,
+) -> None:
+    missing = str(tmp_path / "missing-credentials.json")
+    result, seen = run_page("123", token_flag=False, credentials_path=missing)
 
-    assert result.returncode == 2
+    assert result.returncode == 1
     assert result.stdout == ""
-    assert "Select --token-from-env" in result.stderr
+    assert "Saved BBK credentials are unavailable for confluence" in result.stderr
+    assert TOKEN not in result.stderr
     assert seen == []
 
 

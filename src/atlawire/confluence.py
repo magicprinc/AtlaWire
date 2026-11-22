@@ -1,11 +1,16 @@
-"""Read operations for self-hosted Confluence."""
+"""Read operations for self-hosted Confluence.
+
+These adapters issue one fixed GET per call, return the server JSON object
+unchanged, and never follow returned links. They follow the Confluence 6.6.0
+documentation; the live version and exact response shapes are not verified.
+"""
 
 import json
 import re
 from collections.abc import Callable, Mapping
 from hashlib import sha256
 from typing import TypedDict
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import requests
 
@@ -17,10 +22,26 @@ from atlawire.http import (
 )
 
 _PAGE_EXPAND = "body.storage,version,space,ancestors"
+_HISTORY_PATH = "/rest/api/content/{id}/history"
+_PAGE_VERSION_EXPAND = "body.storage,version"
+_PAGE_VERSION_STATUS = "historical"
 _CHILD_PATH = "/rest/api/content/{id}/child/page"
 _CHILD_EXPAND = "version"
+_ATTACHMENT_PATH = "/rest/api/content/{id}/child/attachment"
+_COMMENT_PATH = "/rest/api/content/{id}/child/comment"
+_COMMENT_EXPAND = "body.storage"
+_COMMENT_DEPTH_ALL = "all"
+_LABEL_PATH = "/rest/api/content/{id}/label"
 _SEARCH_PATH = "/rest/api/search"
 _SPACE_PATH = "/rest/api/space"
+# One explicit page; the server may cap the limit. Defaults follow Confluence
+# 6.6.0 documentation.
+PAGE_START_MIN = 0
+PAGE_LIMIT_MIN = 1
+PAGE_LIMIT_MAX = 1000
+ATTACHMENT_LIMIT_DEFAULT = 50
+COMMENT_LIMIT_DEFAULT = 25
+LABEL_LIMIT_DEFAULT = 200
 CQL_LIMIT_MIN = 0
 CQL_LIMIT_MAX = 1000
 CQL_LIMIT_DEFAULT = 25
@@ -32,6 +53,9 @@ CHILD_LIMIT_MAX = 1000
 CHILD_LIMIT_DEFAULT = 100
 _PAGE_ID = re.compile(r"[1-9][0-9]*")
 _RAW_ASCII_CONTROL = re.compile(r"[\x00-\x20\x7f]")
+_UNSAFE_WEBUI = re.compile(
+    r"[\x00-\x20\x7f-\x9f\\\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]"
+)
 _INVALID_ID = (
     "Expected a numeric Confluence page ID or a page link "
     "with one pageId query parameter."
@@ -39,6 +63,8 @@ _INVALID_ID = (
 _INVALID_PAGE = (
     "Expected a Confluence page with a matching id, type, title, and storage body."
 )
+_INVALID_PAGE_VERSION = "Expected the requested Confluence page version."
+_INVALID_VERSION_ARGUMENT = "The page version must be a positive integer."
 _INVALID_RESULT = "Invalid Confluence content metadata in search results."
 _INVALID_SPACE = "Invalid Confluence space metadata in spaces results."
 _INVALID_CHILD = "Invalid Confluence child page metadata in children results."
@@ -126,6 +152,86 @@ def get_page(
     return _validated_page(page, requested_id)
 
 
+def get_page_web_url(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return a browser URL for a Confluence page.
+
+    Reads the page through [get_page][atlawire.confluence.get_page] and appends
+    a validated context-relative ``_links.webui`` path to the configured base
+    URL. Missing, malformed, absolute, or otherwise unsafe links are ignored in
+    favour of ``/pages/viewpage.action?pageId=<id>``. The supplied token is
+    never included, and returned links are never followed.
+    """
+    requested_id = page_id(page_id_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    page = get_page(
+        base,
+        requested_id,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    path = _safe_webui_path(page)
+    if path is None:
+        path = f"/pages/viewpage.action?pageId={requested_id}"
+    return f"{base}{path}"
+
+
+def _safe_webui_path(page: dict[str, object]) -> str | None:
+    """Return a safe context-relative web UI path, or ``None``."""
+    links = page.get("_links")
+    if links is None:
+        return None
+    if not isinstance(links, dict):
+        return None
+    webui = links.get("webui")
+    if not isinstance(webui, str):
+        return None
+    return _validated_webui_path(webui)
+
+
+def _validated_webui_path(value: str) -> str | None:
+    """Reject absolute, control-bearing, backslash, or traversal paths."""
+    if (
+        not value.startswith("/")
+        or value.startswith("//")
+        or not _valid_utf8(value)
+        or _UNSAFE_WEBUI.search(value)
+    ):
+        return None
+    try:
+        split = urlsplit(value)
+    except ValueError:
+        return None
+    if split.scheme or split.netloc:
+        return None
+    candidate = value
+    # Follows no link, but percent-decoded ``..`` and separators could still
+    # change the meaning of a path a browser or proxy later normalizes.
+    for _ in range(4):
+        if _UNSAFE_WEBUI.search(candidate):
+            return None
+        decoded = unquote(candidate)
+        if _UNSAFE_WEBUI.search(decoded):
+            return None
+        if not decoded.startswith("/") or decoded.startswith("//"):
+            return None
+        path = decoded.split("#", 1)[0].split("?", 1)[0]
+        if any(
+            segment == "." or segment.startswith("..")
+            for segment in path.split("/")
+        ):
+            return None
+        if decoded == candidate:
+            return value
+        candidate = decoded
+    return None
+
+
 def _validated_page(page: dict[str, object], requested_id: str) -> dict[str, object]:
     returned_id = page.get("id")
     if isinstance(returned_id, bool):
@@ -144,6 +250,87 @@ def _validated_page(page: dict[str, object], requested_id: str) -> dict[str, obj
     if not isinstance(storage, dict) or not isinstance(storage.get("value"), str):
         raise AtlaWireError(_INVALID_PAGE)
     return page
+
+
+def get_page_history(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return the raw history object for a Confluence page.
+
+    Makes one fixed GET to ``/rest/api/content/{id}/history`` with no query
+    parameters. The object is returned unchanged and links are never followed.
+    This is not a complete version list: Confluence 6.6.0 documents only a
+    history representation, not a full field set or all versions.
+    """
+    requested_id = page_id(page_id_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        return get_json_object(
+            session,
+            f"{base}{_HISTORY_PATH.format(id=requested_id)}",
+            params={},
+        )
+
+
+def get_page_version(
+    base_url: str,
+    page_id_or_url: str | int,
+    version: int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one explicit historical page version.
+
+    Sends one GET to ``/rest/api/content/{id}`` with ``status=historical``,
+    ``version=N``, and ``expand=body.storage,version``. Confluence 6.6.0
+    documents these parameters individually but not this exact combination;
+    the historical status is the value Atlassian's history payload uses for
+    version content links. The raw page object is returned unchanged after its
+    id, page shape, and ``version.number`` are validated. Links are never
+    followed, and live version support is unverified.
+    """
+    _validate_requested_version(version)
+    requested_id = page_id(page_id_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        page = get_json_object(
+            session,
+            f"{base}/rest/api/content/{requested_id}",
+            params={
+                "status": _PAGE_VERSION_STATUS,
+                "version": version,
+                "expand": _PAGE_VERSION_EXPAND,
+            },
+        )
+    return _validated_page_version(page, requested_id, version)
+
+
+def _validated_page_version(
+    page: dict[str, object], requested_id: str, requested_version: int
+) -> dict[str, object]:
+    """Validate the documented page identity and requested version number."""
+    _validated_page(page, requested_id)
+    page_version = page.get("version")
+    if not isinstance(page_version, dict):
+        raise AtlaWireError(_INVALID_PAGE_VERSION)
+    number = page_version.get("number")
+    if (
+        isinstance(number, bool)
+        or not isinstance(number, int)
+        or number != requested_version
+    ):
+        raise AtlaWireError(_INVALID_PAGE_VERSION)
+    return page
+
+
+def _validate_requested_version(version: int) -> None:
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise AtlaWireError(_INVALID_VERSION_ARGUMENT)
 
 
 def search_cql(
@@ -244,6 +431,132 @@ def list_children(
             empty_hint="retry the request.",
             project=_child_row,
             identity=_child_identity,
+        )
+
+
+def get_page_attachments(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    start: int = PAGE_START_MIN,
+    limit: int = ATTACHMENT_LIMIT_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one bounded page of attachment metadata.
+
+    Sends only ``start`` and ``limit`` to the configured instance. The raw JSON
+    object, including pagination metadata and unknown fields, is returned
+    unchanged; continuation links are never followed. The 6.6.0 docs show a flat
+    object, but fields are not guaranteed across Confluence versions.
+    """
+    return _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_ATTACHMENT_PATH,
+        fixed_params={},
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def get_page_comments(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    start: int = PAGE_START_MIN,
+    limit: int = COMMENT_LIMIT_DEFAULT,
+    include_replies: bool = True,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one bounded page of comment metadata.
+
+    Sends ``start``, ``limit``, ``expand=body.storage``, and by default
+    ``depth=all`` so replies and storage bodies are requested. Set
+    ``include_replies=False`` to omit ``depth`` and use the documented root-only
+    default. The raw JSON object is returned unchanged and links are never
+    followed; one page may still be incomplete. The 6.6.0 docs show a
+    content-type-keyed map, but no response shape is assumed.
+    """
+    _validate_include_replies(include_replies)
+    fixed_params = {"expand": _COMMENT_EXPAND}
+    if include_replies:
+        fixed_params["depth"] = _COMMENT_DEPTH_ALL
+    return _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_COMMENT_PATH,
+        fixed_params=fixed_params,
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def get_page_labels(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    start: int = PAGE_START_MIN,
+    limit: int = LABEL_LIMIT_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one bounded page of labels.
+
+    Sends only ``start`` and ``limit`` to the configured instance. The raw JSON
+    object is returned unchanged and links are never followed. The 6.6.0 docs
+    publish no response schema, so no field or pagination shape is assumed.
+    """
+    return _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_LABEL_PATH,
+        fixed_params={},
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def _read_content_page(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    path: str,
+    fixed_params: Mapping[str, str],
+    start: int,
+    limit: int,
+    allow_http_loopback: bool,
+) -> dict[str, object]:
+    """Read exactly one bounded page from one fixed content subresource."""
+    _validate_start(start)
+    _validate_limit(limit, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX)
+    requested_id = page_id(page_id_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        return get_json_object(
+            session,
+            f"{base}{path.format(id=requested_id)}",
+            params={**fixed_params, "start": start, "limit": limit},
+        )
+
+
+def _validate_include_replies(include_replies: bool) -> None:
+    if not isinstance(include_replies, bool):
+        raise AtlaWireError("The include_replies option must be a boolean.")
+
+
+def _validate_start(start: int) -> None:
+    if not isinstance(start, int) or isinstance(start, bool) or start < PAGE_START_MIN:
+        raise AtlaWireError(
+            f"The pagination start must be an integer of at least {PAGE_START_MIN}."
         )
 
 

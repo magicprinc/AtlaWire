@@ -44,7 +44,13 @@ class SafeMarkdownConverter(MarkdownConverter):
     def convert_pre(self, el: object, text: str, parent_tags: set[str]) -> str:
         if not text:
             return ""
-        return "\n\n" + fenced_block(text.strip("\n")) + "\n\n"
+        # HTML ignores the single newline after a <pre> start tag; every later
+        # newline is content. Stripping all of them would erase blank lines at
+        # either boundary, so only that one structural newline is removed.
+        content = escape_controls(text)
+        if content.startswith("\n"):
+            content = content[1:]
+        return "\n\n" + fenced_block(content) + "\n\n"
 
 
 def _visible_escape(match: re.Match[str]) -> str:

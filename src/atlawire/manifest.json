@@ -1,0 +1,3494 @@
+{
+  "schema": "atlawire-read-manifest/v1",
+  "source": "versioned endpoint mappings",
+  "operations": [
+    {
+      "id": "bitbucket.dashboard.pull-request-suggestions",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/dashboard/pull-request-suggestions",
+      "description": "Bitbucket read: dashboard.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.dashboard.pull-requests",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/dashboard/pull-requests",
+      "description": "Bitbucket read: dashboard.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.inbox.pull-requests",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/inbox/pull-requests",
+      "description": "Bitbucket read: inbox.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.inbox.pull-requests.count",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/inbox/pull-requests/count",
+      "description": "Bitbucket read: inbox.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.profile.recent.repos",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/profile/recent/repos",
+      "description": "Bitbucket read: profile.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.projects",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects",
+      "description": "Bitbucket read: projects.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.projects.projectkey",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}",
+      "description": "Bitbucket read: projects.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos",
+      "description": "Bitbucket read: repos.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}",
+      "description": "Bitbucket read: repos.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.branches",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches",
+      "description": "Bitbucket read: refs.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.branches.default",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches/default",
+      "description": "Bitbucket read: refs.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.browse",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/browse",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.browse.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/browse/{path:.*}",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.changes",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/changes",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits",
+      "description": "Bitbucket read: history.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}",
+      "description": "Bitbucket read: history.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "commitId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commitId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.changes",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/changes",
+      "description": "Bitbucket read: history.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "commitId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commitId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.comments",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments",
+      "description": "Bitbucket read: history.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "commitId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commitId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.comments.commentid",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments/{commentId}",
+      "description": "Bitbucket read: history.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "commitId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commitId."
+        },
+        {
+          "name": "commentId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commentId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/diff",
+      "description": "Bitbucket read: diff.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "commitId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commitId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/diff/{path:.*}",
+      "description": "Bitbucket read: diff.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "commitId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commitId."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.compare.changes",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/changes",
+      "description": "Bitbucket read: compare.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.compare.commits",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/commits",
+      "description": "Bitbucket read: compare.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.compare.diff-path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/diff{path:.*}",
+      "description": "Bitbucket read: compare.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff",
+      "description": "Bitbucket read: diff.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff/{path:.*}",
+      "description": "Bitbucket read: diff.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.files",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/files",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.files.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/files/{path:.*}",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.forks",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/forks",
+      "description": "Bitbucket read: repos.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/last-modified",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/last-modified/{path:.*}",
+      "description": "Bitbucket read: content.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.participants",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/participants",
+      "description": "Bitbucket read: repos.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.activities",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/activities",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.changes",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/changes",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/comments",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments.commentid",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/comments/{commentId}",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        },
+        {
+          "name": "commentId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commentId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.commits",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/commits",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/diff",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/diff/{path:.*}",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.merge",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/merge",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.participants",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/participants",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/tasks",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks.count",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/tasks/count",
+      "description": "Bitbucket read: pull-requests.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "pullRequestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for pullRequestId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.raw.path",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
+      "description": "Bitbucket read: raw.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "path",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for path."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.related",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/related",
+      "description": "Bitbucket read: repos.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.tags",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/tags",
+      "description": "Bitbucket read: refs.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.tags.name",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/tags/{name:.*}",
+      "description": "Bitbucket read: refs.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKey."
+        },
+        {
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for repositorySlug."
+        },
+        {
+          "name": "name",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": true,
+          "description": "Path value for name."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.repos",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/repos",
+      "description": "Bitbucket read: repos.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.tasks.taskid",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/tasks/{taskId}",
+      "description": "Bitbucket read: tasks.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "taskId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for taskId."
+        }
+      ]
+    },
+    {
+      "id": "bitbucket.users",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/users",
+      "description": "Bitbucket read: users.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "bitbucket.users.userslug",
+      "product": "bitbucket",
+      "method": "GET",
+      "path": "/rest/api/1.0/users/{userSlug}",
+      "description": "Bitbucket read: users.",
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "userSlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for userSlug."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content",
+      "description": "Confluence read: content-list.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.content.id",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}",
+      "description": "Confluence read: content-get.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.child",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child",
+      "description": "Confluence read: content-child.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.child.attachment",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child/attachment",
+      "description": "Confluence read: content-child-attachment.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.child.comment",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child/comment",
+      "description": "Confluence read: content-child-comment.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.child.type",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child/{type}",
+      "description": "Confluence read: content-child-type.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "type",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for type."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.descendant",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/descendant",
+      "description": "Confluence read: content-descendant.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.descendant.type",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/descendant/{type}",
+      "description": "Confluence read: content-descendant-type.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "type",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for type."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.history",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/history",
+      "description": "Confluence read: content-history.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.history.version.macro.hash.hash",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/history/{version}/macro/hash/{hash}",
+      "description": "Confluence read: content-macro-hash.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "version",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for version."
+        },
+        {
+          "name": "hash",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for hash."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.history.version.macro.id.macroid",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/history/{version}/macro/id/{macroId}",
+      "description": "Confluence read: content-macro-id.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "version",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for version."
+        },
+        {
+          "name": "macroId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for macroId."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.label",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/label",
+      "description": "Confluence read: content-label.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.property",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/property",
+      "description": "Confluence read: content-property-list.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.property.key",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/property/{key}",
+      "description": "Confluence read: content-property-key.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "key",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for key."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.restriction.byoperation",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/restriction/byOperation",
+      "description": "Confluence read: content-restriction-byoperation.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.id.restriction.byoperation.operationkey",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/restriction/byOperation/{operationKey}",
+      "description": "Confluence read: content-restriction-operation.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "operationKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for operationKey."
+        }
+      ]
+    },
+    {
+      "id": "confluence.content.search",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/content/search",
+      "description": "Confluence read: content-search.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.group",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/group",
+      "description": "Confluence read: group-list.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.group.groupname",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/group/{groupName}",
+      "description": "Confluence read: group-get.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "groupName",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for groupName."
+        }
+      ]
+    },
+    {
+      "id": "confluence.group.groupname.member",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/group/{groupName}/member",
+      "description": "Confluence read: group-members.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "groupName",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for groupName."
+        }
+      ]
+    },
+    {
+      "id": "confluence.longtask",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/longtask",
+      "description": "Confluence read: longtask-list.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.longtask.id",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/longtask/{id}",
+      "description": "Confluence read: longtask-get.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "confluence.search",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/search",
+      "description": "Confluence read: search.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.space",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/space",
+      "description": "Confluence read: space-list.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.space.spacekey",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}",
+      "description": "Confluence read: space-get.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "spaceKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for spaceKey."
+        }
+      ]
+    },
+    {
+      "id": "confluence.space.spacekey.content",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/content",
+      "description": "Confluence read: space-content.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "spaceKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for spaceKey."
+        }
+      ]
+    },
+    {
+      "id": "confluence.space.spacekey.content.type",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/content/{type}",
+      "description": "Confluence read: space-content-type.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "spaceKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for spaceKey."
+        },
+        {
+          "name": "type",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for type."
+        }
+      ]
+    },
+    {
+      "id": "confluence.space.spacekey.property",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/property",
+      "description": "Confluence read: space-property-list.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "spaceKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for spaceKey."
+        }
+      ]
+    },
+    {
+      "id": "confluence.space.spacekey.property.key",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/property/{key}",
+      "description": "Confluence read: space-property-key.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "spaceKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for spaceKey."
+        },
+        {
+          "name": "key",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for key."
+        }
+      ]
+    },
+    {
+      "id": "confluence.user",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/user",
+      "description": "Confluence read: user-get.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.user.anonymous",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/user/anonymous",
+      "description": "Confluence read: user-anonymous.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.user.current",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/user/current",
+      "description": "Confluence read: user-current.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.user.memberof",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/user/memberof",
+      "description": "Confluence read: user-memberof.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "confluence.user.watch.content.contentid",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/user/watch/content/{contentId}",
+      "description": "Confluence read: user-watch-content.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "contentId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for contentId."
+        }
+      ]
+    },
+    {
+      "id": "confluence.user.watch.space.spacekey",
+      "product": "confluence",
+      "method": "GET",
+      "path": "/rest/api/user/watch/space/{spaceKey}",
+      "description": "Confluence read: user-watch-space.",
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "spaceKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for spaceKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.attachment.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/{id}",
+      "description": "Jira read: Attachments.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.attachment.id.expand.human",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/{id}/expand/human",
+      "description": "Jira read: Attachments.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.attachment.meta",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/meta",
+      "description": "Jira read: Attachments.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.comment.commentid.properties",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/comment/{commentId}/properties",
+      "description": "Jira read: Comment properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "commentId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commentId."
+        }
+      ]
+    },
+    {
+      "id": "jira.comment.commentid.properties.propertykey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/comment/{commentId}/properties/{propertyKey}",
+      "description": "Jira read: Comment properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "commentId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for commentId."
+        },
+        {
+          "name": "propertyKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for propertyKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.component.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/component/{id}",
+      "description": "Jira read: Components.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.component.id.relatedissuecounts",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/component/{id}/relatedIssueCounts",
+      "description": "Jira read: Components.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.configuration",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/configuration",
+      "description": "Jira read: Configuration.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.customfieldoption.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/customFieldOption/{id}",
+      "description": "Jira read: Custom fields.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.dashboard",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard",
+      "description": "Jira read: Dashboards.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.dashboard.dashboardid.items.itemid.properties",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties",
+      "description": "Jira read: Dashboard items.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "dashboardId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for dashboardId."
+        },
+        {
+          "name": "itemId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for itemId."
+        }
+      ]
+    },
+    {
+      "id": "jira.dashboard.dashboardid.items.itemid.properties.propertykey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties/{propertyKey}",
+      "description": "Jira read: Dashboard items.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "dashboardId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for dashboardId."
+        },
+        {
+          "name": "itemId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for itemId."
+        },
+        {
+          "name": "propertyKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for propertyKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.dashboard.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard/{id}",
+      "description": "Jira read: Dashboards.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.field",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/field",
+      "description": "Jira read: Fields.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.filter.defaultsharescope",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/filter/defaultShareScope",
+      "description": "Jira read: Filters.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.filter.favourite",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/filter/favourite",
+      "description": "Jira read: Filters.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.filter.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}",
+      "description": "Jira read: Filters.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.filter.id.columns",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}/columns",
+      "description": "Jira read: Filters.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.filter.id.permission",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}/permission",
+      "description": "Jira read: Filters.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.filter.id.permission.permissionid",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}/permission/{permissionId}",
+      "description": "Jira read: Filters.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        },
+        {
+          "name": "permissionId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for permissionId."
+        }
+      ]
+    },
+    {
+      "id": "jira.groups.picker",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/groups/picker",
+      "description": "Jira read: Groups.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.groupuserpicker",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/groupuserpicker",
+      "description": "Jira read: Groups.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.issue.createmeta",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/createmeta",
+      "description": "Jira read: Issue create metadata.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.issue.createmeta.projectidorkey.issuetypes",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes",
+      "description": "Jira read: Issue create metadata.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.createmeta.projectidorkey.issuetypes.issuetypeid",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}",
+      "description": "Jira read: Issue create metadata.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        },
+        {
+          "name": "issueTypeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueTypeId."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}",
+      "description": "Jira read: Issue.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.comment",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/comment",
+      "description": "Jira read: Issue comments.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.comment.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/comment/{id}",
+      "description": "Jira read: Issue comments.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        },
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.editmeta",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/editmeta",
+      "description": "Jira read: Issue.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.properties",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/properties",
+      "description": "Jira read: Issue properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.properties.propertykey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/properties/{propertyKey}",
+      "description": "Jira read: Issue properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        },
+        {
+          "name": "propertyKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for propertyKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.remotelink",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink",
+      "description": "Jira read: Issue remote links.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.remotelink.linkid",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink/{linkId}",
+      "description": "Jira read: Issue remote links.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        },
+        {
+          "name": "linkId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for linkId."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.subtask",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/subtask",
+      "description": "Jira read: Issue subtasks.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.transitions",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/transitions",
+      "description": "Jira read: Issue.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.votes",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/votes",
+      "description": "Jira read: Issue votes.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.watchers",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/watchers",
+      "description": "Jira read: Issue watchers.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.worklog",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/worklog",
+      "description": "Jira read: Issue worklogs.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.issueidorkey.worklog.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/worklog/{id}",
+      "description": "Jira read: Issue worklogs.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueIdOrKey."
+        },
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.issue.picker",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issue/picker",
+      "description": "Jira read: Issue picker.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.issuelink.linkid",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issueLink/{linkId}",
+      "description": "Jira read: Issue links.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "linkId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for linkId."
+        }
+      ]
+    },
+    {
+      "id": "jira.issuelinktype",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issueLinkType",
+      "description": "Jira read: Issue link types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.issuelinktype.issuelinktypeid",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issueLinkType/{issueLinkTypeId}",
+      "description": "Jira read: Issue link types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueLinkTypeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueLinkTypeId."
+        }
+      ]
+    },
+    {
+      "id": "jira.issuetype",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype",
+      "description": "Jira read: Issue types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.issuetype.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{id}",
+      "description": "Jira read: Issue types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.issuetype.id.alternatives",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{id}/alternatives",
+      "description": "Jira read: Issue types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.issuetype.issuetypeid.properties",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{issueTypeId}/properties",
+      "description": "Jira read: Issue types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueTypeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueTypeId."
+        }
+      ]
+    },
+    {
+      "id": "jira.issuetype.issuetypeid.properties.propertykey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{issueTypeId}/properties/{propertyKey}",
+      "description": "Jira read: Issue types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "issueTypeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for issueTypeId."
+        },
+        {
+          "name": "propertyKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for propertyKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.jql.autocompletedata",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/jql/autocompletedata",
+      "description": "Jira read: JQL.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.jql.autocompletedata.suggestions",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/jql/autocompletedata/suggestions",
+      "description": "Jira read: JQL.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.mypermissions",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/mypermissions",
+      "description": "Jira read: Permissions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.mypreferences",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/mypreferences",
+      "description": "Jira read: User preferences.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.myself",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/myself",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.password.policy",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/password/policy",
+      "description": "Jira read: Security.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.priority",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/priority",
+      "description": "Jira read: Priority.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.priority.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/priority/{id}",
+      "description": "Jira read: Priority.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.project",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.project.projectidorkey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.components",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/components",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.properties",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/properties",
+      "description": "Jira read: Project properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.properties.propertykey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/properties/{propertyKey}",
+      "description": "Jira read: Project properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        },
+        {
+          "name": "propertyKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for propertyKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.role",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/role",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.role.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/role/{id}",
+      "description": "Jira read: Project roles.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        },
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.statuses",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/statuses",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.version",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/version",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectidorkey.versions",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/versions",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.projectkeyorid.securitylevel",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/securitylevel",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectKeyOrId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectKeyOrId."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.type",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/type",
+      "description": "Jira read: Project types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.project.type.projecttypekey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/type/{projectTypeKey}",
+      "description": "Jira read: Project types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectTypeKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectTypeKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.project.type.projecttypekey.accessible",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/type/{projectTypeKey}/accessible",
+      "description": "Jira read: Project types.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectTypeKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectTypeKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.projectcategory",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/projectCategory",
+      "description": "Jira read: Project categories.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.projectcategory.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/projectCategory/{id}",
+      "description": "Jira read: Project categories.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.projects.picker",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/projects/picker",
+      "description": "Jira read: Project picker.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.projectvalidate.key",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/projectvalidate/key",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.resolution",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/resolution",
+      "description": "Jira read: Resolution.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.resolution.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/resolution/{id}",
+      "description": "Jira read: Resolution.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.rest.auth.1.session",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/auth/1/session",
+      "description": "Jira read: Auth.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.search",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/search",
+      "description": "Jira read: Search.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.securitylevel.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/securitylevel/{id}",
+      "description": "Jira read: Security.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.serverinfo",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/serverInfo",
+      "description": "Jira read: Server.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.status",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/status",
+      "description": "Jira read: Statuses.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.status.idorname",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/status/{idOrName}",
+      "description": "Jira read: Statuses.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "idOrName",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for idOrName."
+        }
+      ]
+    },
+    {
+      "id": "jira.statuscategory",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/statuscategory",
+      "description": "Jira read: Status categories.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.statuscategory.idorkey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/statuscategory/{idOrKey}",
+      "description": "Jira read: Status categories.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "idOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for idOrKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.terminology.entries",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/terminology/entries",
+      "description": "Jira read: Terminology.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.terminology.entries.originalname",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/terminology/entries/{originalName}",
+      "description": "Jira read: Terminology.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "originalName",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for originalName."
+        }
+      ]
+    },
+    {
+      "id": "jira.user",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.a11y.personal-settings",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/a11y/personal-settings",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.assignable.multiprojectsearch",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/assignable/multiProjectSearch",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.assignable.search",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/assignable/search",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.columns",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/columns",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.picker",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/picker",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.properties",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/properties",
+      "description": "Jira read: User properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.properties.propertykey",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/properties/{propertyKey}",
+      "description": "Jira read: User properties.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "propertyKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for propertyKey."
+        }
+      ]
+    },
+    {
+      "id": "jira.user.search",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/search",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.user.viewissue.search",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/viewissue/search",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.version.id",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/version/{id}",
+      "description": "Jira read: Versions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.version.id.relatedissuecounts",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/version/{id}/relatedIssueCounts",
+      "description": "Jira read: Versions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.version.id.unresolvedissuecount",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/version/{id}/unresolvedIssueCount",
+      "description": "Jira read: Versions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for id."
+        }
+      ]
+    },
+    {
+      "id": "jira.version.remotelink",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/version/remotelink",
+      "description": "Jira read: Versions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
+      "id": "jira.version.versionid.remotelink",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/version/{versionId}/remotelink",
+      "description": "Jira read: Versions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "versionId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for versionId."
+        }
+      ]
+    },
+    {
+      "id": "jira.version.versionid.remotelink.globalid",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/version/{versionId}/remotelink/{globalId}",
+      "description": "Jira read: Versions.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "versionId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for versionId."
+        },
+        {
+          "name": "globalId",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for globalId."
+        }
+      ]
+    }
+  ],
+  "deferred": [
+    {
+      "product": "jira",
+      "path": "/rest/api/2/attachment/{id}/expand/raw",
+      "reason": "non-JSON body (archive, raw or download)"
+    },
+    {
+      "product": "jira",
+      "path": "/rest/api/2/avatar/{type}/system",
+      "reason": "non-JSON body (/avatar)"
+    },
+    {
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/subtask/move",
+      "reason": "documented inconsistently"
+    },
+    {
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/avatars",
+      "reason": "non-JSON body (/avatar)"
+    },
+    {
+      "product": "jira",
+      "path": "/rest/api/2/user/avatars",
+      "reason": "non-JSON body (/avatar)"
+    },
+    {
+      "product": "jira",
+      "path": "/rest/api/2/search",
+      "reason": "semantic POST needs a documented body schema"
+    },
+    {
+      "product": "jira",
+      "path": "/rest/api/2/worklog/list",
+      "reason": "semantic POST needs a documented body schema"
+    },
+    {
+      "product": "confluence",
+      "path": "/rest/api/contentbody/convert/{to}",
+      "reason": "semantic POST needs a documented body schema"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/application-properties",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/hooks/{hookKey}/avatar",
+      "reason": "non-JSON body (/avatar)"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/avatar.png",
+      "reason": "non-JSON body (/avatar)"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/archive",
+      "reason": "non-JSON body (archive, raw or download)"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw",
+      "reason": "non-JSON body (archive, raw or download)"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/pull-requests",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}/settings",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}/settings",
+      "reason": "administrative or system route"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/pull-requests/{scmId}",
+      "reason": "administrative or system route"
+    }
+  ]
+}

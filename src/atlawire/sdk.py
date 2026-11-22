@@ -1,0 +1,690 @@
+"""Read-only facade over atlassian-python-api.
+
+The library owns client construction, authentication, the base URL and the
+session. This module adds the read-only boundary the library does not provide:
+one validated route per call, refused redirects, a bounded streamed body, one
+retry policy, and an error object that keeps the HTTP status and a sanitized
+diagnostic excerpt.
+"""
+
+import json
+import logging
+import re
+import time
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from typing import Literal
+
+import requests
+from atlassian import Bitbucket, ConfluenceServer, Jira
+from atlassian.rest_client import AtlassianRestAPI
+
+from atlawire.http import AtlaWireError, normalize_base_url
+
+__all__ = [
+    "SdkRequestError",
+    "client_for",
+    "get_json",
+    "get_json_with_status",
+    "request_json",
+    "request_json_with_status",
+]
+
+Product = Literal["jira", "confluence", "bitbucket"]
+_MAX_PATH = 2048
+_UNSAFE_PATH = re.compile(r"[\\\x00-\x20\x7f?#]")
+_ADMIN_SEGMENTS = frozenset(
+    {
+        "admin",
+        "application-properties",
+        "applicationrole",
+        "audit",
+        "auditing",
+        "cluster",
+        "issuetypescheme",
+        "issuesecurityschemes",
+        "license",
+        "logs",
+        "mail-server",
+        "notificationscheme",
+        "permissions",
+        "permissionscheme",
+        "priorityschemes",
+        "reindex",
+        "screens",
+        "settings",
+        "workflow",
+        "workflows",
+        "workflowscheme",
+    }
+)
+logging.getLogger("atlassian").setLevel(logging.WARNING)
+
+_CLIENTS = {
+    "jira": Jira,
+    "confluence": ConfluenceServer,
+    "bitbucket": Bitbucket,
+}
+# Each semantic-read POST belongs to exactly one product. A Confluence
+# conversion sent through the Jira client is a product mismatch, not a read.
+_READ_ONLY_POSTS: dict[str, tuple[frozenset[str], tuple[str, ...]]] = {
+    "jira": (frozenset({"/rest/api/2/search", "/rest/api/2/worklog/list"}), ()),
+    "bitbucket": (frozenset({"/rest/api/1.0/markup/preview"}), ()),
+    "confluence": (frozenset(), ("/rest/api/contentbody/convert/",)),
+}
+
+# Shared read budgets, measured on content-decoded bytes read from the stream.
+_JSON_LIMIT = 8 * 1024 * 1024
+_BODY_LIMIT = 8 * 1024
+_TIMEOUT = (5, 30)
+_CHUNK = 64 * 1024
+
+# One retry owner: this adapter. Chosen client defaults, not a measured SLA.
+_MAX_ATTEMPTS = 3
+_RETRY_BUDGET = 5.0
+_RETRY_STATUSES = frozenset({429, 503})
+_BACKOFF_SECONDS = (1.0, 2.0)
+
+
+class SdkRequestError(AtlaWireError):
+    """One failed library request with the original response preserved."""
+
+    def __init__(
+        self,
+        *,
+        status: int | None,
+        code: str,
+        classification: str,
+        message: str,
+        body: str | None,
+        content_type: str | None,
+        path: str,
+        body_truncated: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.classification = classification
+        self.message = message
+        self.body = body
+        self.content_type = content_type
+        self.path = path
+        self.body_truncated = body_truncated
+
+    def to_dict(self, *, product: str, token: str) -> dict[str, object]:
+        body = _redact(self.body, token)
+        parsed: object | None = None
+        if body:
+            try:
+                parsed = _strict_json(body)
+            except ValueError, RecursionError:
+                parsed = None
+        return {
+            "ok": False,
+            "product": product,
+            "error": {
+                "status": self.status,
+                "code": self.code,
+                "classification": self.classification,
+                "message": self.message,
+                "path": self.path,
+                "content_type": self.content_type,
+                "body": body,
+                "body_json": parsed,
+                "body_truncated": self.body_truncated,
+            },
+        }
+
+
+def _redact(value: str | None, token: str) -> str | None:
+    if value is None or not token:
+        return value
+    return value.replace(token, "[REDACTED]")
+
+
+def _non_finite(value: str) -> object:
+    """Reject ``NaN``/``Infinity``: neither belongs in a JSON contract."""
+    raise ValueError(f"Non-finite JSON value: {value}.")
+
+
+def _strict_json(text: str) -> object:
+    return json.loads(text, parse_constant=_non_finite)
+
+
+def _classify(status: int | None) -> tuple[str, str]:
+    if status is None:
+        return "transport_error", "transport"
+    if status == 401:
+        return "http_401", "authentication"
+    if status == 403:
+        return "http_403", "authorization"
+    if status == 404:
+        return "http_404", "not_found"
+    if status == 429:
+        return "http_429", "rate_limited"
+    if 300 <= status < 400:
+        return f"http_{status}", "unexpected_redirect"
+    if 400 <= status < 500:
+        return f"http_{status}", "client_error"
+    if 500 <= status < 600:
+        return f"http_{status}", "server_error"
+    return f"http_{status}", "unexpected_status"
+
+
+def _raw_client_for(
+    product: str,
+    base_url: str,
+    token: str,
+    *,
+    allow_http_loopback: bool = False,
+) -> AtlassianRestAPI:
+    """Create the underlying library client for the internal facade."""
+    client_class = _CLIENTS.get(product)
+    if client_class is None:
+        raise AtlaWireError("Unknown Atlassian product.")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    return client_class(
+        url=base,
+        token=token,
+        cloud=False,
+        timeout=_TIMEOUT[1],
+        verify_ssl=True,
+        # The library must not retry: this module owns attempts and delays.
+        backoff_and_retry=False,
+    )
+
+
+_MUTATING = re.compile(
+    r"(?:^|_)(?:add|create|delete|update|set|remove|archive|restore|move|"
+    r"assign|transition|do|post|put|upload|edit|rename|merge|close|disable|"
+    r"enable|register|unregister|pin|unpin|watch|unwatch|vote|unvote|mark|"
+    r"unmark|bulk|change|copy|reset|clean|reindex|start|cancel|approve|"
+    r"decline)(?:_|$)",
+    re.IGNORECASE,
+)
+_RAW_TRANSPORT = frozenset({"request", "get", "post", "put", "delete", "patch"})
+
+
+class ReadOnlyClient:
+    """Proxy that exposes only non-mutating library methods.
+
+    Named high-level reads are forwarded. Mutating names, and the generic HTTP
+    verbs that would bypass the validated route boundary, are refused.
+    """
+
+    def __init__(self, client: object) -> None:
+        object.__setattr__(self, "_client", client)
+
+    def __getattr__(self, name: str):
+        if name in _RAW_TRANSPORT or _MUTATING.search(name):
+            raise AttributeError(f"Read-only client does not expose {name}.")
+        return getattr(self._client, name)
+
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
+
+
+def client_for(
+    product: str,
+    base_url: str,
+    token: str,
+    *,
+    allow_http_loopback: bool = False,
+) -> ReadOnlyClient:
+    """Create one read-only library client; the caller must close it."""
+    return ReadOnlyClient(
+        _raw_client_for(
+            product,
+            base_url,
+            token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    )
+
+
+def get_json(
+    product: str,
+    base_url: str,
+    path: str,
+    *,
+    token: str,
+    params: Mapping[str, object] | None = None,
+    allow_http_loopback: bool = False,
+) -> object:
+    """Read one standard non-admin JSON GET through the library client."""
+    return request_json(
+        product,
+        base_url,
+        path,
+        method="GET",
+        token=token,
+        params=params,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def get_json_with_status(
+    product: str,
+    base_url: str,
+    path: str,
+    *,
+    token: str,
+    params: Mapping[str, object] | None = None,
+    allow_http_loopback: bool = False,
+) -> tuple[int, object]:
+    """Read one JSON GET and return ``(status, payload)``."""
+    return request_json_with_status(
+        product,
+        base_url,
+        path,
+        method="GET",
+        token=token,
+        params=params,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def request_json(
+    product: str,
+    base_url: str,
+    path: str,
+    *,
+    method: str,
+    token: str,
+    params: Mapping[str, object] | None = None,
+    body: Mapping[str, object] | None = None,
+    allow_http_loopback: bool = False,
+) -> object:
+    """Read one standard non-admin JSON endpoint and return its payload."""
+    return request_json_with_status(
+        product,
+        base_url,
+        path,
+        method=method,
+        token=token,
+        params=params,
+        body=body,
+        allow_http_loopback=allow_http_loopback,
+    )[1]
+
+
+def request_json_with_status(
+    product: str,
+    base_url: str,
+    path: str,
+    *,
+    method: str,
+    token: str,
+    params: Mapping[str, object] | None = None,
+    body: Mapping[str, object] | None = None,
+    allow_http_loopback: bool = False,
+) -> tuple[int, object]:
+    """Read one standard non-admin JSON endpoint with its HTTP status.
+
+    Exactly one route is requested per attempt. Redirects are refused rather
+    than followed, the body is read in bounded chunks, and retries are owned
+    here: at most three total attempts and five seconds of scheduled waits.
+    HTTP errors keep their status; a failure without a response has
+    ``status=None``.
+    """
+    normalized = method.upper()
+    if normalized not in {"GET", "POST"}:
+        raise AtlaWireError("Only read-only GET and POST are supported.")
+    _validate_path(path)
+    if normalized == "POST":
+        _check_semantic_post(product, path)
+    if normalized == "GET" and body is not None:
+        raise AtlaWireError("A GET request cannot carry a JSON body.")
+    if normalized == "POST" and body is None:
+        raise AtlaWireError("A POST request requires a JSON body.")
+
+    client = _raw_client_for(
+        product, base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        return _attempt_loop(
+            client,
+            normalized,
+            path,
+            params=_checked_params(params),
+            body=dict(body) if body is not None else None,
+            retryable=normalized == "GET",
+        )
+    finally:
+        client.close()
+
+
+def _check_semantic_post(product: str, path: str) -> None:
+    exact, prefixes = _READ_ONLY_POSTS.get(product, (frozenset(), ()))
+    if path in exact or path.startswith(prefixes):
+        return
+    raise AtlaWireError("This POST endpoint is not read-only for this product.")
+
+
+def _checked_params(params: Mapping[str, object] | None) -> dict[str, str | int]:
+    """Accept only scalar query values, so encoding is predictable."""
+    checked: dict[str, str | int] = {}
+    for name, value in (params or {}).items():
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise AtlaWireError("Query parameters must be strings or integers.")
+        checked[name] = value
+    return checked
+
+
+def _attempt_loop(
+    client: AtlassianRestAPI,
+    method: str,
+    path: str,
+    *,
+    params: dict[str, str | int],
+    body: dict[str, object] | None,
+    retryable: bool,
+) -> tuple[int, object]:
+    waited = 0.0
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            response = _send(client, method, path, params=params, body=body)
+        except requests.Timeout:
+            delay = _pause(attempt, waited, None) if retryable else None
+            if delay is None:
+                raise SdkRequestError(
+                    status=None,
+                    code="timeout",
+                    classification="timeout",
+                    message="Request timed out.",
+                    body=None,
+                    content_type=None,
+                    path=path,
+                ) from None
+            if delay:
+                time.sleep(delay)
+            waited += delay
+            continue
+        except requests.ConnectionError:
+            delay = _pause(attempt, waited, None) if retryable else None
+            if delay is None:
+                raise SdkRequestError(
+                    status=None,
+                    code="transport_error",
+                    classification="transport",
+                    message="Request failed; check connectivity and TLS settings.",
+                    body=None,
+                    content_type=None,
+                    path=path,
+                ) from None
+            if delay:
+                time.sleep(delay)
+            waited += delay
+            continue
+        except requests.RequestException:
+            raise SdkRequestError(
+                status=None,
+                code="transport_error",
+                classification="transport",
+                message="Request failed; check connectivity and TLS settings.",
+                body=None,
+                content_type=None,
+                path=path,
+            ) from None
+
+        try:
+            return _consume(response, path, attempt, waited, retryable=retryable)
+        except _Retry as retry:
+            waited = retry.waited
+            continue
+        finally:
+            response.close()
+
+    raise SdkRequestError(  # pragma: no cover - the loop returns or raises
+        status=None,
+        code="transport_error",
+        classification="transport",
+        message="Request failed.",
+        body=None,
+        content_type=None,
+        path=path,
+    )
+
+
+class _Retry(Exception):
+    """Internal signal: one bounded wait was scheduled and fits the budget."""
+
+    def __init__(self, waited: float) -> None:
+        super().__init__("retry")
+        self.waited = waited
+
+
+def _pause(attempt: int, waited: float, retry_after: float | None) -> float | None:
+    """Return an allowed delay, or ``None`` when no further attempt fits."""
+    if attempt >= _MAX_ATTEMPTS:
+        return None
+    if retry_after is not None:
+        delay = retry_after
+    else:
+        delay = _BACKOFF_SECONDS[min(attempt - 1, len(_BACKOFF_SECONDS) - 1)]
+    if delay < 0 or waited + delay > _RETRY_BUDGET:
+        return None
+    return delay
+
+
+def _send(
+    client: AtlassianRestAPI,
+    method: str,
+    path: str,
+    *,
+    params: dict[str, str | int],
+    body: dict[str, object] | None,
+) -> requests.Response:
+    """Send one request through the library session, without following it."""
+    url = f"{str(client.url).rstrip('/')}{path}"
+    return client.session.request(
+        method,
+        url,
+        params=params or None,
+        data=json.dumps(body) if body is not None else None,
+        headers=({"Content-Type": "application/json"} if body is not None else None),
+        timeout=_TIMEOUT,
+        allow_redirects=False,
+        stream=True,
+    )
+
+
+def _consume(
+    response: requests.Response,
+    path: str,
+    attempt: int,
+    waited: float,
+    *,
+    retryable: bool,
+) -> tuple[int, object]:
+    """Validate status and return the decoded JSON, or schedule one retry."""
+    status = response.status_code
+    if 300 <= status < 400:
+        raise _error(
+            response,
+            path=path,
+            code=f"http_{status}",
+            classification="unexpected_redirect",
+            message="The server returned a redirect; it was not followed.",
+        )
+    if status >= 400:
+        delay = (
+            _pause(attempt, waited, _retry_after(response))
+            if retryable and status in _RETRY_STATUSES
+            else None
+        )
+        if delay is not None:
+            if delay:
+                time.sleep(delay)
+            raise _Retry(waited + delay)
+        code, classification = _classify(status)
+        raise _error(
+            response,
+            path=path,
+            code=code,
+            classification=classification,
+            message=f"HTTP {status}: request failed.",
+        )
+
+    if status == 206:
+        # A partial body is never a complete read, even without a Range header.
+        raise SdkRequestError(
+            status=status,
+            code="invalid_response",
+            classification="partial_content",
+            message="HTTP 206: partial content is not a supported read.",
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+        )
+
+    try:
+        payload = _read_limited(response, _JSON_LIMIT)
+    except _TooLarge:
+        # The success body is already over budget; do not keep reading a
+        # diagnostic excerpt from the remainder of that same body.
+        raise SdkRequestError(
+            status=status,
+            code="invalid_response",
+            classification="response_too_large",
+            message=f"The JSON response exceeds the {_JSON_LIMIT}-byte limit.",
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+            body_truncated=True,
+        ) from None
+    if not payload:
+        if status == 204:
+            # Documented no-content: the caller decides whether this route
+            # allows it. A 200 with an empty body stays an error.
+            return status, None
+        raise _error(
+            response,
+            path=path,
+            code="invalid_response",
+            classification="invalid_response",
+            message="The response body is empty; JSON was expected.",
+        )
+    try:
+        return status, _strict_json(payload.decode("utf-8"))
+    except UnicodeDecodeError, ValueError, RecursionError:
+        body, truncated = _excerpt(payload)
+        raise SdkRequestError(
+            status=status,
+            code="invalid_response",
+            classification="invalid_response",
+            message="The response body is not valid JSON.",
+            body=body,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+            body_truncated=truncated,
+        ) from None
+
+
+def _excerpt(payload: bytes) -> tuple[str, bool]:
+    """Return a bounded diagnostic excerpt of bytes already read."""
+    truncated = len(payload) > _BODY_LIMIT
+    raw = payload[:_BODY_LIMIT]
+    try:
+        return raw.decode("utf-8"), truncated
+    except UnicodeDecodeError:
+        return raw.decode("latin-1"), truncated
+
+
+class _TooLarge(Exception):
+    pass
+
+
+def _read_limited(response: requests.Response, limit: int) -> bytes:
+    """Read content-decoded bytes, stopping as soon as the limit is passed."""
+    chunks: list[bytes] = []
+    total = 0
+    for chunk in response.iter_content(chunk_size=_CHUNK):
+        total += len(chunk)
+        if total > limit:
+            raise _TooLarge
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _read_excerpt(response: requests.Response) -> tuple[str | None, bool]:
+    """Return a bounded diagnostic excerpt and whether the body was cut."""
+    chunks: list[bytes] = []
+    total = 0
+    truncated = False
+    try:
+        for chunk in response.iter_content(chunk_size=_CHUNK):
+            room = _BODY_LIMIT - total
+            if room <= 0 or len(chunk) > room:
+                chunks.append(chunk[:room])
+                truncated = True
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+    except requests.RequestException:
+        return None, truncated
+    try:
+        return b"".join(chunks).decode("utf-8"), truncated
+    except UnicodeDecodeError:
+        return b"".join(chunks).decode("latin-1"), truncated
+
+
+def _retry_after(response: requests.Response) -> float | None:
+    header = response.headers.get("Retry-After")
+    if not header:
+        return None
+    value = header.strip()
+    if value.isdigit():
+        return float(value)
+    try:
+        parsed = parsedate_to_datetime(value)
+    except TypeError, ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return max(0.0, (parsed - datetime.now(UTC)).total_seconds())
+
+
+def _error(
+    response: requests.Response,
+    *,
+    path: str,
+    code: str,
+    classification: str,
+    message: str,
+) -> SdkRequestError:
+    body, truncated = _read_excerpt(response)
+    if not truncated and body is not None and body.endswith("\n"):
+        body = body.rstrip("\n")
+    return SdkRequestError(
+        status=response.status_code,
+        code=code,
+        classification=classification,
+        message=message,
+        body=body,
+        content_type=response.headers.get("Content-Type"),
+        path=path,
+        body_truncated=truncated,
+    )
+
+
+def _validate_path(path: str) -> None:
+    if (
+        not isinstance(path, str)
+        or not path.startswith("/rest/")
+        or len(path) > _MAX_PATH
+        or "//" in path
+        or _UNSAFE_PATH.search(path)
+        or any(part in {".", ".."} for part in path.split("/"))
+    ):
+        raise AtlaWireError("Expected a safe standard REST path.")
+    segments = [part for part in path.split("/") if part]
+    if any(segment in _ADMIN_SEGMENTS for segment in segments):
+        raise AtlaWireError("Administrative REST paths are not supported.")

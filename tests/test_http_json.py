@@ -13,6 +13,7 @@ from atlawire.http import (
     bearer_session,
     get_json_array,
     get_json_object,
+    get_json_object_allow_no_content,
     get_text,
     post_json_object,
 )
@@ -330,3 +331,113 @@ def test_oversized_json_stops_before_reading_the_entire_body(
     assert adapter.raw is not None
     assert JSON_LIMIT < adapter.raw.consumed < len(body)
     assert adapter.raw.closed
+
+
+class _NoContentResponse:
+    """A 204 response that records closure and rejects body reads."""
+
+    status_code = 204
+    headers: dict[str, str] = {}
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def __enter__(self) -> "_NoContentResponse":
+        return self
+
+    def __exit__(self, *exc_info: object) -> bool:
+        self.closed = True
+        return False
+
+    def iter_content(self, chunk_size: int) -> Iterator[bytes]:
+        raise AssertionError("A 204 body must not be read")
+
+
+class _NoContentSession:
+    """A caller-owned session that records close and the single GET."""
+
+    def __init__(self) -> None:
+        self.response = _NoContentResponse()
+        self.calls: list[tuple[str, dict[str, object]]] = []
+        self.closed = False
+
+    def get(self, url: str, **kwargs: object) -> _NoContentResponse:
+        self.calls.append((url, dict(kwargs)))
+        return self.response
+
+    def close(self) -> None:
+        self.closed = True
+
+    def __enter__(self) -> "_NoContentSession":
+        return self
+
+    def __exit__(self, *exc_info: object) -> bool:
+        self.close()
+        return False
+
+
+def test_allow_no_content_204_closes_response_and_session() -> None:
+    session = _NoContentSession()
+
+    with session:
+        assert get_json_object_allow_no_content(session, URL, params={}) is None
+
+    assert session.response.closed
+    assert session.closed
+    assert len(session.calls) == 1
+    url, kwargs = session.calls[0]
+    assert url == URL
+    assert kwargs["params"] == {}
+    assert kwargs["allow_redirects"] is False
+
+
+@responses.activate
+def test_allow_no_content_204_returns_none_with_the_real_reader() -> None:
+    responses.get(URL, status=204)
+
+    with bearer_session(TOKEN) as session:
+        assert get_json_object_allow_no_content(session, URL, params={}) is None
+
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_allow_no_content_rejects_200_null_malformed_and_empty_json() -> None:
+    responses.get(URL, body="null", content_type="application/json")
+    responses.get(URL, body="{", content_type="application/json")
+    responses.get(URL, body="", content_type="application/json")
+
+    for match in ("JSON object", "valid JSON", "valid JSON"):
+        with (
+            bearer_session(TOKEN) as session,
+            pytest.raises(AtlaWireError, match=match),
+        ):
+            get_json_object_allow_no_content(session, URL, params={})
+
+    assert len(responses.calls) == 3
+
+
+@responses.activate
+def test_existing_object_reader_still_rejects_204() -> None:
+    responses.get(URL, status=204)
+
+    with (
+        bearer_session(TOKEN) as session,
+        pytest.raises(AtlaWireError, match="valid JSON"),
+    ):
+        get_json_object(session, URL, params={})
+
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_allow_no_content_refuses_a_redirect_without_following_it() -> None:
+    responses.get(URL, status=302, headers={"Location": "https://evil.invalid/"})
+
+    with (
+        bearer_session(TOKEN) as session,
+        pytest.raises(AtlaWireError, match="redirect refused"),
+    ):
+        get_json_object_allow_no_content(session, URL, params={})
+
+    assert len(responses.calls) == 1

@@ -25,6 +25,9 @@ COMMENT_PAGES_MIN = 1
 COMMENT_PAGES_MAX = 1000
 COMMENT_PAGES_DEFAULT = 100
 _COMMENT_PAGE_SIZE = 50
+USER_RESULTS_MIN = 1
+USER_RESULTS_MAX = 1000
+USER_RESULTS_DEFAULT = 50
 
 
 class IssueRow(TypedDict):
@@ -108,6 +111,69 @@ def get_issue(
     ):
         raise AtlaWireError("Expected a Jira issue with a key and fields.")
     return issue
+
+
+def get_issue_worklogs(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one issue's worklog document exactly as the server sent it.
+
+    Only the key is taken from ``key_or_url``; every request goes to the
+    configured ``base_url``. ``startAt``, ``maxResults``, ``total``, and every
+    worklog row are preserved unchanged, so a capped page stays visible
+    instead of being reported as complete. The fixed read is the 8.22
+    ``/rest/api/2/issue/{key}/worklog`` endpoint.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/rest/api/2/issue/{key}/worklog", params={}
+        )
+    worklogs = document.get("worklogs")
+    if not isinstance(worklogs, list):
+        raise AtlaWireError("Expected a Jira worklogs array.")
+    for value in worklogs:
+        _reference_object(value, "worklog")
+    return document
+
+
+def get_issue_changelog(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one issue's changelog document exactly as the server sent it.
+
+    The fixed read is the 8.22 issue endpoint with ``expand=changelog``. Only
+    the key is taken from ``key_or_url``; every request goes to the configured
+    ``base_url``. The returned document keeps ``startAt``, ``maxResults``,
+    ``total``, all histories, and unknown fields unchanged. A capped history
+    therefore stays visible instead of being reported as complete.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        issue = get_json_object(
+            session,
+            f"{base}/rest/api/2/issue/{key}",
+            params={"expand": "changelog"},
+        )
+    changelog = issue.get("changelog")
+    if not isinstance(changelog, dict):
+        raise AtlaWireError("Expected a Jira changelog document.")
+    histories = changelog.get("histories")
+    if not isinstance(histories, list):
+        raise AtlaWireError("Expected a Jira changelog histories array.")
+    for value in histories:
+        _reference_object(value, "change history")
+    return changelog
 
 
 def list_issue_comments(
@@ -369,6 +435,186 @@ def list_statuses(
     return sorted(set(names))
 
 
+def list_priorities(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return every Jira priority exactly as the server sent it.
+
+    Jira Server and Data Center expose the instance-wide priority list at
+    ``/rest/api/2/priority``. Each row is a complete server object, including
+    unknown and nested fields, and is returned unchanged.
+    """
+    return _read_reference_list(
+        base_url,
+        token=token,
+        path="/rest/api/2/priority",
+        label="priority",
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def list_resolutions(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return every Jira resolution exactly as the server sent it.
+
+    The fixed read is ``/rest/api/2/resolution``. Each row is returned
+    unchanged, so unknown and nested fields survive.
+    """
+    return _read_reference_list(
+        base_url,
+        token=token,
+        path="/rest/api/2/resolution",
+        label="resolution",
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def list_issue_types(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return every visible Jira issue type exactly as the server sent it.
+
+    The fixed read is ``/rest/api/2/issuetype``. Rows are not filtered by
+    subtask status and are returned unchanged.
+    """
+    return _read_reference_list(
+        base_url,
+        token=token,
+        path="/rest/api/2/issuetype",
+        label="issue type",
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def list_status_categories(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return every visible Jira status category exactly as sent.
+
+    The fixed read is ``/rest/api/2/statuscategory``. Rows are returned
+    unchanged; no status is derived from a category.
+    """
+    return _read_reference_list(
+        base_url,
+        token=token,
+        path="/rest/api/2/statuscategory",
+        label="status category",
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def list_jira_projects(
+    base_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return the visible Jira project array exactly as the server sent it.
+
+    The fixed 8.22 read is ``/rest/api/2/project``. Every row is returned
+    unchanged, including unknown and nested fields. This response carries no
+    pagination metadata, so the client cannot prove that no further visible
+    project exists; a short array is not a completeness claim.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        values = get_json_array(session, f"{base}/rest/api/2/project", params={})
+    return [_reference_object(value, "project") for value in values]
+
+
+def _read_reference_list(
+    base_url: str,
+    *,
+    token: str,
+    path: str,
+    label: str,
+    allow_http_loopback: bool,
+) -> list[dict[str, object]]:
+    """Read one fixed reference endpoint and validate every row before returning."""
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        values = get_json_array(session, f"{base}{path}", params={})
+    return [_reference_object(value, label) for value in values]
+
+
+def _reference_object(value: object, label: str) -> dict[str, object]:
+    """Return one consumed server object without dropping or coercing fields."""
+    if not isinstance(value, dict):
+        raise AtlaWireError(f"Expected Jira {label} objects.")
+    return value
+
+
+def search_users(
+    base_url: str,
+    username: str,
+    *,
+    token: str,
+    start_at: int = 0,
+    max_results: int = USER_RESULTS_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return one bounded page of Jira users matching ``username``.
+
+    The Jira 8.22 ``/rest/user/search`` endpoint takes a non-empty
+    ``username`` substring and returns a bare array, not a paged envelope.
+    Only the requested page is read; an empty or full page never proves that
+    no further matching users exist. Inactive users are excluded by the
+    server default. Raw user objects are returned unchanged. A page longer
+    than ``max_results`` is rejected instead of being returned.
+    """
+    _check_user_search(username, start_at, max_results)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        values = get_json_array(
+            session,
+            f"{base}/rest/api/2/user/search",
+            params={
+                "username": username,
+                "startAt": start_at,
+                "maxResults": max_results,
+            },
+        )
+    if len(values) > max_results:
+        raise AtlaWireError("Jira returned more users than maxResults.")
+    return [_reference_object(value, "user") for value in values]
+
+
+def _check_user_search(username: object, start_at: object, max_results: object) -> None:
+    """Reject unusable user search input before a session or request exists."""
+    if not isinstance(username, str) or not username.strip():
+        raise AtlaWireError("Expected non-empty Jira user search text.")
+    try:
+        username.encode("utf-8")
+    except UnicodeEncodeError:
+        raise AtlaWireError(
+            "Expected the Jira user search text as valid UTF-8."
+        ) from None
+    if not isinstance(start_at, int) or isinstance(start_at, bool) or start_at < 0:
+        raise AtlaWireError("Expected a non-negative Jira user search start index.")
+    if (
+        not isinstance(max_results, int)
+        or isinstance(max_results, bool)
+        or not USER_RESULTS_MIN <= max_results <= USER_RESULTS_MAX
+    ):
+        raise AtlaWireError(
+            "The Jira user result limit must be between "
+            f"{USER_RESULTS_MIN} and {USER_RESULTS_MAX}."
+        )
+
+
 def list_transitions(
     base_url: str,
     key_or_url: str,
@@ -431,6 +677,38 @@ def _transition_string(value: object, label: str) -> str:
     except UnicodeEncodeError:
         message = f"Expected a Jira transition {label} as valid UTF-8 text."
         raise AtlaWireError(message) from None
+    return value
+
+
+def list_issue_remote_links(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return every remote link of one issue exactly as the server sent it.
+
+    Only the key is taken from ``key_or_url``; every request goes to the
+    configured ``base_url``, including when the pasted browse URL names another
+    host. The complete array is validated before anything is returned, so a
+    malformed late entry cannot yield a partial list. Nested values, unknown
+    fields, and ``null`` are preserved; returned URLs are data, never
+    destinations, so they are not fetched.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        values = get_json_array(
+            session, f"{base}/rest/api/2/issue/{key}/remotelink", params={}
+        )
+    return [_project_remote_link(value) for value in values]
+
+
+def _project_remote_link(value: object) -> dict[str, object]:
+    """Return one consumed link object without dropping, adding, or coercing it."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected Jira remote link objects.")
     return value
 
 

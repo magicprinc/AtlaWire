@@ -1,5 +1,6 @@
 """Read operations for self-hosted Bitbucket."""
 
+import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
@@ -15,6 +16,7 @@ from atlawire.http import (
     get_json_object,
     get_text,
     normalize_base_url,
+    reject_credential_echo,
 )
 
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
@@ -30,8 +32,19 @@ _PAGE_SIZE = 100
 _COMMIT_LIMIT_DEFAULT = 25
 _FIND_LIMIT_DEFAULT = 25
 _PULL_REQUEST_LIMIT_DEFAULT = 25
+_TAG_LIMIT_DEFAULT = 25
 _PULL_REQUEST_STATES = frozenset({"OPEN", "MERGED", "DECLINED", "ALL"})
 _PULL_REQUEST_ORDERS = frozenset({"NEWEST", "OLDEST"})
+_TAG_ORDERS = frozenset({"ALPHABETICAL", "MODIFICATION"})
+_SOURCE_PATH_CHANGE_TYPES = frozenset({"MOVE", "COPY", "RENAME"})
+# Four times the shared 8 MiB JSON response budget in atlawire.http. This is a
+# simple aggregate ceiling for retained per-file fallback output, represented
+# as encoded JSON rather than exact Python heap usage.
+_DIFF_FALLBACK_RETAINED_LIMIT = 4 * 8 * 1024 * 1024
+_DIFF_FALLBACK_RETAINED_MESSAGE = (
+    "The pull request diff fallback output exceeds the retained-output limit; "
+    "request fewer files or use explicit per-file diffs."
+)
 _DASHBOARD_STATES = frozenset({"OPEN", "MERGED", "DECLINED"})
 _DASHBOARD_ROLES = frozenset({"AUTHOR", "REVIEWER", "PARTICIPANT"})
 _DASHBOARD_PARTICIPANT_STATUSES = frozenset({"UNAPPROVED", "NEEDS_WORK", "APPROVED"})
@@ -56,6 +69,17 @@ _DIFF_TEXT_UNSAFE = re.compile(
     r"\ud800-\udfff]"
 )
 _DIFF_LINE_BREAKS = ("\r", "\n", "\u2028", "\u2029")
+
+
+class DeclaredTruncationError(AtlaWireError):
+    """A server explicitly declared a response truncated.
+
+    This is a subtype of [AtlaWireError][atlawire.http.AtlaWireError], so
+    existing callers keep catching the base type and the existing message stays
+    unchanged. The distinct type lets the pull request diff fallback react only
+    to a declared truncation, never to auth, transport, or malformed-shape
+    failures.
+    """
 
 
 class Repository(TypedDict):
@@ -125,6 +149,24 @@ MyPullRequest = TypedDict(
         "created": int | None,
     },
 )
+
+
+class PullRequestFallbackFile(TypedDict):
+    path: str
+    source_path: str | None
+    diff: dict[str, object]
+
+
+class PullRequestDiffFallback(TypedDict):
+    fallback: bool
+    fallback_reason: str | None
+    diff: dict[str, object] | None
+    files: list[PullRequestFallbackFile]
+
+
+class _PullRequestFallbackChange(TypedDict):
+    path: str
+    source_path: str | None
 
 
 class Branch(TypedDict):
@@ -260,6 +302,36 @@ def get_pull_request(
     return value
 
 
+def get_pull_request_merge_status(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return the server's mergeability object for one pull request.
+
+    ``repo`` is ``PROJECT/slug`` and ``pr_id`` follows the same canonical
+    positive decimal rules as
+    [get_pull_request][atlawire.bitbucket.get_pull_request]. Exactly one GET
+    targets the fixed ``/merge`` route without query parameters through the
+    shared bearer and JSON transport.
+
+    The decoded object is returned unchanged, so documented fields such as
+    ``canMerge``, ``conflicted``, ``outcome`` and ``vetoes`` keep their raw
+    nested values and unknown fields are preserved. This read only asks whether
+    the pull request can be merged: it never sends the prohibited merge POST,
+    requests another route, or follows response links. Only the shared object
+    shape is required; no additional field validation is applied.
+    """
+    _, url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        return get_json_object(session, f"{url}/merge", params={})
+
+
 def get_repository_file(
     base_url: str,
     repo: str,
@@ -339,6 +411,7 @@ def list_repository_files(
     token: str,
     at: str | None = None,
     max_pages: int = 100,
+    before_page: Callable[[], None] | None = None,
     allow_http_loopback: bool = False,
 ) -> list[str]:
     """List every file path under the repository root in server order.
@@ -350,7 +423,9 @@ def list_repository_files(
     values, with the legacy object representation read through the shared path
     reader. Each page is followed through its own ``nextPageStart``, and the
     whole list is built before it is returned, so a later failure yields no
-    partial list.
+    partial list. The optional ``before_page`` callback runs before every page
+    request and propagates its exception; it is not a cancellation mechanism for
+    an in-flight request.
     """
     _validate_page_limit(max_pages)
     params = _revision_params(at)
@@ -363,6 +438,7 @@ def list_repository_files(
             max_pages,
             project=_repository_file_path,
             params=params,
+            before_page=before_page,
         )
 
 
@@ -402,6 +478,36 @@ def list_directory(
             params=params,
             transform=_children_envelope,
         )
+
+
+def get_last_modified(
+    base_url: str,
+    repo: str,
+    path: str | None = None,
+    *,
+    token: str,
+    at: str | None = None,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return last-modification metadata for a repository or relative path.
+
+    ``repo`` is ``PROJECT/slug``. ``None`` and the empty string select the
+    repository root; otherwise ``path`` is a relative Git path whose safe
+    segments are encoded exactly once. A nonempty ``at`` is sent only as the
+    ``at`` query parameter, while ``None`` and the empty string omit it so the
+    server uses the tip of the default branch.
+
+    Exactly one GET targets the fixed ``/last-modified`` route, with the
+    selected path suffix when present. The decoded object is returned
+    unchanged, so the ``files`` map, ``latestCommit``, and unknown nested fields
+    are preserved, and response links are never followed.
+    """
+    suffix = _last_modified_suffix(path)
+    params = _revision_params(at)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return get_json_object(session, f"{url}/last-modified{suffix}", params=params)
 
 
 def get_pull_request_file(
@@ -474,6 +580,25 @@ def list_pull_request_files(
     return _pull_request_files(page)
 
 
+def _pull_request_fallback_changes(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool,
+) -> list[_PullRequestFallbackChange]:
+    """Read and validate the complete changes page used by the fallback."""
+    _, url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    with bearer_session(token) as session:
+        page = get_json_object(
+            session, f"{url}/changes", params={"limit": _CHANGES_LIMIT}
+        )
+    return _fallback_changes(page)
+
+
 def get_pull_request_diff(
     base_url: str,
     repo: str,
@@ -526,6 +651,108 @@ def get_pull_request_diff(
     return value
 
 
+def get_pull_request_diff_with_fallback(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    context: int = 3,
+    allow_http_loopback: bool = False,
+) -> PullRequestDiffFallback:
+    """Return a whole pull request diff or an all-or-nothing file fallback.
+
+    Exactly one whole-diff request is made first through
+    [get_pull_request_diff][atlawire.bitbucket.get_pull_request_diff]. A
+    successful response is returned unchanged with ``fallback=False``.
+
+    Only a [DeclaredTruncationError][atlawire.bitbucket.DeclaredTruncationError]
+    from that whole-diff response triggers the fallback. Auth, transport,
+    malformed flags, and malformed shapes propagate unchanged without another
+    request. The fallback then reads the one documented ``/changes`` page and
+    requires it to be terminal, untruncated, and below its reported limit;
+    capped, truncated, malformed, or failed changes fail the call. Every changed
+    path is validated before any per-file request, duplicate destination paths
+    fail, and copied, moved, or renamed entries must carry a valid ``srcPath``.
+
+    Each changed file is then fetched once through the explicit per-file diff
+    contract, including ``srcPath`` when present, and every response is
+    validated with the same declared-truncation rules. Any later failure aborts
+    the whole call without a partial result. An empty changes page after a
+    declared whole-diff truncation is rejected as inconsistent rather than
+    returned as a recovered empty result. The returned ``files`` list keeps each
+    decoded diff object unchanged and in server order; ``fallback=True`` and
+    ``fallback_reason`` identify why the whole diff was not used.
+
+    This proves only that the server declared the whole diff truncated. It does
+    not prove completeness against an unflagged server cap, and no response
+    link is followed. Requests are not snapshot-pinned: if the pull request
+    changes between the whole-diff read, the changes read, and the per-file
+    reads, the fallback can mix revisions. A successful result therefore does
+    not assert snapshot consistency.
+
+    Retained per-file diffs are capped in aggregate at four times the shared
+    8 MiB JSON response budget (32 MiB), measured as encoded-JSON size per
+    object rather than exact Python heap usage. A valid but very large PR whose
+    recovered diffs exceed this guard fails with no partial result and must use
+    explicit per-file diff requests instead.
+    """
+    try:
+        whole = get_pull_request_diff(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            context=context,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except DeclaredTruncationError as error:
+        reason = str(error)
+    else:
+        return PullRequestDiffFallback(
+            fallback=False,
+            fallback_reason=None,
+            diff=whole,
+            files=[],
+        )
+    changes = _pull_request_fallback_changes(
+        base_url,
+        repo,
+        pr_id,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    files: list[PullRequestFallbackFile] = []
+    retained = 0
+    for change in changes:
+        diff = get_pull_request_diff(
+            base_url,
+            repo,
+            pr_id,
+            token=token,
+            context=context,
+            path=change["path"],
+            source_path=change["source_path"],
+            allow_http_loopback=allow_http_loopback,
+        )
+        retained += _retained_diff_size(diff)
+        if retained > _DIFF_FALLBACK_RETAINED_LIMIT:
+            raise AtlaWireError(_DIFF_FALLBACK_RETAINED_MESSAGE)
+        files.append(
+            PullRequestFallbackFile(
+                path=change["path"],
+                source_path=change["source_path"],
+                diff=diff,
+            )
+        )
+    return PullRequestDiffFallback(
+        fallback=True,
+        fallback_reason=reason,
+        diff=None,
+        files=files,
+    )
+
+
 def get_pull_request_diff_text(
     base_url: str,
     repo: str,
@@ -563,7 +790,9 @@ def get_pull_request_diff_text(
         source_path=source_path,
         allow_http_loopback=allow_http_loopback,
     )
-    return _render_pull_request_diff_text(value, context=context)
+    text = _render_pull_request_diff_text(value, context=context)
+    reject_credential_echo(text, tokens=(token,))
+    return text
 
 
 def list_pull_request_comments(
@@ -735,6 +964,7 @@ def list_branches(
     token: str,
     filter_text: str | None = None,
     max_pages: int = 100,
+    before_page: Callable[[], None] | None = None,
     allow_http_loopback: bool = False,
 ) -> list[Branch]:
     """List repository branches in server order or raise without partial rows.
@@ -743,7 +973,9 @@ def list_branches(
     ``filterText`` on every page request; ``None`` and the empty string omit the
     filter. Text that UTF-8 cannot encode is rejected before any request. Only
     ``displayId``, ``id``, ``latestCommit`` and ``isDefault`` are projected, and
-    each page is followed through its own ``nextPageStart``.
+    each page is followed through its own ``nextPageStart``. The optional
+    ``before_page`` callback runs before every page request and propagates its
+    exception.
     """
     _validate_page_limit(max_pages)
     params = _branch_filter(filter_text)
@@ -756,6 +988,7 @@ def list_branches(
             max_pages,
             project=_branch,
             params=params,
+            before_page=before_page,
         )
 
 
@@ -766,6 +999,7 @@ def get_branch(
     *,
     token: str,
     max_pages: int = 100,
+    before_page: Callable[[], None] | None = None,
     allow_http_loopback: bool = False,
 ) -> Branch | None:
     """Return the branch whose display name is exactly ``name``.
@@ -776,7 +1010,8 @@ def get_branch(
     verbatim as ``filterText`` on every page. The validated ``/branches`` route
     is traversed to exhaustion through the shared pager, and the first
     projected row whose ``displayId`` equals ``name`` byte for byte is
-    returned.
+    returned. The optional ``before_page`` callback runs before every page
+    request and propagates its exception.
 
     ``None`` means a complete successful traversal contained no exact match.
     A malformed later page, a non-advancing cursor, a transport failure, or
@@ -787,18 +1022,102 @@ def get_branch(
     wanted = _revision(name)
     if not wanted.strip():
         raise AtlaWireError("The branch name must be non-blank text.")
-    rows = list_branches(
-        base_url,
-        repo,
-        token=token,
-        filter_text=wanted,
-        max_pages=max_pages,
-        allow_http_loopback=allow_http_loopback,
-    )
+    if before_page is None:
+        rows = list_branches(
+            base_url,
+            repo,
+            token=token,
+            filter_text=wanted,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    else:
+        rows = list_branches(
+            base_url,
+            repo,
+            token=token,
+            filter_text=wanted,
+            max_pages=max_pages,
+            before_page=before_page,
+            allow_http_loopback=allow_http_loopback,
+        )
     for row in rows:
         if row["name"] == wanted:
             return row
     return None
+
+
+def list_tags(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    filter_text: str | None = None,
+    order_by: str | None = None,
+    limit: int = _TAG_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """List repository tags in server order, stopping at ``limit`` rows.
+
+    ``repo`` is ``PROJECT/slug``. The fixed ``/tags`` route is paged from
+    ``start=0``; each request asks for no more than the rows still missing and
+    follows the server's opaque ``nextPageStart``, even after a short page.
+    Every row must be a JSON object and is returned unchanged, so declared and
+    unknown nested fields are preserved, and no response link is followed.
+
+    A nonempty ``filter_text`` is sent verbatim as ``filterText`` and
+    ``order_by`` must be exactly ``ALPHABETICAL`` or ``MODIFICATION`` when
+    given. Both filters are repeated on every page; ``None`` and the empty
+    filter string omit ``filterText``, and ``None`` omits ``orderBy``.
+
+    Reaching ``limit`` stops the traversal without reading or requiring the
+    final page's unused next-page hint. Exactly ``limit`` rows therefore only
+    proves that the cap was reached, not that the repository has no more tags;
+    completeness needs a larger limit or a traversal to the terminal page.
+    """
+    _validate_page_limit(max_pages)
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise AtlaWireError("The tag limit must be between 1 and 1000.")
+    params = _tag_params(filter_text, order_by)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_repository_url(base, repo)}/tags"
+    with bearer_session(token) as session:
+        return _read_pages(
+            session,
+            url,
+            max_pages,
+            project=_tag_row,
+            params=params,
+            limit=limit,
+        )
+
+
+def get_tag(
+    base_url: str,
+    repo: str,
+    name: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one tag by exact name exactly as the server sent it.
+
+    ``repo`` is ``PROJECT/slug``. ``name`` is a slash-delimited Git tag path:
+    each segment must be nonempty, must not be ``.`` or ``..``, and must not
+    contain control characters, backslashes, or a literal percent escape. Safe
+    segments are encoded exactly once while slashes remain separators, so the
+    request cannot escape the fixed ``/tags`` route. Exactly one GET targets
+    that route without query parameters; the decoded object is returned
+    unchanged, and response links are never followed.
+    """
+    segments = _tag_segments(name)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return get_json_object(
+            session, f"{url}/tags/{_encoded_path(segments)}", params={}
+        )
 
 
 def list_commits(
@@ -984,7 +1303,9 @@ def get_commit_diff_text(
         allow_http_loopback=allow_http_loopback,
     )
     values = [value] if isinstance(value, dict) else value
-    return _render_diff_text(values, context=context, subject=_DIFF_SUBJECT_COMMIT)
+    text = _render_diff_text(values, context=context, subject=_DIFF_SUBJECT_COMMIT)
+    reject_credential_echo(text, tokens=(token,))
+    return text
 
 
 def _read_commit_file_diff(
@@ -1134,6 +1455,29 @@ def _branch_filter(value: str | None) -> dict[str, str] | None:
     except UnicodeEncodeError:
         raise AtlaWireError("The branch filter must be valid UTF-8 text.") from None
     return {"filterText": value}
+
+
+def _tag_params(filter_text: str | None, order_by: str | None) -> dict[str, str]:
+    """Validate optional tag filters before any request.
+
+    ``filter_text`` is sent verbatim when it is nonempty; ``None`` and the empty
+    string omit it. ``order_by`` must be exactly ``ALPHABETICAL`` or
+    ``MODIFICATION`` when present. Returning one mapping lets the shared pager
+    repeat both filters unchanged on every page.
+    """
+    params: dict[str, str] = {}
+    if filter_text is not None:
+        if not isinstance(filter_text, str):
+            raise AtlaWireError("The tag filter must be a string.")
+        if filter_text:
+            params["filterText"] = _require_encodable(filter_text, "tag filter")
+    if order_by is not None:
+        if not isinstance(order_by, str) or order_by not in _TAG_ORDERS:
+            raise AtlaWireError(
+                "The tag order must be ALPHABETICAL or MODIFICATION."
+            )
+        params["orderBy"] = order_by
+    return params
 
 
 def _commit_params(at: str | None, path: str | None) -> dict[str, str]:
@@ -1287,6 +1631,29 @@ def _directory_segments(path: str) -> tuple[str, ...]:
     if path == "":
         return ()
     return _file_segments(path)
+
+
+def _tag_segments(name: str) -> tuple[str, ...]:
+    """Reuse the safe relative-path rules for a slash-delimited tag name.
+
+    Git tag names may contain slashes, so each segment is validated and encoded
+    separately while the slash stays a path separator. Traversal, empty
+    segments, control characters, backslashes, and literal percent escapes are
+    rejected before any request.
+    """
+    if not isinstance(name, str) or not name:
+        raise AtlaWireError("Expected a tag name with safe path segments.")
+    try:
+        return _file_segments(name)
+    except AtlaWireError:
+        raise AtlaWireError("Expected a tag name with safe path segments.") from None
+
+
+def _last_modified_suffix(path: str | None) -> str:
+    """Return the validated path suffix; ``None`` and empty mean the root."""
+    if path is None or path == "":
+        return ""
+    return "/" + _encoded_path(_file_segments(path))
 
 
 def _browse_url(repository_url: str, segments: tuple[str, ...]) -> str:
@@ -1471,6 +1838,57 @@ def _pull_request_files(page: dict[str, object]) -> list[ChangedFile]:
     return [_changed_file(value) for value in values]
 
 
+def _fallback_changes(
+    page: dict[str, object],
+) -> list[_PullRequestFallbackChange]:
+    """Validate the fallback changes page and its rename source metadata."""
+    rows = _pull_request_files(page)
+    values = page.get("values")
+    if not isinstance(values, list):
+        raise AtlaWireError("Expected a Bitbucket values array.")
+    if not values:
+        raise AtlaWireError(
+            "A truncated pull request diff cannot be recovered from "
+            "an empty changes page."
+        )
+    changes: list[_PullRequestFallbackChange] = []
+    seen: set[str] = set()
+    for value, row in zip(values, rows, strict=True):
+        change = _fallback_change(value, row)
+        if change["path"] in seen:
+            raise AtlaWireError("Duplicate path in Bitbucket pull request changes.")
+        seen.add(change["path"])
+        changes.append(change)
+    return changes
+
+
+def _retained_diff_size(value: dict[str, object]) -> int:
+    """Return one encoded-JSON size proxy for a retained file diff."""
+    return len(json.dumps(value, separators=(",", ":")))
+
+
+def _fallback_change(
+    value: object, row: ChangedFile
+) -> _PullRequestFallbackChange:
+    """Return one validated fallback path and its optional source path."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket change object.")
+    _file_segments(row["path"])
+    source = value.get("srcPath")
+    if source is None:
+        if row["type"] in _SOURCE_PATH_CHANGE_TYPES:
+            raise AtlaWireError(
+                "A copied, moved, or renamed Bitbucket change requires "
+                "a source path."
+            )
+        return _PullRequestFallbackChange(path=row["path"], source_path=None)
+    source_path = _require_encodable(_change_path(source), "change source path")
+    _file_segments(source_path)
+    return _PullRequestFallbackChange(
+        path=row["path"], source_path=source_path
+    )
+
+
 def _changed_file(value: object) -> ChangedFile:
     """Project one change, rejecting text that UTF-8 cannot encode."""
     if not isinstance(value, dict):
@@ -1565,61 +1983,69 @@ def _children_envelope(page: dict[str, object]) -> dict[str, object]:
 
 
 def _validate_diff(value: dict[str, object], *, subject: str) -> None:
-    """Reject declared truncation and malformed truncation-bearing collections.
+    """Reject malformed shapes/flags, then declared truncation.
 
     Only the documented envelope, file, hunk, segment and line nodes are
     inspected; unknown metadata is left untouched and is not searched for
-    flags. ``subject`` only names the request in diagnostics.
+    flags. All documented shapes and flags are validated before a declared true
+    flag is reported, so a malformed sibling always takes precedence over
+    truncation. ``subject`` only names the request in diagnostics.
     """
-    _check_diff_truncation(value, subject=subject)
+    truncated = _diff_truncation_flag(value)
     diffs = value.get("diffs")
     if not isinstance(diffs, list):
         raise AtlaWireError("Expected a Bitbucket diffs array.")
     for diff in diffs:
         if not isinstance(diff, dict):
             raise AtlaWireError("Expected a Bitbucket diff object.")
-        _check_diff_truncation(diff, subject=subject)
+        truncated = _diff_truncation_flag(diff) or truncated
         if "hunks" not in diff:
             continue
         hunks = diff["hunks"]
         if not isinstance(hunks, list):
             raise AtlaWireError("Invalid hunks in a Bitbucket diff.")
         for hunk in hunks:
-            _check_diff_hunk(hunk, subject=subject)
+            truncated = _check_diff_hunk(hunk) or truncated
+    if truncated:
+        raise DeclaredTruncationError(
+            f"Bitbucket reported a truncated {subject} diff."
+        )
 
 
-def _check_diff_hunk(hunk: object, *, subject: str) -> None:
-    """Validate one file hunk and its segments, if declared."""
+def _check_diff_hunk(hunk: object) -> bool:
+    """Validate one file hunk and return whether any node declares truncation."""
     if not isinstance(hunk, dict):
         raise AtlaWireError("Expected a Bitbucket diff hunk object.")
-    _check_diff_truncation(hunk, subject=subject)
+    truncated = _diff_truncation_flag(hunk)
     if "segments" not in hunk:
-        return
+        return truncated
     segments = hunk["segments"]
     if not isinstance(segments, list):
         raise AtlaWireError("Invalid segments in a Bitbucket diff hunk.")
     for segment in segments:
-        _check_diff_segment(segment, subject=subject)
+        truncated = _check_diff_segment(segment) or truncated
+    return truncated
 
 
-def _check_diff_segment(segment: object, *, subject: str) -> None:
-    """Validate one hunk segment and its lines, if declared."""
+def _check_diff_segment(segment: object) -> bool:
+    """Validate one hunk segment and return whether it or a line is truncated."""
     if not isinstance(segment, dict):
         raise AtlaWireError("Expected a Bitbucket diff segment object.")
-    _check_diff_truncation(segment, subject=subject)
+    truncated = _diff_truncation_flag(segment)
     if "lines" not in segment:
-        return
+        return truncated
     lines = segment["lines"]
     if not isinstance(lines, list):
         raise AtlaWireError("Invalid lines in a Bitbucket diff segment.")
     for line in lines:
         if not isinstance(line, dict):
             raise AtlaWireError("Expected a Bitbucket diff line object.")
-        _check_diff_truncation(line, subject=subject)
+        truncated = _diff_truncation_flag(line) or truncated
+    return truncated
 
 
-def _check_diff_truncation(value: dict[str, object], *, subject: str) -> None:
-    """Accept an omitted or exact false flag; reject true and any other value.
+def _diff_truncation_flag(value: dict[str, object]) -> bool:
+    """Return whether a node declares truncation; malformed values raise.
 
     Server 5.10 emits both bare booleans and the lowercase strings ``"true"``
     and ``"false"`` across the envelope levels, so those exact strings are
@@ -1627,12 +2053,12 @@ def _check_diff_truncation(value: dict[str, object], *, subject: str) -> None:
     ``"false"`` must never be mistaken for a truncation report.
     """
     if "truncated" not in value:
-        return
+        return False
     flag = value["truncated"]
     if flag is True or flag == "true":
-        raise AtlaWireError(f"Bitbucket reported a truncated {subject} diff.")
+        return True
     if flag is False or flag == "false":
-        return
+        return False
     raise AtlaWireError("Invalid Bitbucket diff truncation flag.")
 
 
@@ -1863,6 +2289,7 @@ def _read_pages[RowT](
     read_full_pages: bool = False,
     transform: Callable[[dict[str, object]], dict[str, object]] | None = None,
     on_page: Callable[[], None] | None = None,
+    before_page: Callable[[], None] | None = None,
 ) -> list[RowT]:
     """Read cursor pages, optionally stopping after ``limit`` projected rows.
 
@@ -1875,7 +2302,9 @@ def _read_pages[RowT](
     call returns at the projected row cap without needing the unused next-page
     hint. An optional ``transform`` replaces the fetched page before its cursor
     and rows are read. ``on_page`` observes completed requests so callers can
-    share one page budget across several calls.
+    share one page budget across several calls. ``before_page`` runs before each
+    request, including the first, and propagates its exception; it cannot cancel
+    a request already in flight.
 
     A present ``start`` echo must equal the cursor requested for that page and a
     present ``size`` echo must equal the number of values; an omitted echo is not
@@ -1888,6 +2317,8 @@ def _read_pages[RowT](
     start = 0
     rows: list[RowT] = []
     for _ in range(max_pages):
+        if before_page is not None:
+            before_page()
         remaining = None if limit is None or read_full_pages else limit - len(rows)
         size = _PAGE_SIZE if remaining is None else min(_PAGE_SIZE, remaining)
         page = get_json_object(
@@ -1947,6 +2378,13 @@ def _next_page_start(page: dict[str, object], start: int) -> int:
     ):
         raise AtlaWireError("Invalid or non-advancing Bitbucket nextPageStart.")
     return next_start
+
+
+def _tag_row(value: object) -> dict[str, object]:
+    """Require one tag row to be an object and return it without projection."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket tag object.")
+    return value
 
 
 def _project(value: object) -> Project:

@@ -1,12 +1,22 @@
 """Render a fetched Jira issue as Markdown without extra network or file effects.
 
-The renderer converts only the HTML that Jira already returned in
+The default renderer converts only the HTML that Jira already returned in
 ``renderedFields``. It keeps link labels and image alt text but drops link and
 image destinations, and escapes text that could otherwise become active
 Markdown or HTML. This is a readability measure, not a general HTML sanitizer.
 Rendered comment bodies are used only for unambiguous ids; raw descriptions or
 comments use a literal fenced text block. C0/C1 controls are shown as visible
 escape sequences instead of raw bytes.
+
+Wiki mode (``use_wiki=True``) instead reads the raw Jira wiki markup in
+``fields.description`` and in every ``fields.comment`` body; ``renderedFields``
+is then ignored. [wiki_to_markdown] supports a deliberately small subset:
+headings, ``*bold*``, ``_italic_``, inline code, ``{code}``/``{noformat}``
+blocks and http(s) links. Any other macro, image or table is shown literally
+with an explicit label; list, quote and other inline styles stay escaped
+literal text. Links are never followed, non-http(s) destinations never become
+active Markdown, and all remaining prose is inline-escaped: layout C0 controls
+are dropped, while bidi controls and lone surrogates become visible escapes.
 """
 
 import re
@@ -26,6 +36,30 @@ _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _CONVERSION_UNAVAILABLE = (
     "_Rendered Markdown conversion was unavailable; no raw fallback was available._"
 )
+
+# Jira wiki rules kept intentionally narrow. Each pattern owns one syntax and
+# there is no recursive parse: unsupported nesting stays literal text.
+_WIKI_HEADING = re.compile(r"^ {0,3}h([1-6])\.\s*(.*)$")
+_WIKI_CODE = re.compile(r"\{code(?::(?P<params>[^}\n]{0,256}))?\}")
+_WIKI_CODE_CLOSE = re.compile(r"\{code\}")
+_WIKI_NOFORMAT = re.compile(r"\{noformat\}")
+_WIKI_NOFORMAT_CLOSE = re.compile(r"\{noformat\}")
+_WIKI_LANGUAGE = re.compile(r"[A-Za-z0-9_+.#-]{1,32}")
+_WIKI_SAFE_LINK = re.compile(
+    r"https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+", re.IGNORECASE
+)
+_WIKI_ISSUE_LINK = re.compile(r"[A-Z][A-Z0-9_]*-[0-9]+")
+_WIKI_INLINE = re.compile(
+    r"\{\{(?P<code>[^{}\n]{0,4096}?)\}\}"
+    r"|!(?P<image>[^!\s\n]{1,512})!"
+    r"|\[(?P<link>[^\[\]\n]{0,2048})\]"
+    r"|\{(?P<macro>[A-Za-z][A-Za-z0-9_-]{0,63})"
+    r"(?::(?P<params>[^}\n]{0,256}))?\}"
+    r"|(?<![\w])\*(?P<bold>[^*\n]{1,1000})\*(?![\w])"
+    r"|(?<![\w])_(?P<italic>[^_\n]{1,1000})_(?![\w])"
+)
+_BACKTICKS = re.compile(r"`+")
+_WIKI_EMPTY_COMMENT = "_Empty comment body._"
 
 
 class _RenderedComments(NamedTuple):
@@ -194,6 +228,17 @@ def _ambiguous_raw_ids(comments: list[dict[str, object]]) -> set[str]:
     return ambiguous
 
 
+def _comment_title(index: int, entry: dict[str, object]) -> str:
+    title = [f"Comment {index}"]
+    author = _author(entry)
+    if author:
+        title.append(inline(author))
+    created = _created(entry)
+    if created:
+        title.append(inline(created))
+    return "### " + " · ".join(title)
+
+
 def _comment(
     index: int,
     entry: dict[str, object],
@@ -215,23 +260,331 @@ def _comment(
         content = _CONVERSION_UNAVAILABLE
     else:
         content = fenced_block(body, "text")
-    title = [f"Comment {index}"]
-    author = _author(entry)
-    if author:
-        title.append(inline(author))
-    created = _created(entry)
-    if created:
-        title.append(inline(created))
-    return "### " + " · ".join(title) + "\n\n" + content
+    return _comment_title(index, entry) + "\n\n" + content
 
 
-def render_issue_markdown(issue: dict[str, object]) -> str:
+class _WikiPart(NamedTuple):
+    """One plain text run or one code-like macro from Jira wiki markup."""
+
+    value: str
+    macro: str | None = None
+    info: str = ""
+    terminated: bool = True
+
+
+def _wiki_language(params: str | None) -> str:
+    """Return a safe info string for a ``{code}`` language parameter."""
+    if not params:
+        return ""
+    parts = [part.strip() for part in params.split("|")]
+    language = ""
+    for part in parts:
+        if part.lower().startswith("language="):
+            language = part.split("=", 1)[1].strip()
+            break
+    else:
+        language = parts[0] if parts else ""
+    return language if _WIKI_LANGUAGE.fullmatch(language) else ""
+
+
+def _wiki_parts(text: str) -> list[_WikiPart]:
+    """Split text around ``{code}`` and ``{noformat}`` blocks.
+
+    An opener without a closing macro consumes the rest of the input and keeps
+    its ``terminated`` flag false, so no code is silently dropped.
+    """
+    parts: list[_WikiPart] = []
+    position = 0
+    while position < len(text):
+        code = _WIKI_CODE.search(text, position)
+        plain = _WIKI_NOFORMAT.search(text, position)
+        if plain is not None and (code is None or plain.start() < code.start()):
+            match = plain
+            macro = "noformat"
+            closer = _WIKI_NOFORMAT_CLOSE
+            info = ""
+        elif code is not None:
+            match = code
+            macro = "code"
+            closer = _WIKI_CODE_CLOSE
+            info = _wiki_language(match["params"])
+        else:
+            parts.append(_WikiPart(text[position:]))
+            break
+        if match.start() > position:
+            parts.append(_WikiPart(text[position : match.start()]))
+        closing = closer.search(text, match.end())
+        if closing is None:
+            parts.append(
+                _WikiPart(text[match.end() :], macro, info, terminated=False)
+            )
+            break
+        parts.append(_WikiPart(text[match.end() : closing.start()], macro, info))
+        position = closing.end()
+    return parts
+
+
+def _code_content(value: str) -> str:
+    """Drop only the line break that ends the opener line, keeping blank lines.
+
+    Jira writes ``{code}`` on its own line, so the first newline is structural.
+    Every later newline, including trailing ones, is code content and is kept.
+    """
+    content = escape_controls(value)
+    return content[1:] if content.startswith("\n") else content
+
+
+def _code_span(content: str) -> str:
+    """Format one inline code span without losing embedded backticks."""
+    content = escape_controls(content).replace("\n", " ")
+    if not content:
+        return "`[empty Jira inline code]`"
+    longest = max((len(run) for run in _BACKTICKS.findall(content)), default=0)
+    fence = "`" * (longest + 1)
+    pad = " " if content[:1] in "` " or content[-1:] in "` " else ""
+    return f"{fence}{pad}{content}{pad}{fence}"
+
+
+def _wiki_unsupported(kind: str, literal: str) -> str:
+    """Keep an unsupported construct visible, inert and explicitly labelled."""
+    return f"`[unsupported Jira {kind}]` {inline(literal)}"
+
+
+def _wiki_unsupported_block(kind: str, literal: str) -> str:
+    label = f"_Unsupported Jira {kind}; showing it literally._"
+    return label + "\n\n" + fenced_block(literal, "text")
+
+
+def _wiki_link(body: str) -> str:
+    """Render one bracketed Jira link, or label its unsupported destination."""
+    label, separator, target = body.partition("|")
+    if separator:
+        target = target.strip()
+        if _WIKI_SAFE_LINK.fullmatch(target):
+            text = inline(label.strip() or target)
+            return f"[{text}](<{target}>)"
+        return _wiki_unsupported("link target", f"[{body}]")
+    target = body.strip()
+    if _WIKI_SAFE_LINK.fullmatch(target):
+        return f"[{inline(target)}](<{target}>)"
+    if body.startswith(("~", "^")) or _WIKI_ISSUE_LINK.fullmatch(target):
+        return _wiki_unsupported("link target", f"[{body}]")
+    return inline(f"[{body}]")
+
+
+def _wiki_gap(text: str) -> str:
+    """Escape text between two inline tokens, keeping the separating spaces."""
+    escaped = inline(text)
+    if not escaped:
+        return " " if text else ""
+    if text[:1].isspace():
+        escaped = " " + escaped
+    if text[-1:].isspace():
+        escaped += " "
+    return escaped
+
+
+def _escape_image_opener(pieces: list[str]) -> None:
+    """Keep a literal ``!`` before a link from forming a Markdown image.
+
+    The visible exclamation stays, but it becomes ``\\!`` so the following
+    ``[label](<url>)`` is parsed as a link rather than an image.
+    """
+    if pieces and pieces[-1].endswith("!"):
+        pieces[-1] = pieces[-1][:-1] + "\\!"
+
+
+def _wiki_inline(text: str) -> str:
+    """Escape one line of wiki text, converting only the supported inline forms."""
+    pieces: list[str] = []
+    position = 0
+    for match in _WIKI_INLINE.finditer(text):
+        if match.start() > position:
+            pieces.append(_wiki_gap(text[position : match.start()]))
+        if match["code"] is not None:
+            pieces.append(_code_span(match["code"]))
+        elif match["image"] is not None:
+            pieces.append(_wiki_unsupported("image", match[0]))
+        elif match["link"] is not None:
+            _escape_image_opener(pieces)
+            pieces.append(_wiki_link(match["link"]))
+        elif match["macro"] is not None:
+            name = match["macro"]
+            pieces.append(_wiki_unsupported(f"macro {name}", match[0]))
+        elif match["bold"] is not None:
+            pieces.append(f"**{inline(match['bold'])}**")
+        else:
+            pieces.append(f"*{inline(match['italic'])}*")
+        position = match.end()
+    if position < len(text):
+        tail = text[position:]
+        escaped = inline(tail)
+        if escaped and tail[:1].isspace():
+            escaped = " " + escaped
+        pieces.append(escaped)
+    return "".join(pieces)
+
+
+def _flush_paragraph(paragraph: list[str], blocks: list[str]) -> None:
+    if paragraph:
+        blocks.append("\n".join(paragraph))
+        paragraph.clear()
+
+
+def _wiki_text_blocks(text: str) -> list[str]:
+    """Render headings, tables and paragraph lines from a plain wiki run."""
+    blocks: list[str] = []
+    paragraph: list[str] = []
+    lines = text.split("\n")
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not line.strip():
+            _flush_paragraph(paragraph, blocks)
+            index += 1
+            continue
+        heading = _WIKI_HEADING.match(line)
+        if heading is not None:
+            _flush_paragraph(paragraph, blocks)
+            body = _wiki_inline(heading[2].strip())
+            blocks.append("#" * int(heading[1]) + (f" {body}" if body else ""))
+            index += 1
+            continue
+        if line.lstrip().startswith("|"):
+            _flush_paragraph(paragraph, blocks)
+            start = index
+            while index < len(lines) and lines[index].lstrip().startswith("|"):
+                index += 1
+            blocks.append(
+                _wiki_unsupported_block("table", "\n".join(lines[start:index]))
+            )
+            continue
+        rendered_line = _wiki_inline(line)
+        if rendered_line:
+            paragraph.append(rendered_line)
+        index += 1
+    _flush_paragraph(paragraph, blocks)
+    return blocks
+
+
+def wiki_to_markdown(text: str) -> str:
+    """Render Jira wiki markup read-only, without fetching or executing anything.
+
+    Supported syntax is intentionally small: ``h1.``-``h6.`` headings,
+    ``*bold*``, ``_italic_``, ``{{inline code}}``, ``{code}``/``{code:lang}``
+    and ``{noformat}`` blocks, and ``[label|http(s) URL]`` or bare ``[URL]``
+    links. A ``[label|target]`` whose target is not http(s) is shown literally
+    with a label; the same applies to images, other macros and tables. Nested
+    or other inline styles stay literal text. Code blocks drop only the line
+    break ending the opener line, so blank content lines are preserved. An
+    unterminated code block keeps the remaining input in a labelled fence. The
+    result ends with one newline unless the input has no renderable content.
+    """
+    if not isinstance(text, str):
+        raise AtlaWireError("Expected Jira wiki text.")
+    blocks: list[str] = []
+    for part in _wiki_parts(text):
+        if part.macro is None:
+            blocks.extend(_wiki_text_blocks(part.value))
+            continue
+        content = _code_content(part.value)
+        if part.terminated:
+            blocks.append(fenced_block(content, part.info))
+            continue
+        label = f"_Unterminated Jira {part.macro} block; showing the rest literally._"
+        blocks.append(label + "\n\n" + fenced_block(content, part.info))
+    rendered = "\n\n".join(blocks)
+    if not rendered:
+        return ""
+    return escape_controls(rendered.strip()) + "\n"
+
+
+def _wiki_description(fields: dict[str, object]) -> str | None:
+    value = fields.get("description")
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise AtlaWireError("Invalid Jira description in the issue.")
+    if not value.strip():
+        return None
+    return wiki_to_markdown(value).rstrip("\n")
+
+
+def _wiki_comment(index: int, entry: dict[str, object]) -> str:
+    body = entry.get("body")
+    if body is None:
+        body = ""
+    if not isinstance(body, str):
+        raise AtlaWireError("Invalid Jira comment body in the issue.")
+    if body.strip():
+        content = wiki_to_markdown(body).rstrip("\n")
+    else:
+        content = _WIKI_EMPTY_COMMENT
+    return _comment_title(index, entry) + "\n\n" + content
+
+
+def _comment_blocks(
+    fields: dict[str, object],
+    rendered_fields: dict[str, object],
+    use_wiki: bool,
+) -> list[str]:
+    """Render the comment section; wiki mode reads raw bodies only."""
+    rendered_comments: _RenderedComments | None = (
+        None if use_wiki else _rendered_comments(rendered_fields)
+    )
+    comments, total = _comments(fields)
+    ambiguous_raw: set[str] = (
+        set() if use_wiki else _ambiguous_raw_ids(comments)
+    )
+    if not (comments or (total is not None and total > 0)):
+        return []
+    blocks = ["## Comments"]
+    if total is not None and total > len(comments):
+        blocks.append(
+            f"_Comments are incomplete: showing {len(comments)} of {total}._"
+        )
+    if use_wiki:
+        blocks.extend(
+            _wiki_comment(index, entry)
+            for index, entry in enumerate(comments, 1)
+        )
+    elif rendered_comments is not None:
+        blocks.extend(
+            _comment(index, entry, rendered_comments, ambiguous_raw)
+            for index, entry in enumerate(comments, 1)
+        )
+    return blocks
+
+
+def _metadata(fields: dict[str, object]) -> str:
+    return " · ".join(
+        f"**{label}:** {inline(value)}"
+        for label, value in (
+            ("Status", _field_name(fields, "status", "status")),
+            ("Type", _field_name(fields, "issuetype", "type")),
+            ("Priority", _field_name(fields, "priority", "priority")),
+            ("Assignee", _field_name(fields, "assignee", "assignee")),
+        )
+        if value
+    )
+
+
+def render_issue_markdown(
+    issue: dict[str, object], *, use_wiki: bool = False
+) -> str:
     """Return a self-contained Markdown representation of a fetched issue.
 
     The function is pure: it reads the issue mapping and performs no I/O. A
     rendered body is matched to a raw comment by id, not by list position.
     Missing or empty rendered bodies fall back to literal fenced raw text.
+
+    With ``use_wiki`` the raw description and every raw comment body are
+    rendered as Jira wiki markup instead of the HTML in ``renderedFields``;
+    that field is still shape-checked but supplies no content. Comments keep
+    their original order and are never dropped.
     """
+    if not isinstance(use_wiki, bool):
+        raise AtlaWireError("Expected a boolean wiki option.")
     if not isinstance(issue, dict):
         raise AtlaWireError("Expected a Jira issue object.")
     key = issue.get("key")
@@ -259,35 +612,15 @@ def render_issue_markdown(issue: dict[str, object]) -> str:
         heading += ": " + inline(summary)
     blocks = [heading]
 
-    metadata = [
-        f"**{label}:** {inline(value)}"
-        for label, value in (
-            ("Status", _field_name(fields, "status", "status")),
-            ("Type", _field_name(fields, "issuetype", "type")),
-            ("Priority", _field_name(fields, "priority", "priority")),
-            ("Assignee", _field_name(fields, "assignee", "assignee")),
-        )
-        if value
-    ]
+    metadata = _metadata(fields)
     if metadata:
-        blocks.append(" · ".join(metadata))
+        blocks.append(metadata)
 
-    description = _description(fields, rendered_fields)
+    description = (
+        _wiki_description(fields) if use_wiki else _description(fields, rendered_fields)
+    )
     if description:
         blocks.extend(("## Description", description))
 
-    rendered_comments = _rendered_comments(rendered_fields)
-    comments, total = _comments(fields)
-    ambiguous_raw = _ambiguous_raw_ids(comments)
-    if comments or (total is not None and total > 0):
-        blocks.append("## Comments")
-        if total is not None and total > len(comments):
-            blocks.append(
-                f"_Comments are incomplete: showing {len(comments)} of {total}._"
-            )
-        blocks.extend(
-            _comment(index, entry, rendered_comments, ambiguous_raw)
-            for index, entry in enumerate(comments, 1)
-        )
-
+    blocks.extend(_comment_blocks(fields, rendered_fields, use_wiki))
     return escape_controls("\n\n".join(blocks) + "\n")

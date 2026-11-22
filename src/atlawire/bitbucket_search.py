@@ -17,6 +17,7 @@ from atlawire.http import (
     bearer_session,
     normalize_base_url,
     post_json_object,
+    reject_credential_echo,
 )
 
 SEARCH_LIMIT_MIN = 1
@@ -94,7 +95,7 @@ def search_code(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/search/latest/search"
     with bearer_session(token) as session:
-        return _search_pages(
+        rows = _search_pages(
             session,
             url,
             effective,
@@ -103,6 +104,11 @@ def search_code(
             project=scope_project,
             slug=scope_slug,
         )
+        # Highlight and entity decoding happens after the shared transport has
+        # already inspected the wire body, so re-check the fully projected rows
+        # before they can cross the authenticated boundary into CLI output.
+        reject_credential_echo(rows, tokens=(token,))
+        return rows
 
 
 def _validate_query(query: str) -> None:
