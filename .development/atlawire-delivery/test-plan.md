@@ -60,6 +60,12 @@ and raw-field assertions. The priority fixture uses `pluginRank`, unlike
 other reference fixtures; compare an independent expected nested value, not
 the same mutable object returned by a mock.
 
+The subsequent PonyTail selection passed 251 tests and failed
+`test_catalog_is_strict_json_serializable`. Do not diagnose it as invalid
+CLI JSON: the encoder accepted the catalog, but Click choice tuples became
+lists on decode. Keep the round-trip assertion and check that normalization
+preserves the advertised choices and legacy catalog structure.
+
 Before expanding the catalog, prove these paths from the pinned library through
 the installed CLI:
 
@@ -79,14 +85,28 @@ variant or an isolated negative-control fixture. Do not inject faults into
 the shared candidate or the live server. For routine route additions, share
 the harness; do not reproduce the whole boundary suite per route.
 
+### If a failure is attributed to the upstream library
+
+Run a minimal standalone test against `atlassian-python-api` directly,
+without the AtlaWire wrapper or a mock of the library method in question.
+Use sanitized fixtures and record the exact assertion, command and SDK,
+Python and Atlassian server versions. Distinguish the original documented
+failure from a transport/configuration error or an AtlaWire-only contract
+mismatch. If there is a working alternative, verify it with a positive
+control and also test the AtlaWire fallback separately. Follow the
+[upstream reporting workflow](delivery-plan.md#upstream-bug-reports-and-feature-requests),
+including the standalone test as a GitHub issue comment for a confirmed bug.
+For a missing capability, record the docs/source evidence and expected
+behavior instead of inventing a failing bug test.
+
 ## 3. Required scenarios and what each test must reject
 
 ### A. Agent discovers and uses the tool, without source
 
 | Scenario | Observable result and faulty implementation rejected |
 | --- | --- |
-| Fresh install, no credentials: root help, product help, command `--help`, `--catalog`, `--describe` a known operation | All work offline and show the expected command, usable parameters/defaults and result kind. Catalog retains its existing command metadata and has one `operations` row per supported ID. Unknown describe ID emits a structured error and does not echo the submitted value. Pair the installed test with in-process spies that fail on credential resolution or request dispatch; merely setting a missing credential path does not prove these were never attempted. |
-| Use only installed help/JSON to run a documented example on a synthetic fixture | Execute the advertised argv, not a corrected hand-written call. Assert documented required options, typed input, default behavior and exact returned object. Wrong ordering, missing options, invalid quoting and help/runtime drift fail. |
+| Fresh install, no credentials: root help, product help, command `--help`, `--catalog`, `--describe` a known operation | All work offline and show the expected command, usable parameters/defaults and result kind. Catalog retains its existing command metadata and has one `operations` row per supported ID. Unknown describe ID emits `validation_error`, exit `2`, and does not echo the submitted value. Pair the installed test with in-process spies that fail on credential resolution or request dispatch; merely setting a missing credential path does not prove these were never attempted. |
+| Use only installed help/JSON to run a documented example on a synthetic fixture | Launch the actual console from the wheel and execute the advertised argv, not a corrected hand-written call. Use the real loader with a synthetic saved file, not a monkeypatched resolver. Assert documented inputs/defaults, actual request and exact returned object. Wrong ordering, missing options, invalid quoting and help/runtime drift fail. |
 | Agent distinguishes normal results from errors | Test JSON-only stdout and exact exit code for each new machine-facing **entry point**, not a separate error matrix per operation. Verify canonical read/describe success and use malformed args, missing config and HTTP failure to distinguish exits 0/2/1. Valid object, list, empty list, declared text and documented no-content success are distinguishable. Help/version, existing catalog success format and documented legacy behavior follow the delivery plan's explicit rules. A Python-only loopback case is not CLI evidence. |
 
 ### B. One registered read really does what its description says
@@ -96,18 +116,18 @@ the harness; do not reproduce the whole boundary suite per route.
 | Every required ID, with independent synthetic request and response fixture | Capture the real method, context-prefixed route, parsed query/body, matched synthetic bearer and request count. Assert a meaningful response shape and fixture identity, including at least one extra field where valid. Use full payload comparison on representative raw responses. A correct status on the wrong resource, or discarded fields/envelopes, fails. |
 | Parameter boundaries | Cover a missing required argument, unknown argument, wrong type (including boolean as an integer), documented limits and enum members. For supported parameters, send Unicode, spaces, `+`, `&`, repeated names and an identifier/path that requires encoding. Check parsed query/body **and** the relevant exact wire spelling to catch double encoding and duplicate-key loss. Do not apply a restrictive generic key regex to a documented different identifier domain. |
 | Page 1 advertises page 2 | Fixture returns `nextPageStart=19` after a request with `start=5, limit=2`; assert the client emits the first envelope intact and sends exactly one request on a healthy transport. Explicitly request page 2 from the advertised continuation, then assert `start=19`. Also cover Jira offset and Confluence metadata where those adapters paginate. Reject fetching page 2 automatically, deriving `7`, stripping the cursor, or calling a bare array exhaustive. |
-| Response validation | A valid empty array is successful. A wrong object/array type, malformed late row required by the contract, login HTML for JSON, bad JSON, non-finite number, disallowed 206, unexpected 204 and missing mandatory field fail with exactly one error JSON and no partial success data. A documented 204 maps to `data:null`; distinguish it from an undocumented 200 JSON `null`. Verify text and binary using declared endpoint kinds, not heuristics. |
+| Response validation | A valid empty array is successful. A wrong object/array type, malformed late row required by the contract, login HTML for JSON, bad JSON, non-finite number, disallowed 206, unexpected 204 and missing mandatory field fail with exactly one error JSON and no partial success data. In the SDK-backed project lookup, an empty HTTP 200, a 200 with JSON `null`, and a 204 are three failures; a documented 204 for Bitbucket's default branch is a separate positive control and maps to `data:null`. Exercise the registered Python adapter as well as the canonical CLI, not only the legacy `read-operation` path. |
 | Positive binary and interrupted download | Compare bytes or an independent SHA-256, not just a file name or byte count. Exercise size cap, interrupted stream, an existing output file and cleanup. Never overwrite an existing file or publish a completed receipt or partial output on failure. Test a non-UTF-8 binary fixture so replacing bytes with decoded text fails. |
 
 ### C. Read-only and credentials: prove the point of refusal
 
 | Scenario | Observable result and faulty implementation rejected |
 | --- | --- |
-| Unknown, mutating and excluded admin ID; unsupported method/route alias; wrong-product semantic POST; path escape or invalid context | Test before credential resolution and assert zero requests on the approved listener and a second forbidden listener. Run against every retained public escape hatch, including advertised SDK access and old route aliases if they survive. Confirm approved semantic POSTs still work under only their registered product. Do not carry forward the existing test that accepts Confluence conversion with the Jira client. |
-| Same host with different product contexts and synthetic tokens | Only the selected configured product receives its paired token. A missing product pair, wrong destination, malformed pair or rejected credential must not try another product, reach a redirect, or load another source as fallback. Check unselected products continue to work. |
-| Redirect from GET and semantic POST | Refuse off-origin and wrong-context redirects before a second request. Test a redirect that would preserve POST as well as a normal login redirect. Verify both listener counts, not just the eventual error. |
+| Unknown, mutating and excluded admin ID; unsupported method/route alias; wrong-product semantic POST; path escape or invalid context | Test before credential resolution and assert zero requests on both listeners. Assert the public interface does not expose a callable generic SDK `request()`; no actual write is needed to prove this. If legacy aliases are retained, test their restrictions too. Convert the old Confluence-through-Jira success case into one correct Confluence positive case and one wrong-product no-request case. |
+| Same host with different product contexts and synthetic tokens | Use distinct tokens; a shared token fixture cannot detect a pairing mistake. Supply a valid loopback URL but omit the token in explicit environment mode: assert `credentials_error`, `status:null`, exit `2`, and zero requests. A malformed or rejected pair must not try another product or another credential source. Check unselected products continue to work. |
+| Redirect from GET and semantic POST | A synthetic GET 302 and a POST-preserving redirect must fail. Check one request to the first server and zero to the redirected destination, including wrong-context redirects on the same host. A second server returning a well-shaped 200 must not turn the redirect into success. |
 | Optional GET side effects | Verify the Jira issue read does not request activity-history updates. Verify listing transitions never invokes an actual transition. The first accepted request is inspected, not inferred from its response. |
-| Credential-safe results and logs | Synthetic response echoes a long fixture token in success and error paths (including JSON escaping where relevant). Safe ordinary bodies still keep their documented excerpt and parsed form; echoed credentials, authorization fields and unsafe diagnostics never reach stdout, stderr or log files. Test a valid non-secret control case to reject a catch-all that returns empty data/errors. |
+| Credential handling and diagnostics | Supply synthetic credentials through configuration. Assert the tool does not print those stored values or auth headers in startup, CLI results generated by the tool, or logs. Test that local failure diagnostics contain stable codes, not a dump of the exception/request. Preserve ordinary upstream payloads and existing secrecy tests; a synthetic upstream success deliberately containing an echo is not a new release gate or a reason to scan every result. |
 | Human setup, required for handoff but not for the first read slice | Synthetic browser, hidden terminal and private temp store. Correct product instructions, no clipboard read, token verified against only the selected URL. A `GetPassWarning` or non-interactive invocation must stop before reading visible input. On failed validation, cancellation or failed write, the existing store is unchanged; on confirmed replacement, only the selected matched pair changes. Instructions go to terminal/stderr; stdout carries only the final safe JSON status. If optional browser consent is implemented, also test success, canceled callback, wrong state and no token output. Never mint, rotate or revoke live tokens as a release test. |
 
 ### D. Error and retry behavior
@@ -122,15 +142,16 @@ the harness; do not reproduce the whole boundary suite per route.
   exactly one JSON document with the agreed exit code; merely asserting
   `returncode != 0` fails the contract.
 - Verify the effective pinned retry owner, not just constructor attributes.
-  A recoverable pre-response connection failure and a 503 followed by 200
-  each produce one successful result and the expected attempt count. Test
-  429 followed by success within budget, and a `Retry-After` beyond the
-  five-second cumulative wait budget that does **not** induce the advertised
-  wait or another call. Exhaustion stops after at most three total attempts
-  (the first attempt counts) and produces the right error. A unit-level controlled
-  clock/sleeper checks delay and bounds; real loopback checks that the
-  installed transport actually retries. Do not depend on wall-clock sleeps
-  or purposely trigger throttling on the real service.
+  One dropped pre-response connection and one 503 followed by 200 each
+  produce success on the second attempt. For repeated 503s with no
+  `Retry-After` and sufficient wait budget, assert exactly three total
+  attempts, exit `1`, `status:503` and `code:"http_503"`, not `transport_error`.
+  Test 429 followed by success within budget. A 429 with `Retry-After: 90`
+  must return `status:429` and `code:"http_429"` after one request with no
+  sleep. Also check the cumulative budget with two individual delays that
+  would each fit but do not fit together. A controlled clock/sleeper checks
+  delays; real loopback checks the installed transport's attempts. Do not
+  depend on wall-clock sleeps or trigger throttling on the real service.
 - Prove no retries for non-retryable HTTP, redirect, invalid data, and
   semantic POST not explicitly declared retryable. Separate the healthy
   single-page request-count test from retry cases. After all paths assert
@@ -171,7 +192,7 @@ there is no test-count or mutation-score target.
 | A valid nonempty success comes from the wrong resource/product | Use distinct context prefixes, distinct credentials and a marker valid only for the expected resource. Inspect the request and fixture ID; an HTTP 200 and a well-shaped response are insufficient. |
 | A rejected method or redirect reaches the network, then fails later | On a positive control the approved listener sees the expected request; on a rejected operation neither listener is called. On a refused redirect assert exactly one request to the origin and zero to the other destination. |
 | SDK retries and a wrapper also retries, or it treats the retry count as additional attempts | Exhaust a queue of retryable failures and assert the exact three total attempts. Vary delay to show the cumulative limit: a first `Retry-After` of 3 seconds and a second of 3 exceed 5 even though each alone fits. Use a controlled sleeper, not elapsed wall time. |
-| A request leaks a token in a JSON body, error trace or rotated log | Send a synthetic echo where it would be visible, and assert its absence on all publication channels while asserting a valid ordinary response is preserved. Test a success echo and an error echo, not just blacklisting an unused token. |
+| AtlaWire prints a credential from configuration, an auth header or raw diagnostics | Configure a synthetic credential and exercise normal use and local/auth failure. Check stdout, stderr and logs for direct publication by AtlaWire; assert the documented result and error still arrive. Do not introduce broad scanning of results to pass this check. |
 | Hidden input degrades to visible input, or saving a new pair erases the old pair on failure | Drive `GetPassWarning` with a visible-input trap. Inject a save failure after verification and before replacing the saved file; assert previous bytes, including other products, are unchanged, no temp file remains, and the result is not success. Also prove a confirmed save succeeds. |
 | Binary read publishes a receipt or temporary contents after interruption | Interrupt after a nonempty byte prefix. Assert no success receipt and no file at the destination; when the destination already exists, assert its original bytes remain. Pair with known-byte success. |
 | Federated results turn an unsupported or broken product into “no matches” | Fixture gives one success and one failure/unsupported source. Assert per-product status, surviving data and incomplete result. Separate all-failed case must have a top-level error; a next page without a failure must not be labeled a transport error. |
@@ -189,7 +210,7 @@ invitation to run tests against a live destructive path.
    environment run:
    ```text
    C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests/test_jira_reference_unit.py tests/test_jira_reference_cli_e2e.py
-   C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests/test_sdk_unit.py tests/test_sdk_e2e.py tests/test_sdk_cli_e2e.py tests/test_facade_unit.py tests/test_facade_cli_e2e.py
+   C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests/test_sdk_unit.py tests/test_sdk_e2e.py tests/test_sdk_cli_e2e.py tests/test_facade_unit.py tests/test_facade_cli_e2e.py tests/test_catalog_unit.py
    ```
    Include the new installed-CLI test selection for the slice. Run affected
    compatibility tests with each batch. These commands are not the release
@@ -202,8 +223,10 @@ invitation to run tests against a live destructive path.
    and independently verified test cases; report exclusions/unresolved items
    separately. No untested required ID, unexpected skip, or unsupported
    required operation counts as done.
-3. **Clean wheel proof.** Check the lock (`uv lock --check`); build a versioned
-   wheel with the approved Python 3.15 tooling. Run the release-equivalent
+3. **Clean wheel proof.** Run `uv lock --check` without regenerating the lock
+   as part of the check. Confirm the lock includes the same SDK pin as the
+   project metadata. Build a versioned wheel with approved Python 3.15 tooling.
+   Run the release-equivalent
    checks on one final wheel hash; if it changes, rerun its bound checks.
    In an approved isolated
    install target outside the checkout, prove exact wheel hash, package

@@ -13,12 +13,15 @@ development plans as separate review iterations, without unrelated code.
 
 ## Start here
 
-1. Keep the working Jira compatibility fix. Rerun its 136-case selection
-   after integrating the candidate. Keep existing work that already passes
-   its contract; do not start with a rewrite.
+1. Keep the working Jira compatibility fix and rerun its 136-case selection
+   after integration. Fix the catalog round-trip regression and reconcile
+   the dependency lock. Keep existing work that passes its contract; do not
+   start with a rewrite.
 2. Prove one path from the installed console: find the command in help,
    describe it as JSON, execute it through the pinned library, and parse
-   both its success and its failure. Use the exact slice in the test plan.
+   both its success and its failure. Close the confirmed transport, local
+   validation, and retry issues in that shared path before adding operations.
+   Use the exact slice in the test plan.
 3. Expand that path to the documented reads by product. Workers extend
    the registry and independent fixtures, not the CLI architecture.
 4. Finish the human setup fallback and the named additive workflows, then
@@ -176,7 +179,9 @@ the current unrestricted forms alongside a supposedly read-only canonical API.
 ### 2. `%readonly-1`: A name filter does not enforce the public read boundary
 
 [`sdk.py:175–219`](../../src/atlawire/sdk.py#L175) forwards unknown attributes
-to the library client, so approval depends on naming, not behavior.
+to the library client; the reviewer confirmed the public proxy exposes the
+generic `request()` method without invoking a write. The `api-get` path also
+followed a synthetic 302 to a second loopback server and exited successfully.
 [`sdk.py:255–278`](../../src/atlawire/sdk.py#L255) accepts `/rest/` GETs subject
 to a segment blacklist and matches semantic POSTs without binding them to the
 product. An existing test explicitly accepts Confluence conversion under the Jira
@@ -189,12 +194,13 @@ library's issue read defaults to updating history.
 validated arguments. Retain semantic POSTs only by exact operation, with
 documented conversion destinations and body representations. Disable optional
 activity-history writes. Never derive destinations from result links; refuse
-redirects by default and do not replay a semantic POST to another route. Preserve
-the matched credential pair. Keep explicit environment mode if already supported,
-but require a complete pair and never fall back after auth failure. Test that
-rejected inputs do not even load credentials, and that no redirected destination
-receives a request. Classify obvious admin reads by reference; park ambiguous
-routes with evidence and an owner, rather than build a permission engine.
+redirects and do not replay a semantic POST to another route. Preserve the
+matched credential pair. In explicit environment mode, validate both values
+before constructing a client or sending a request; an absent token is not
+anonymous mode. Never fall back after auth failure. Restore product-specific
+positive POST coverage and reject the wrong product in a separate no-request
+test. Classify obvious admin reads by reference; park ambiguous routes with
+evidence and an owner rather than build a permission engine.
 
 ### 3. `%compatibility-1`: Fix behavior regressions, not the assertions that caught them
 
@@ -216,14 +222,20 @@ for malformed payloads, status semantics, failure output and no follow-on
 request. Do not promote `read_operation(use_library=True)`
 as-is: [`operations.py:1200–1221`](../../src/atlawire/operations.py#L1200)
 short-circuits on any SDK `None`, despite documenting a single route-specific
-204 exception. Normal HTTP errors keep status and category; conforming empty
-lists remain successful. Distinguish contract violations from revised wording
-in diagnostics, rather than assuming every failing test is a library bug.
+204 exception. The reviewer observed an empty HTTP 200 returned as `None` for
+Jira project lookup in this Python branch; the compatibility CLI does not
+enable the branch. Pass status and content to the operation validator before
+interpreting an empty body. Normal HTTP errors keep status and category;
+conforming empty lists remain successful. Distinguish contract violations from
+revised wording, rather than assuming every failing test is an SDK bug.
 
 ### 4. `%response-1`, `%errors-1`: A machine contract has to work before the HTTP request too
 
 The current SDK commands parse JSON and resolve credentials outside their JSON
-error handlers; Click usage failures bypass those handlers altogether
+error handlers. Malformed JSON and missing configuration both reproduced
+`exit 1` with no JSON stdout; missing token in explicit environment mode also
+reached the synthetic server and returned success. Click usage failures bypass
+the JSON handlers altogether
 ([`api-request` handler](../../src/atlawire/cli.py#L759),
 [`main()`](../../src/atlawire/cli.py#L3907)). The SDK relays
 exception text, returns success unfiltered, and only redacts its diagnostic
@@ -231,7 +243,7 @@ body in `to_dict()` ([`sdk.py:84–105`](../../src/atlawire/sdk.py#L84),
 [`sdk.py:271–314`](../../src/atlawire/sdk.py#L271)). Capping an extracted
 string after the library has buffered a response is not a bound on the read.
 The in-progress facade adds a second error formatter and treats anything
-returned by `get_json` as success
+returned by `get_json` as success, without checking response kind
 ([`facade.py:316`](../../src/atlawire/facade.py#L316),
 [`facade.py:480–516`](../../src/atlawire/facade.py#L480)).
 
@@ -246,9 +258,10 @@ returned by `get_json` as success
 | Documented compatibility commands | Keep existing output, exit and error contracts unless an unsafe path must be closed. Compatibility commands are not the new machine contract. |
 
 Process termination and a broken stdout pipe are outside the JSON promise.
-Python returns the same JSON-compatible result for expected failures. Do not
-promise to catch Python signature errors outside the dispatcher. Parse and
-serialize strictly; `NaN`/`Infinity` are not JSON.
+Use one boundary around canonical CLI argument parsing, configuration and
+execution. Python returns the same JSON-compatible result for expected
+failures. Do not promise to catch Python signature errors outside the
+dispatcher. Parse and serialize strictly; `NaN`/`Infinity` are not JSON.
 
 - Success: `{"ok":true,"product":"jira","data":...}`. Use `product:null`
   when the result has no single product. Preserve the complete parsed
@@ -270,11 +283,16 @@ serialize strictly; `NaN`/`Infinity` are not JSON.
 - `body` is a sanitized diagnostic excerpt capped at 8 KiB, **not** an
   unconditional promise of byte-for-byte upstream text. Include `body_json`
   only for a complete, safe, parseable body, not a truncated fragment.
-  Withhold unsafe content. Never serialize exception strings, header
-  dumps, credentials or request query/body. Test causal echoes in both
-  success and error responses, preserving ordinary payloads; avoid redesigning
-  all unrelated CLI output to catch coincidental strings. Apply actual
-  response/read bounds where required and prove cleanup on failure.
+  Never serialize raw exception strings, header dumps, saved credentials or
+  request query/body as diagnostics. Apply actual response/read bounds where
+  required and prove cleanup on failure.
+- `%token-scope-26`: A loopback server deliberately reflected a synthetic
+  bearer value in a valid success payload; no live token exposure was shown.
+  This is not a separate release gate or a reason to add generic token
+  scanning, rewriting, or fail-closed filtering of valid upstream data.
+  Keep existing protections and tests. Ensure AtlaWire itself does not
+  print values from its credential store, emit auth headers, or log request
+  or response bodies.
 - Binary is declared per operation, never guessed from the payload. Small
   binary uses a documented bounded base64 result. Large files/archives require
   an explicit destination and return a JSON receipt only after a complete
@@ -285,8 +303,11 @@ serialize strictly; `NaN`/`Infinity` are not JSON.
 ### 5. `%retry-2`, `%pagination-1`: Recover from a network blink, not by making the agent guess
 
 [`sdk.py:159–172`](../../src/atlawire/sdk.py#L159) passes retry settings for
-429/503 to the library. That alone proves neither connection recovery nor the
-effective delay for `Retry-After`. The prototype's searchable/pageable methods
+429/503 to the library. The review measured four requests on repeated 503s,
+reported exhaustion as `transport_error`, and intercepted a scheduled
+90-second 429 delay without waiting. A dropped connection before a response
+did recover on the second attempt; preserve that behavior.
+The prototype's searchable/pageable methods
 accept `limit` but not a continuation offset
 ([`facade.py:139–167`](../../src/atlawire/facade.py#L139),
 [`facade.py:396`](../../src/atlawire/facade.py#L396)). It cannot be used
@@ -299,7 +320,9 @@ For retryable reads use at most **three total attempts** and **five seconds
 of cumulative waiting between attempts**, including `Retry-After`.
 Recover from a transient pre-response connection failure/reset and 429/503.
 If `Retry-After` does not fit the remaining wait budget, return a structured
-rate-limit failure without another call. Do not retry 401/403/404, invalid
+rate-limit failure without sleeping or making another call. If the final
+attempt returns an HTTP error, keep its status and safe diagnostics; if that
+attempt ends without an HTTP response, use `status:null`. Do not retry 401/403/404, invalid
 payloads, redirects, or unverified semantic POSTs. Do not replay a binary
 download after partial output. An idle read timeout and a wait budget are
 not a wall-clock deadline. Publish the effective policy and check exact
@@ -346,9 +369,42 @@ behavior. Use one fixed low-level library adapter for genuine gaps **or SDK
 semantic mismatches**, not custom HTTP or wrappers around projected data
 claimed to be raw. The pinned SDK's raw-response mode is a candidate for fixed
 reads that need headers/status; validate the actual 5.0.5 behavior in the
-slice. Report confirmed SDK bugs or maintainable feature gaps upstream with a
-minimal sanitized reproducer; a projection chosen by the library is not by
-itself a defect. Publishing an issue is distinct from preparing it.
+slice. A projection deliberately chosen by the library is not by itself a
+defect.
+
+### Upstream bug reports and feature requests
+
+`%upstream-issues-27`: Use the
+[atlassian-python-api GitHub issue tracker](https://github.com/atlassian-api/atlassian-python-api/issues)
+when the gap is in the library, not in our use of it. Search for existing
+issues first. Write issue titles, descriptions, test comments and supporting
+materials in clear English.
+
+- **Confirmed library defect:** Write one minimal runnable test that uses
+  the library directly, without an AtlaWire wrapper. Demonstrate the failure
+  for the intended assertion on the pinned version; check the latest
+  compatible release if an approved environment is available. Open a bug
+  issue explaining **what breaks, why it matters, and what was expected**.
+  Include SDK and Python versions, Atlassian product/edition/server version,
+  relevant OS and transport versions, a documentation reference, exact
+  reproduction steps, and sanitized expected/actual results. Add the
+  complete test as a separate comment on that issue, with its run command,
+  dependencies and any necessary synthetic fixtures.
+- **Material missing capability:** After checking the library docs and API
+  surface, open a feature request if a documented read is missing or a
+  limitation forces a meaningful workaround. Explain the real workflow it
+  blocks, why the existing method is insufficient, the proposed behavior
+  and a small acceptance example. Include affected versions, the reference
+  endpoint and parameters, and how the current workaround behaves. Do not
+  file a feature request for every stylistic preference or wrapper.
+
+Share only synthetic or sanitized evidence. Never post real credentials,
+internal URLs/IDs, customer payloads or sensitive logs. Route suspected
+security vulnerabilities through the upstream private reporting process.
+Record the issue and test-comment links in the operation's evidence where
+applicable. Prepare a ready-to-post draft if publishing is not authorized;
+do not mark it opened. A tested compatible fallback can ship without
+waiting for an upstream fix.
 
 ### 7. `%cross-product-1`: Return surviving evidence without lying about completeness
 
@@ -375,7 +431,9 @@ reference. No local cache/FTS or new framework before the base is complete.
 [`pyproject.toml:11–16`](../../pyproject.toml#L11) pins 5.0.5;
 [`uv.lock:6–12`](../../uv.lock#L6) omits it. The E2E helper selects
 `atlawire` by PATH and inherits the current environment
-([`tests/_loopback.py:90–104`](../../tests/_loopback.py#L90)). The facade tests
+([`tests/_loopback.py:90–104`](../../tests/_loopback.py#L90)). `--describe` is
+not wired in the current CLI, and `--catalog` contains Click command metadata
+but no canonical operations list. The facade tests
 call Python directly with an injected credential provider despite the E2E
 filename ([`test_facade_cli_e2e.py:90–97`](../../tests/test_facade_cli_e2e.py#L90)).
 That is useful loopback evidence; it does not exercise CLI parsing, stdout,
@@ -385,9 +443,12 @@ wheel ([`checks/test_sdk_live.py:17–29`](../../checks/test_sdk_live.py#L17)).
 
 **Fix:** Reconcile the lock, build the versioned wheel and prove a clean
 Python 3.15 install outside the checkout early. Use an approved isolated
-install target, not a repo-wide environment migration. Check the import
-location, version, console path and packaged catalog; run the docs-only agent
-walkthrough on that exact artifact. For offline tests use synthetic credentials,
+install target, not a repo-wide environment migration. Normalize Click
+metadata to native JSON values at the catalog producer without changing the
+wire shape or dropping choices. Run the documented help → describe → example
+sequence as an actual subprocess from that wheel, with a synthetic saved
+credential file read by the real loader. Check the import location, version,
+console path and packaged catalog. For offline tests use synthetic credentials,
 an isolated home and a deliberately selected environment. For real-server tests
 the owner runs an approved fixture-scoped, read-only command and provides only
 revision/artifact identity and sanitized statuses and counts. An old smoke run
@@ -397,7 +458,7 @@ and a fake-subprocess parity test are not fresh live evidence.
 
 | Order | Owner and work | Exit check |
 | --- | --- | --- |
-| 1. Recover the baseline | Integrator records tracked and untracked candidate changes, collects current worker patches without overwriting work, keeps the verified Jira compatibility fix and reruns focused tests. In parallel gather live versions and safe fixtures through the owner, and reconcile the lock/build configuration. | Focused tests green; reproducible candidate and explicit scope questions. Do not build a second throwaway wheel just for this step. |
+| 1. Recover the baseline | Integrator records tracked and untracked candidate changes, keeps the verified Jira compatibility fix, and fixes the catalog round-trip and lock. In parallel gather live versions and safe fixtures through the owner. | Focused Jira, SDK, facade and catalog selection green; `uv lock --check` passes. Do not build a second throwaway wheel just for this step. |
 | 2. Prove one vertical slice | One owner wires the existing registry, product credential resolution, private SDK transport, JSON boundary and CLI discovery. Add one high-level read per product where compatible, at least one fixed fallback, and one semantic POST. Include a real continuation, an auth error and a recovered network failure. Use the prototype as input rather than making it a second public surface. | Independent documented fixture expectations; unit → installed loopback → owner-run live smoke. Root and command `--help`, `--catalog` and `--describe` work before auth. Invoke a documented example outside the checkout; exact request, response, failed-output and retry oracles pass. |
 | 3. Complete the base by product | Split Jira, Confluence and Bitbucket into non-overlapping product batches. Each worker owns its operation data, adapter exceptions and tests. Integrator owns shared dispatcher, credentials, CLI and docs. Classify binary, semantic POST and ambiguous permissions early rather than leave the difficult routes to the end. | Every required ID has discovery, independent request/response assertions and a passing installed-loopback case. Live status recorded per operation; representative live successes for each distinct adapter/response kind and all three products. No silent exclusions. |
 | 4. Finish setup and verify additive workflows | Implement the simple browser + hidden-paste setup without requiring OAuth. Reuse implemented Jira comment search, Confluence rendering, Bitbucket repo grep, PR review/diff and search work where it passes its contract. Compare BBK and AtlaWire against stable fixtures. | Setup survives cancellation/failed verification without replacing stored credentials. Partial-result tests, bounded work and real BBK parity evidence pass for the workflows claimed. Base discovery and calls remain available. |
@@ -406,7 +467,7 @@ and a fake-subprocess parity test are not fresh live evidence.
 Per-operation tests should share a harness, not an oracle. The harness can
 read the manifest to enumerate IDs, but expected paths, encoded parameters and
 payloads come from independent reference fixtures. Shared negative tests cover
-unknown operation/argument, product mismatches, auth echo, redirects and
+unknown operation/argument, product mismatches, missing credentials, redirects and
 malformed payloads. Critical checks must fail on the corresponding faulty
 behavior. Test rotation and a failed log write with the real installed CLI:
 the output stays parseable and no token or synthetic request/response content
@@ -429,6 +490,15 @@ pass the proposed tests. The [fault checklist](test-plan.md#4-prove-the-critical
 requires a real failure at the intended boundary and a pass after the fix.
 It also separates the installed CLI evidence from Python-only tests and ties
 clean-install and live checks to the same wheel hash.
+
+The subsequent PonyTail source/loopback review on `f936b32` and its working-tree
+candidate ended with **251 passed, 1 failed, exit 1, no skips** across the
+Jira reference, SDK, facade and catalog selections. The catalog failure was
+`test_catalog_is_strict_json_serializable`: nine choice fields differed by
+Python `tuple` versus decoded `list`. It did not show invalid CLI JSON.
+Carry the confirmed cases into the first slice rather than rebuilding the
+facade or expanding the catalog first. Full suite, final wheel and live
+verification remain open.
 
 **Today:** Aim for the complete delivery gates, not a new round of abstract
 architecture. The first useful checkpoint is a green compatibility baseline
