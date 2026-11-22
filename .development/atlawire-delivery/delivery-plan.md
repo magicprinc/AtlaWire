@@ -136,9 +136,12 @@ atlawire --describe bitbucket.repository.get
   than opening a guessed URL.
 - Save the verified URL/token pair to the same private BBK-compatible store
   only after explicit owner setup. Replacing a configured pair requires
-  confirmation; preserve other products and existing fields, and do not replace
-  a working pair on cancellation, validation failure or failed persistence.
-  Test with a synthetic browser launcher, prompt and store. If the owner
+  confirmation. Preserve other products and existing fields. Validate first,
+  then atomically publish the completed private file. Cancellation or failure
+  before that publish point leaves the old file intact. Do not run a
+  concurrent BBK configuration write during enrollment; do not build shared
+  storage coordination for ordinary reads. Test with a synthetic browser
+  launcher, prompt and store. If the owner
   created a token in the browser but local saving failed, do not claim it
   was revoked.
 - `%live-fixtures-8`: The owner confirms existing tokens are available. Use
@@ -195,23 +198,22 @@ routes with evidence and an owner, rather than build a permission engine.
 
 ### 3. `%compatibility-1`: Fix behavior regressions, not the assertions that caught them
 
-On this working tree the focused Jira reference run had **22 failures, 114
-passes**. Twenty-one are CLI cases, including wrong JSON shapes, late malformed
-rows, an oversized user page, 206, redirects and diagnostic differences.
-[`cli.py:307–326`](../../src/atlawire/cli.py#L307) returns the SDK result
+Before the retained compatibility fix, the focused Jira reference run had
+**22 failures, 114 passes**. Twenty-one were CLI cases, including wrong JSON
+shapes, late malformed rows, an oversized user page, 206, redirects and
+diagnostic differences. The former `_sdk_json` CLI helper returned SDK results
 without domain checks, while the existing
 [`jira.py:538–592`](../../src/atlawire/jira.py#L538) readers validate rows and
-the user limit. The separate failing unit test checks for `pluginField` in all
-fixtures, but the priority fixture uses `pluginRank`
+the user limit. The separately failing unit test expected `pluginField` in
+all fixtures, but the priority fixture uses `pluginRank`
 ([fixture](../../tests/test_jira_reference_unit.py#L20),
-[assertion](../../tests/test_jira_reference_unit.py#L240)).
+[corrected assertion](../../tests/test_jira_reference_unit.py#L241)).
 
-**Fix:** Reconnect the six compatibility commands to their existing strict
-readers for the first green baseline. Migrate one command only after the
-new adapter can preserve its contract; retain tests for malformed payloads,
-status semantics, failure output and no follow-on request. Fix the unit oracle
-to compare the fixture's actual independent field and nested values, not to
-drop the preservation check. Do not promote `read_operation(use_library=True)`
+**Fix retained:** The six compatibility commands again use their strict readers,
+and the unit oracle compares the independent field and nested values. Migrate
+one command only after the new adapter can preserve its contract; retain tests
+for malformed payloads, status semantics, failure output and no follow-on
+request. Do not promote `read_operation(use_library=True)`
 as-is: [`operations.py:1200–1221`](../../src/atlawire/operations.py#L1200)
 short-circuits on any SDK `None`, despite documenting a single route-specific
 204 exception. Normal HTTP errors keep status and category; conforming empty
@@ -222,8 +224,8 @@ in diagnostics, rather than assuming every failing test is a library bug.
 
 The current SDK commands parse JSON and resolve credentials outside their JSON
 error handlers; Click usage failures bypass those handlers altogether
-([`cli.py:688–809`](../../src/atlawire/cli.py#L688),
-[`cli.py:3929–3931`](../../src/atlawire/cli.py#L3929)). The SDK relays
+([`api-request` handler](../../src/atlawire/cli.py#L759),
+[`main()`](../../src/atlawire/cli.py#L3907)). The SDK relays
 exception text, returns success unfiltered, and only redacts its diagnostic
 body in `to_dict()` ([`sdk.py:84–105`](../../src/atlawire/sdk.py#L84),
 [`sdk.py:271–314`](../../src/atlawire/sdk.py#L271)). Capping an extracted
@@ -258,9 +260,13 @@ serialize strictly; `NaN`/`Infinity` are not JSON.
   stable `code`, broad `classification`, safe `message`, operation ID (nullable),
   canonical route template (if applicable), `content_type`, `body`, `body_json`
   and `body_truncated`. Product can be `null` when unknown. Use one mapper for
-  CLI and Python. Error codes must distinguish usage/configuration, access
-  denial, missing resource, rate limit, timeout/network and invalid response.
-  Guide the agent using stable codes, not wording it must pattern-match.
+  CLI and Python. Keep predictable codes: `validation_error` for usage,
+  `credentials_error` for missing or malformed local configuration,
+  `http_<status>` for server HTTP failures, and `timeout`, `transport_error`,
+  `invalid_response`, or `internal_error` for the corresponding execution
+  failures. Classify HTTP 401/403/404/429 as authentication, authorization,
+  not found, and rate limit respectively. Guide the agent using stable codes,
+  not wording it must pattern-match.
 - `body` is a sanitized diagnostic excerpt capped at 8 KiB, **not** an
   unconditional promise of byte-for-byte upstream text. Include `body_json`
   only for a complete, safe, parseable body, not a truncated fragment.
@@ -349,7 +355,7 @@ itself a defect. Publishing an issue is distinct from preparing it.
 The existing `find` fails closed on one product error and resolves all three
 configurations before issuing any request
 ([`federated.py:177–190`](../../src/atlawire/federated.py#L177),
-[`cli.py:329–348`](../../src/atlawire/cli.py#L329)). That is not the target
+[`cli.py:313–332`](../../src/atlawire/cli.py#L313)). That is not the target
 partial-success contract. Bitbucket code search is a plugin backed by an index,
 not equivalent to repository-name search.
 
@@ -417,6 +423,12 @@ catalog consumers, distinguish JSON from human and legacy output, specify
 retry/rotation limits, make manual setup a handoff gate without blocking
 the first read slice, and pin verification to the actual CLI and artifact.
 No claim is made that this pass proves the runtime behavior.
+
+The final pass checked whether a plausible broken implementation could still
+pass the proposed tests. The [fault checklist](test-plan.md#4-prove-the-critical-tests-can-fail)
+requires a real failure at the intended boundary and a pass after the fix.
+It also separates the installed CLI evidence from Python-only tests and ties
+clean-install and live checks to the same wheel hash.
 
 **Today:** Aim for the complete delivery gates, not a new round of abstract
 architecture. The first useful checkpoint is a green compatibility baseline

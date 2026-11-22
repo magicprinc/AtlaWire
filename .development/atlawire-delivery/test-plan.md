@@ -34,6 +34,22 @@ workflows kept separate.
    not a pass. Store summaries, not command dumps containing real settings or
    payloads.
 
+### What counts as a useful test
+
+Write down **input → externally observable outcome → plausible defect**
+before writing production code. Test the public contract without importing
+the production function that computes the expected answer. A test that only
+asserts “a command exists”, “stdout is JSON”, “the result is nonempty”, or
+“a mocked SDK returned exactly what we stubbed” is not a behavior test.
+
+For a request rejected before I/O, use a paired valid case to prove the
+listener and request recorder work, then assert zero requests on the invalid
+case. At the unit boundary, explicitly fail if credentials or transport are
+accessed. For subprocess cases, bound the run, check its exit status and
+assert that the server thread finished without hiding handler failure. A
+launch, import, timeout or fixture failure does not demonstrate that a
+regression test detected a product defect.
+
 ## 2. Start with the regression and one installed slice
 
 The Jira-focused run reproduced 21 CLI regressions and one fixture-oracle
@@ -137,7 +153,37 @@ failure, all requested products failed, unsupported Bitbucket Search,
 pagination/limits vs true errors, ref pinning and documented diff truncation.
 An empty result must not hide an unsupported or failed product.
 
-## 4. Release gates and handoff
+## 4. Prove the critical tests can fail
+
+For each applicable critical boundary below, keep a runnable regression and
+record the exact node ID and the assertion that detects the shown defect.
+Use the unchanged test on the known pre-fix candidate, or a controlled,
+temporary faulty variant in an explicitly approved isolated copy. Then run
+the same test against the correction. A passing positive fixture alone is
+not sensitivity evidence. One regression may cover more than one check;
+there is no test-count or mutation-score target.
+
+| Plausible defect | Decisive check, not a proxy |
+| --- | --- |
+| Catalog description uses the wrong option or advertises a second canonical command | Run the actual argv from `--describe` on the wheel and assert exact wire query/body and fixture identity. Check the canonical IDs against the required inventory rather than comparing two lists from the same dispatcher. |
+| CLI accepts an invalid argument or missing credentials by falling through to Click's text error | Assert exactly one strict JSON document, expected error code, nullable status and correct exit. The JSON checker must reject non-finite values; default `json.loads` alone accepts them. No credential/network work on a local validation failure. |
+| The client skips an unexpected row, drops cursor metadata, or silently walks the next page | Address the late bad row and a distinct healthy two-page fixture. Compare the complete first payload and captured requests, then the requested second payload. A server over-returning the user page is rejected where that is the compatibility contract. |
+| A valid nonempty success comes from the wrong resource/product | Use distinct context prefixes, distinct credentials and a marker valid only for the expected resource. Inspect the request and fixture ID; an HTTP 200 and a well-shaped response are insufficient. |
+| A rejected method or redirect reaches the network, then fails later | On a positive control the approved listener sees the expected request; on a rejected operation neither listener is called. On a refused redirect assert exactly one request to the origin and zero to the other destination. |
+| SDK retries and a wrapper also retries, or it treats the retry count as additional attempts | Exhaust a queue of retryable failures and assert the exact three total attempts. Vary delay to show the cumulative limit: a first `Retry-After` of 3 seconds and a second of 3 exceed 5 even though each alone fits. Use a controlled sleeper, not elapsed wall time. |
+| A request leaks a token in a JSON body, error trace or rotated log | Send a synthetic echo where it would be visible, and assert its absence on all publication channels while asserting a valid ordinary response is preserved. Test a success echo and an error echo, not just blacklisting an unused token. |
+| Hidden input degrades to visible input, or saving a new pair erases the old pair on failure | Drive `GetPassWarning` with a visible-input trap. Inject a save failure after verification and before replacing the saved file; assert previous bytes, including other products, are unchanged, no temp file remains, and the result is not success. Also prove a confirmed save succeeds. |
+| Binary read publishes a receipt or temporary contents after interruption | Interrupt after a nonempty byte prefix. Assert no success receipt and no file at the destination; when the destination already exists, assert its original bytes remain. Pair with known-byte success. |
+| Federated results turn an unsupported or broken product into “no matches” | Fixture gives one success and one failure/unsupported source. Assert per-product status, surviving data and incomplete result. Separate all-failed case must have a top-level error; a next page without a failure must not be labeled a transport error. |
+
+If an applied fault is not detected, fix the test and repeat the pair.
+If permission to run an isolated faulty variant is unavailable and there is
+no useful pre-fix run, mark sensitivity **INCONCLUSIVE**. For read-only
+enforcement, credential secrecy, and replacement of stored credentials,
+missing decisive sensitivity evidence is a handoff blocker, not an
+invitation to run tests against a live destructive path.
+
+## 5. Release gates and handoff
 
 1. **Focused green.** From `D:/REPO/github/AtlaWire` in the isolated offline
    environment run:
@@ -157,7 +203,9 @@ An empty result must not hide an unsupported or failed product.
    separately. No untested required ID, unexpected skip, or unsupported
    required operation counts as done.
 3. **Clean wheel proof.** Check the lock (`uv lock --check`); build a versioned
-   wheel with the approved Python 3.15 tooling. In an approved isolated
+   wheel with the approved Python 3.15 tooling. Run the release-equivalent
+   checks on one final wheel hash; if it changes, rerun its bound checks.
+   In an approved isolated
    install target outside the checkout, prove exact wheel hash, package
    metadata, imported module location and console launcher. Run section A
    there plus the slice from section 2 over actual loopback transport.
@@ -175,7 +223,11 @@ An empty result must not hide an unsupported or failed product.
    exercised live; do not equate representative checks with universal
    live coverage.
 5. **Review before handoff.** Implementer self-reviews code **and tests**
-   against the original requirements and attaches the evidence above.
+   against the original requirements and attaches the evidence above. The
+   receipt lists `requirement | test node/command | faulty behavior |
+   observed faulty and corrected outcomes | remaining limitation` for each
+   critical check. A clean table without the actual failed/pass run and its
+   candidate identity is not an executable verification receipt.
    Return the exact candidate and test receipt to the reviewer. The fresh
    review challenges both the tests and implementation; separately
    authorized independent execution uses an isolated copy of that candidate.
