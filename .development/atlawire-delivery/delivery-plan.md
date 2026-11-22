@@ -32,6 +32,13 @@ The initial release is for supported self-hosted server versions, not a
 universal Atlassian SDK. An installed preview is a useful milestone, not
 acceptance of reduced standard coverage.
 
+**Implementation decision:** Canonical commands and Python methods use the
+existing operation registry and a single private `atlassian-python-api`
+adapter. The initial installed slice uses `jira.project.get`,
+`confluence.space.get`, and `bitbucket.repository.get`, followed by the
+page, fixed fallback, and semantic POST cases in the test plan. Do not make
+`read <id>` or the prototype's separate registry a second canonical interface.
+
 ## The agent's acceptance test
 
 Give a fresh agent `atlawire` on `PATH`, access to run it, and the hint
@@ -73,6 +80,18 @@ atlawire --describe bitbucket.repository.get
   (include its argument array so an agent need not guess shell quoting).
   Descriptions state what the method does and does **not** do, e.g. “List the
   available transitions; does not change issue status.”
+- `%verify-32`, `%catalog-38`: The runtime operation registry is the
+  authority for the canonical command path, inputs and response semantics.
+  Add only the missing facts to its entry for each operation: a concise
+  purpose, an example argument array, result kind and key fields, and the
+  documented permission, version and pagination rules. For non-paged
+  operations say so; distinguish a documented default from a server-selected
+  or unknown default, and do not invent permissions. Generate help and JSON
+  from these entries. Agents start with `--help` for browsing, `--catalog`
+  for machine enumeration, and `--describe ID` for an exact call. `commands`
+  describes the actual Click tree for compatibility; `operations` identifies
+  canonical reads. If the projections disagree, fix the mismatch before
+  advertising the operation; do not ask the caller to choose one.
 - Every supported operation, including a library gap, is callable as a named
   read. Python offers `AtlaWire().call(ID, **params)` and thin product methods
   for common workflows. Both interfaces execute the same entry. Do not add
@@ -84,6 +103,12 @@ atlawire --describe bitbucket.repository.get
   when a product is not configured. The short guide shipped next to the wheel
   explains setup, these flags, success and error conventions, and a few
   workflows. It is not a second hand-maintained catalog.
+- `%docs-40`: Ship the existing `docs/AGENT-QUICKSTART.md` as the short
+  guide alongside the wheel. It owns installation, setup and troubleshooting;
+  README links to it. The shared result/error contract owns field meanings and
+  stable codes; the guide explains how to read that contract with examples.
+  The operation registry owns per-operation semantics. Do not maintain a new
+  walkthrough, error-code table or endpoint reference with the same facts.
 
 ### Local credentials and diagnostics
 
@@ -134,9 +159,18 @@ atlawire --describe bitbucket.repository.get
   support PATs; [native Confluence PATs start at
   7.9](https://confluence.atlassian.com/enterprise/using-personal-access-tokens-1026032365.html).
   Do not infer the authentication mechanism for the live Confluence instance
-  from the 6.6 REST reference used for coverage. If the deployment's
-  token-creation page is unknown, give the owner the setup guidance rather
-  than opening a guessed URL.
+  from the 6.6 REST reference used for coverage. The implementer records the
+  documented setup for each product; the deployment owner confirms the live
+  version, token mechanism and page or instructions used. Jira 8.22 and
+  Bitbucket 5.10 use the documented PAT flow; enable the Confluence PAT
+  instructions only where that mechanism is verified. If a known bearer
+  token is available but its creation page is not verified, guide the owner
+  through the approved source and accept it via the same hidden prompt; do
+  not open a guessed page. A deployment with no verified way to obtain an
+  accepted bearer token remains unsupported for new enrollment: return
+  `credentials_error` (exit `2`) with guidance, without opening a browser
+  or prompting. An OAuth-only deployment does not require us to build
+  OAuth as part of this release.
 - Save the verified URL/token pair to the same private BBK-compatible store
   only after explicit owner setup. Replacing a configured pair requires
   confirmation. Preserve other products and existing fields. Validate first,
@@ -151,8 +185,11 @@ atlawire --describe bitbucket.repository.get
   them via the existing private provider for the owner-run real-server
   checks; no re-enrollment, credential migration, or new auth flow is needed
   to prove the initial read slice. The handoff still needs the documented,
-  tested manual setup flow for new users; one-click consent is optional.
-  Do not print, inspect or copy active tokens.
+  tested manual setup flow for the deployments claimed at handoff; one-click
+  consent is optional. The deployment owner validates the real setup or
+  confirms that only existing credentials are supported on that deployment.
+  Existing-token access alone does not pass the new-enrollment check. Do not
+  print, inspect or copy active tokens.
 
 ## Findings and decisions
 
@@ -258,10 +295,22 @@ returned by `get_json` as success, without checking response kind
 | Documented compatibility commands | Keep existing output, exit and error contracts unless an unsafe path must be closed. Compatibility commands are not the new machine contract. |
 
 Process termination and a broken stdout pipe are outside the JSON promise.
+`%errors-33`: A valid invocation selects one top-level action. Product and
+command help such as `atlawire bitbucket repository get --help` is legal.
+Top-level `--catalog` and `--describe ID` are standalone: combining either
+with the other, with root `--help`/`--version`, or with a command is
+`validation_error`, exit `2`, in either argument order. Handle this before
+Click eager callbacks can print and exit. Do not treat an option name inside
+a parsed value or after the end-of-options marker as a second action; shell
+quoting is not part of argv.
 Use one boundary around canonical CLI argument parsing, configuration and
-execution. Python returns the same JSON-compatible result for expected
-failures. Do not promise to catch Python signature errors outside the
-dispatcher. Parse and serialize strictly; `NaN`/`Infinity` are not JSON.
+execution, including unknown options and missing arguments. Keep the legacy
+contract for recognised legacy commands. Build one JSON document before
+writing; if output is interrupted, callers must reject an incomplete
+document rather than expect a second envelope on the broken stream.
+Python returns the same JSON-compatible result for expected failures. Do not
+promise to catch Python signature errors outside the dispatcher. Parse and
+serialize strictly; `NaN`/`Infinity` are not JSON.
 
 - Success: `{"ok":true,"product":"jira","data":...}`. Use `product:null`
   when the result has no single product. Preserve the complete parsed
@@ -293,12 +342,15 @@ dispatcher. Parse and serialize strictly; `NaN`/`Infinity` are not JSON.
   Keep existing protections and tests. Ensure AtlaWire itself does not
   print values from its credential store, emit auth headers, or log request
   or response bodies.
-- Binary is declared per operation, never guessed from the payload. Small
-  binary uses a documented bounded base64 result. Large files/archives require
-  an explicit destination and return a JSON receipt only after a complete
-  bounded download. Use existing streaming/bounds helpers where needed; do
-  not overwrite an existing file or leave partial output on failure. Reuse
-  this policy rather than implement separate file handling per endpoint.
+- `%binary-35`: No binary subsystem in the JSON-only first slice. When
+  implementing the first required binary operation, record its concrete
+  size limit, media/response kind and output contract before writing code.
+  Use bounded base64 JSON for small inline objects or an explicit destination
+  and JSON receipt for files/archives. Implement only the form that real
+  operations need. Never infer destinations from response links, overwrite
+  an existing file, or publish a receipt or partial file on failure. Reuse
+  existing streaming/bounds helpers. Deferring that implementation to its
+  first consumer does not remove required binary operations from release.
 
 ### 5. `%retry-2`, `%pagination-1`: Recover from a network blink, not by making the agent guess
 
@@ -313,20 +365,30 @@ accept `limit` but not a continuation offset
 [`facade.py:396`](../../src/atlawire/facade.py#L396)). It cannot be used
 to reliably obtain page two.
 
-**Fix:** One retry owner: use the pinned library's verified retry behavior or
-its supported session configuration, not stacked retry loops. Use the
-existing legacy 5 s connect and 30 s idle read timeouts as starting values.
-For retryable reads use at most **three total attempts** and **five seconds
-of cumulative waiting between attempts**, including `Retry-After`.
-Recover from a transient pre-response connection failure/reset and 429/503.
-If `Retry-After` does not fit the remaining wait budget, return a structured
-rate-limit failure without sleeping or making another call. If the final
-attempt returns an HTTP error, keep its status and safe diagnostics; if that
-attempt ends without an HTTP response, use `status:null`. Do not retry 401/403/404, invalid
-payloads, redirects, or unverified semantic POSTs. Do not replay a binary
-download after partial output. An idle read timeout and a wait budget are
-not a wall-clock deadline. Publish the effective policy and check exact
-attempt counts and delays with synthetic faults.
+**Fix (`%retry-34`):** The private SDK adapter is the only retry-policy owner
+for canonical reads. Configure the library or its supported session to do the
+retry if it can meet the contract. If neither can, disable SDK/session
+automatic retry and keep the small policy at that adapter around SDK calls.
+Never stack retry engines. **Three total attempts** and **five seconds of
+cumulative scheduled waits between attempts** are chosen client defaults,
+not a measured SLA. Use 5 s connect and 30 s idle read limits, inherited
+from the strict path. Time spent connecting or reading is not retry wait.
+Use the same policy for loopback; only the test clock/sleeper differs.
+
+Retry an eligible GET on 429/503 or transient failure before any response.
+Do not retry certificate, configuration or protocol validation failures, or
+semantic POSTs in the first slice. Use `Retry-After` for
+429/503 when it is a valid nonnegative delay in seconds or an HTTP-date;
+compute an HTTP-date delay from the current UTC time, with past dates
+treated as zero. If missing or invalid, use 1 s before the second attempt
+and 2 s before the third. No extra jitter in the initial policy. If the
+chosen wait exceeds the remaining budget, do not sleep or send another
+request: return the current HTTP error (429 or 503). If the final attempt
+returns an HTTP error, keep its status and safe diagnostics; if it ends
+without an HTTP response, use `status:null`. Do not retry other HTTP errors,
+invalid payloads, redirects, or a binary download after partial output.
+These are not a wall-clock deadline. Publish the policy and test it with
+synthetic faults.
 
 One operation returns **one logical page**, not necessarily one attempt. Expose
 documented continuation inputs (`startAt`, `start`, etc.) and keep upstream
@@ -362,8 +424,27 @@ or unsupported remains a gap. A 403 is not proof the endpoint is
 administrative. Do not let uncertainty in a few rows block implementation of
 the rest; do not erase those rows from the completion report.
 
+`%scope-30`: The integrator reconciles the existing mappings into one
+committed machine-readable **release inventory**, outside the runtime
+package. Freeze the target product/edition/reference versions and each row's
+method, normalized route, stable ID, response kind, disposition and source
+anchor. Required rows define the completion denominator; excluded and
+unresolved rows must include a reason and evidence. Do not derive the list
+from the runtime registry or count the historical mappings as final. The
+inventory can be built in parallel with the first slice; settle remaining
+in-scope uncertainty before claiming full coverage. Changes to scope after
+freeze require a recorded decision, not removal of a failing test. Compare
+the required IDs with the advertised canonical base; explicitly identify
+additive or compatibility-only operations outside that set. No smaller
+subset may be called the complete release.
+
+`%library-role-31`: Canonical operations always go through the pinned SDK.
+The existing strict HTTP path remains for legacy callers during migration;
+it is not an alternative canonical backend, and there is no transport
+auto-fallback on failure. Retain reusable validation, error mapping and
+bounded-read helpers, not a second backend behind the canonical command.
 Per required operation, record adapter choice, discoverability, installed
-loopback evidence and live status separately. Use a high-level method where it
+loopback evidence and live status separately. Use a high-level SDK method where it
 preserves documented arguments, status semantics, output and one-page
 behavior. Use one fixed low-level library adapter for genuine gaps **or SDK
 semantic mismatches**, not custom HTTP or wrappers around projected data
@@ -460,8 +541,8 @@ and a fake-subprocess parity test are not fresh live evidence.
 | --- | --- | --- |
 | 1. Recover the baseline | Integrator records tracked and untracked candidate changes, keeps the verified Jira compatibility fix, and fixes the catalog round-trip and lock. In parallel gather live versions and safe fixtures through the owner. | Focused Jira, SDK, facade and catalog selection green; `uv lock --check` passes. Do not build a second throwaway wheel just for this step. |
 | 2. Prove one vertical slice | One owner wires the existing registry, product credential resolution, private SDK transport, JSON boundary and CLI discovery. Add one high-level read per product where compatible, at least one fixed fallback, and one semantic POST. Include a real continuation, an auth error and a recovered network failure. Use the prototype as input rather than making it a second public surface. | Independent documented fixture expectations; unit → installed loopback → owner-run live smoke. Root and command `--help`, `--catalog` and `--describe` work before auth. Invoke a documented example outside the checkout; exact request, response, failed-output and retry oracles pass. |
-| 3. Complete the base by product | Split Jira, Confluence and Bitbucket into non-overlapping product batches. Each worker owns its operation data, adapter exceptions and tests. Integrator owns shared dispatcher, credentials, CLI and docs. Classify binary, semantic POST and ambiguous permissions early rather than leave the difficult routes to the end. | Every required ID has discovery, independent request/response assertions and a passing installed-loopback case. Live status recorded per operation; representative live successes for each distinct adapter/response kind and all three products. No silent exclusions. |
-| 4. Finish setup and verify additive workflows | Implement the simple browser + hidden-paste setup without requiring OAuth. Reuse implemented Jira comment search, Confluence rendering, Bitbucket repo grep, PR review/diff and search work where it passes its contract. Compare BBK and AtlaWire against stable fixtures. | Setup survives cancellation/failed verification without replacing stored credentials. Partial-result tests, bounded work and real BBK parity evidence pass for the workflows claimed. Base discovery and calls remain available. |
+| 3. Complete the base by product | Split Jira, Confluence and Bitbucket into non-overlapping product batches. Each batch owns its operation data, adapter exceptions and tests. Integrator owns the release inventory, shared dispatcher, credentials, CLI and docs. Classify binary, semantic POST and ambiguous permissions early rather than leave difficult routes to the end. | Reconcile the frozen inventory with discoverable canonical reads. Every required ID passes an independent installed-loopback case; record separate live status. Apply the live minimum in the test plan. No silent exclusions. |
+| 4. Finish setup and verify additive workflows | Implement the simple browser + hidden-paste setup without requiring OAuth. Reuse implemented Jira comment search, Confluence rendering, Bitbucket repo grep, PR review/diff and search work where it passes its contract. Compare BBK and AtlaWire against stable fixtures. | Setup survives cancellation/failed verification without replacing stored credentials. The deployment owner verifies enrollment for the configurations advertised at handoff. Partial-result tests, bounded work and real BBK parity evidence pass for the workflows claimed. Base discovery and calls remain available. |
 | 5. Freeze and hand off | Run the complete offline suite and project quality checks on the reconciled candidate. Build the final wheel, repeat clean-install discovery and smoke, and collect the owner's sanitized live receipt. Have the requested fresh PonyTail reviewer challenge the original requirements, code and tests. Independent verification of the credential/read boundary uses the approved isolated candidate, not HEAD alone. | Publish a local release report: exact artifact, commands, versions, failures/skips, known unsupported scope, quickstart and feedback. No release/sign-off with unresolved material failures or missing decisive live evidence. |
 
 Per-operation tests should share a harness, not an oracle. The harness can
@@ -500,14 +581,25 @@ Carry the confirmed cases into the first slice rather than rebuilding the
 facade or expanding the catalog first. Full suite, final wheel and live
 verification remain open.
 
-**Today:** Aim for the complete delivery gates, not a new round of abstract
-architecture. The first useful checkpoint is a green compatibility baseline
-plus an installed, self-describing slice. If any gate remains open at handoff,
-label the artifact a **review candidate** and list the exact missing operation
-IDs or evidence; do not lower the acceptance criteria to meet a date. BBK
-retirement is a separate owner decision after Atlassian parity, credential
-independence, preservation of its changes/state and an explicit plan for its
-other integrations. No removal, deployment or upstream posting in this review.
+### Decisions on the implementer's objections
+
+| Objection | Decision and reason |
+| --- | --- |
+| `%scope-30` | Accept the independent release inventory; reject a reduced release. An installed slice is useful, but does not meet the owner's full-coverage requirement. |
+| `%library-role-31` | Accept one private SDK path for canonical reads; reject making the strict legacy transport their backend. The pinned library is an explicit constraint, and preserving legacy behavior during migration does not require two canonical paths. |
+| `%verify-32`, `%catalog-38`, `%docs-40` | Accept; the registry owns operation facts, generated discovery surfaces serve different callers, and the existing quickstart owns setup. No duplicate schema or guide. |
+| `%errors-33` | Accept explicit action selection and incomplete-output semantics; reject exempting canonical parse failures from JSON. That would move error detection back into each caller. |
+| `%retry-34` | Accept fixed defaults and one owner; do not add jitter tuning or a configurable retry framework without a need. |
+| `%binary-35` | Accept implementing binary output with its first required consumer; reject dropping mandatory binary reads from the release scope. |
+| `%setup-36` | Accept product-specific instructions and owner verification; reject speculative OAuth or guessing the live Confluence setup from REST reference docs. |
+| `%gates-37`, `%testscope-39` | Accept exact offline/live gate split and bounded negative controls; representative live results do not imply per-operation live coverage. The test plan names the approval and evidence rules. |
+| `%dates-41` | Accept removing scheduling language from acceptance; retain the installed slice as a technical milestone. |
+
+If a mandatory gate remains open, label the artifact a **review candidate**
+and list the exact missing operation IDs or evidence. BBK retirement is a
+separate owner decision after Atlassian parity, credential independence,
+preservation of its changes/state and a plan for its other integrations.
+No removal, deployment or upstream posting in this review.
 
 ## Review evidence
 

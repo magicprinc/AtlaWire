@@ -22,13 +22,14 @@ workflows kept separate.
    subprocesses. Do not assume passing mock tests prove egress restrictions.
    Use no real credential files, inherited product values, proxy/netrc state,
    or non-loopback test targets offline.
-3. For every required operation, keep one row: stable ID, docs version/anchor,
-   chosen SDK adapter, contract fixture, installed CLI case, live status and
-   reason if not verified. The operation matrix may enumerate the test cases;
-   it cannot supply their expected request/response. Derive method, path,
-   parameter semantics, expected response and permission scope from the
-   reference or independent fixture evidence. If the manifest had the
-   documented path or parameter wrong, the test must fail.
+3. Compare the checked-in release inventory with the advertised canonical
+   base and test coverage IDs; reject omissions, duplicates and unclassified
+   additions. The inventory is derived from versioned references, not emitted
+   by the runtime registry. For each required ID record the SDK adapter,
+   contract fixture, installed CLI case, live status and reason if unverified.
+   Tests may use the inventory to enumerate IDs, not to construct expected
+   requests or responses. Derive those expectations independently; an
+   incorrect route shared by the registry and inventory must still fail.
 4. Record the exact command, cwd, candidate/artifact hash, executed/failed/
    skipped counts and exit code. A blocked, filtered, empty or skipped test is
    not a pass. Store summaries, not command dumps containing real settings or
@@ -77,13 +78,20 @@ the installed CLI:
 | Jira search by semantic-read POST | Prove that method, product, JSON body, and response schema are retained and that arbitrary POST is not enabled. |
 | One synthetic HTTP 401/403 and one recovered loopback connection failure | Prove runtime mapping, automatic retry and output framing without a live fault injection. |
 
-In each batch: **unit first → installed CLI loopback → owner-run live
-validation**. Write a representative critical regression before the fix and
+In each batch: **unit first → installed CLI loopback**. Ask the owner for
+live validation when a batch adds a product, an adapter/response kind, or
+a required live scenario not yet represented. Repeat the live minimum on the
+final artifact. Write a representative critical regression before the fix and
 show that it fails for the intended behavior, then passes unchanged. If a
 bug has no runnable original implementation, use a small controlled faulty
 variant or an isolated negative-control fixture. Do not inject faults into
 the shared candidate or the live server. For routine route additions, share
 the harness; do not reproduce the whole boundary suite per route.
+
+Exercise the pinned SDK on canonical paths. A fake SDK or the strict legacy
+transport can help isolate a unit test but neither counts as canonical
+end-to-end evidence. Verify the representative high-level and fallback calls
+use that library and do not switch to a second transport after an error.
 
 ### If a failure is attributed to the upstream library
 
@@ -108,6 +116,8 @@ behavior instead of inventing a failing bug test.
 | Fresh install, no credentials: root help, product help, command `--help`, `--catalog`, `--describe` a known operation | All work offline and show the expected command, usable parameters/defaults and result kind. Catalog retains its existing command metadata and has one `operations` row per supported ID. Unknown describe ID emits `validation_error`, exit `2`, and does not echo the submitted value. Pair the installed test with in-process spies that fail on credential resolution or request dispatch; merely setting a missing credential path does not prove these were never attempted. |
 | Use only installed help/JSON to run a documented example on a synthetic fixture | Launch the actual console from the wheel and execute the advertised argv, not a corrected hand-written call. Use the real loader with a synthetic saved file, not a monkeypatched resolver. Assert documented inputs/defaults, actual request and exact returned object. Wrong ordering, missing options, invalid quoting and help/runtime drift fail. |
 | Agent distinguishes normal results from errors | Test JSON-only stdout and exact exit code for each new machine-facing **entry point**, not a separate error matrix per operation. Verify canonical read/describe success and use malformed args, missing config and HTTP failure to distinguish exits 0/2/1. Valid object, list, empty list, declared text and documented no-content success are distinguishable. Help/version, existing catalog success format and documented legacy behavior follow the delivery plan's explicit rules. A Python-only loopback case is not CLI evidence. |
+| Conflicting actions or framework-level parse failure | Invoke `--catalog --describe ID`, `--help --catalog`, `--describe ID --version`, and discovery plus a command, in both orders. Assert exactly one JSON `validation_error`, exit `2`, and no credential, log or network activity. Also check an unknown canonical option and a missing positional argument through the real CLI. Run valid command-level `--help`, one known legacy invocation and a literal flag-like argument as positive controls; raw argv scanning must not reject the value. |
+| Discovery authority and metadata | Compare representative registry-backed operations to independent expectations for command path, argument rules, documented/server-chosen defaults, response kind, access conditions and pagination. Use a paged and a non-paged operation; the latter must not advertise a continuation. Help, `--catalog` and `--describe` must point to the same canonical invocation without replacing existing `commands` metadata. |
 
 ### B. One registered read really does what its description says
 
@@ -117,7 +127,7 @@ behavior instead of inventing a failing bug test.
 | Parameter boundaries | Cover a missing required argument, unknown argument, wrong type (including boolean as an integer), documented limits and enum members. For supported parameters, send Unicode, spaces, `+`, `&`, repeated names and an identifier/path that requires encoding. Check parsed query/body **and** the relevant exact wire spelling to catch double encoding and duplicate-key loss. Do not apply a restrictive generic key regex to a documented different identifier domain. |
 | Page 1 advertises page 2 | Fixture returns `nextPageStart=19` after a request with `start=5, limit=2`; assert the client emits the first envelope intact and sends exactly one request on a healthy transport. Explicitly request page 2 from the advertised continuation, then assert `start=19`. Also cover Jira offset and Confluence metadata where those adapters paginate. Reject fetching page 2 automatically, deriving `7`, stripping the cursor, or calling a bare array exhaustive. |
 | Response validation | A valid empty array is successful. A wrong object/array type, malformed late row required by the contract, login HTML for JSON, bad JSON, non-finite number, disallowed 206, unexpected 204 and missing mandatory field fail with exactly one error JSON and no partial success data. In the SDK-backed project lookup, an empty HTTP 200, a 200 with JSON `null`, and a 204 are three failures; a documented 204 for Bitbucket's default branch is a separate positive control and maps to `data:null`. Exercise the registered Python adapter as well as the canonical CLI, not only the legacy `read-operation` path. |
-| Positive binary and interrupted download | Compare bytes or an independent SHA-256, not just a file name or byte count. Exercise size cap, interrupted stream, an existing output file and cleanup. Never overwrite an existing file or publish a completed receipt or partial output on failure. Test a non-UTF-8 binary fixture so replacing bytes with decoded text fails. |
+| Positive binary and interrupted download | Start with the first required binary operation, not in the initial JSON slice. Use non-UTF-8 bytes and compare decoded bytes or an independent SHA-256. Test the documented cap on both sides of its boundary. For file output, interrupt after a prefix and check cleanup, no receipt, and no overwrite of an existing file. |
 
 ### C. Read-only and credentials: prove the point of refusal
 
@@ -128,7 +138,7 @@ behavior instead of inventing a failing bug test.
 | Redirect from GET and semantic POST | A synthetic GET 302 and a POST-preserving redirect must fail. Check one request to the first server and zero to the redirected destination, including wrong-context redirects on the same host. A second server returning a well-shaped 200 must not turn the redirect into success. |
 | Optional GET side effects | Verify the Jira issue read does not request activity-history updates. Verify listing transitions never invokes an actual transition. The first accepted request is inspected, not inferred from its response. |
 | Credential handling and diagnostics | Supply synthetic credentials through configuration. Assert the tool does not print those stored values or auth headers in startup, CLI results generated by the tool, or logs. Test that local failure diagnostics contain stable codes, not a dump of the exception/request. Preserve ordinary upstream payloads and existing secrecy tests; a synthetic upstream success deliberately containing an echo is not a new release gate or a reason to scan every result. |
-| Human setup, required for handoff but not for the first read slice | Synthetic browser, hidden terminal and private temp store. Correct product instructions, no clipboard read, token verified against only the selected URL. A `GetPassWarning` or non-interactive invocation must stop before reading visible input. On failed validation, cancellation or failed write, the existing store is unchanged; on confirmed replacement, only the selected matched pair changes. Instructions go to terminal/stderr; stdout carries only the final safe JSON status. If optional browser consent is implemented, also test success, canceled callback, wrong state and no token output. Never mint, rotate or revoke live tokens as a release test. |
+| Human setup, required for handoff but not for the first read slice | Synthetic browser, hidden terminal and private temp store. Verify the documented page/instructions; for unsupported enrollment assert `credentials_error`, exit `2`, and no browser launch or prompt. No clipboard read, token verified only against the selected URL. A `GetPassWarning` or non-interactive invocation stops before visible input. Failed validation, cancellation or failed write preserves the existing store; confirmed replacement changes only the selected pair. Instructions stay off stdout. If optional browser consent is implemented, test success, canceled callback, wrong state and no token output. |
 
 ### D. Error and retry behavior
 
@@ -149,11 +159,17 @@ behavior instead of inventing a failing bug test.
   Test 429 followed by success within budget. A 429 with `Retry-After: 90`
   must return `status:429` and `code:"http_429"` after one request with no
   sleep. Also check the cumulative budget with two individual delays that
-  would each fit but do not fit together. A controlled clock/sleeper checks
-  delays; real loopback checks the installed transport's attempts. Do not
+  would each fit but do not fit together. With a fixed UTC clock, check a
+  future HTTP-date, a past date (zero), and invalid or missing headers
+  (1 s then 2 s); no additional jitter. When a 503 delay exceeds budget,
+  keep 503 rather than recategorizing it as 429. Connection/read time is
+  not charged to the scheduled-wait budget. A controlled clock/sleeper
+  checks delays; real loopback checks the installed transport's attempts. Do not
   depend on wall-clock sleeps or trigger throttling on the real service.
-- Prove no retries for non-retryable HTTP, redirect, invalid data, and
-  semantic POST not explicitly declared retryable. Separate the healthy
+- Prove no retries for non-retryable HTTP, redirects, invalid data, permanent
+  TLS/configuration failures, and semantic POSTs in the first slice. If a
+  retryable HTTP error is followed by a final transport failure, assert
+  `status:null`, not the stale earlier HTTP status. Separate the healthy
   single-page request-count test from retry cases. After all paths assert
   that production code closes the response/session **before** fixture
   cleanup. A closed test server by itself is not that evidence.
@@ -176,13 +192,17 @@ An empty result must not hide an unsupported or failed product.
 
 ## 4. Prove the critical tests can fail
 
-For each applicable critical boundary below, keep a runnable regression and
-record the exact node ID and the assertion that detects the shown defect.
-Use the unchanged test on the known pre-fix candidate, or a controlled,
-temporary faulty variant in an explicitly approved isolated copy. Then run
-the same test against the correction. A passing positive fixture alone is
-not sensitivity evidence. One regression may cover more than one check;
-there is no test-count or mutation-score target.
+`%testscope-39`: For each applicable **shared** boundary in the table, keep a
+runnable regression and record the node ID and assertion that detects the
+fault; do not repeat mutation checks for each operation. Prefer the known
+pre-fix failure. If it is unavailable, use a fixture-based negative control
+for a boundary the fixture can actually exercise, or ask the owner to approve
+the exact project-local isolated candidate directory for a controlled faulty
+variant. Never change production in the shared working tree for this check.
+Keep the faulty variant out of the delivered tree; retain only the regression
+and sanitized receipt, which identifies the candidate, the fault and observed
+assertion. Run the same test against the correction. A passing positive
+fixture alone is not sensitivity evidence; there is no mutation-score target.
 
 | Plausible defect | Decisive check, not a proxy |
 | --- | --- |
@@ -220,9 +240,11 @@ invitation to run tests against a live destructive path.
    project lint/types and the applicable dependency audit. Give pytest a
    unique project-local `--basetemp` if used. Report tool failures instead of
    suppressing them. Reconcile the required inventory against advertised IDs
-   and independently verified test cases; report exclusions/unresolved items
-   separately. No untested required ID, unexpected skip, or unsupported
-   required operation counts as done.
+   and independently verified test cases. **Pass threshold:** every required
+   ID is implemented, advertised and passes its installed-CLI loopback case.
+   No unresolved in-scope classification, unexpected skip, or unsupported
+   required operation counts as done. Exclusions and additive reads are
+   reported separately.
 3. **Clean wheel proof.** Run `uv lock --check` without regenerating the lock
    as part of the check. Confirm the lock includes the same SDK pin as the
    project metadata. Build a versioned wheel with approved Python 3.15 tooling.
@@ -233,18 +255,21 @@ invitation to run tests against a live destructive path.
    metadata, imported module location and console launcher. Run section A
    there plus the slice from section 2 over actual loopback transport.
    A passing editable install or `CliRunner` alone is not this evidence.
-4. **Real-server proof.** The owner runs the updated fixture-scoped live
+4. **Real-server proof (`%gates-37`).** The owner runs the updated fixture-scoped live
    read-only runner for the same installed artifact using the saved
    credentials. Record the observed server versions and a sanitized outcome
-   per run. Require positive shape/identity checks for each product and
-   representative distinct adapter/response kinds (including a real page
-   continuation, semantic POST and binary where required by the scope), plus
-   successful BBK comparisons for the workflows claimed. No read of real
-   fixture values or tokens by the reviewer, no live failure injection. A
-   gap in permission, fixture or availability remains visible in the matrix;
-   mark it inconclusive, not passed. State explicitly which operations were
-   exercised live; do not equate representative checks with universal
-   live coverage.
+   per run. **Pass threshold:** positive shape/identity for each product and
+   each distinct adapter/response kind used in scope, including a real page
+   continuation, semantic POST and binary where applicable, plus successful
+   BBK comparisons for the workflows claimed. One example can satisfy more
+   than one category. The deployment owner also confirms the advertised
+   enrollment method is usable on each deployment claimed for new users; no
+   requirement to mint or revoke a live token in automated checks.
+   No live failure injection or review of real fixture values or tokens.
+   Other individual reads need not each run live if they pass offline and
+   their adapter/kind is represented. Mark each unrun ID as such; the owner
+   accepts that disclosed residual risk. Missing a required representative
+   check is **INCONCLUSIVE** and blocks release; never count it as a pass.
 5. **Review before handoff.** Implementer self-reviews code **and tests**
    against the original requirements and attaches the evidence above. The
    receipt lists `requirement | test node/command | faulty behavior |
