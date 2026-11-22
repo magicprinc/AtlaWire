@@ -22,7 +22,7 @@ OUTPUT = ROOT / "src" / "atlawire" / "manifest.json"
 # Match the route's own shape, not a substring like "/content/": Confluence
 # content routes are JSON.
 _DEFERRED_SUFFIXES = ("/archive", "/raw", "/raw/", "/download")
-_DEFERRED_MARKERS = ("/avatar", ".png", "/markup/preview")
+_DEFERRED_MARKERS = ("/avatar/", "avatar.png", "/markup/preview")
 _PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
 
 # Segments the canonical SDK adapter refuses. An advertised operation must not
@@ -88,6 +88,8 @@ def _version(product: str) -> str:
 
 def _deferred(path: str) -> str | None:
     lowered = path.lower()
+    if lowered.endswith("/avatar"):
+        return "non-JSON body (/avatar)"
     if lowered.endswith(_DEFERRED_SUFFIXES):
         return "non-JSON body (archive, raw or download)"
     for marker in _DEFERRED_MARKERS:
@@ -161,7 +163,7 @@ def main() -> int:
                 {
                     "product": product,
                     "path": path,
-                    "reason": "semantic POST needs a documented body schema",
+                    "reason": "registered separately: semantic POST with declared body schema",
                 }
             )
             continue

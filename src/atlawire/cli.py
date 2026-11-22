@@ -148,10 +148,12 @@ from atlawire.jira_metadata import (
     get_transition_fields,
 )
 from atlawire.operations import (
+    BINARY_MAX_BYTES,
     OperationShapeError,
     canonical_operations,
     describe_operation,
     list_operations,
+    read_binary,
     read_operation,
 )
 from atlawire.sdk import SdkRequestError, get_json, request_json
@@ -760,6 +762,25 @@ def read_operation_command(
     default=None,
     help="Optional JSON object of declared typed query fields.",
 )
+@click.option(
+    "--body",
+    "raw_body",
+    default=None,
+    help="JSON object of declared body fields for a semantic-read POST.",
+)
+@click.option(
+    "--out",
+    "destination",
+    default=None,
+    help="Destination file for a binary read; must not already exist.",
+)
+@click.option(
+    "--max-bytes",
+    type=click.IntRange(min=1),
+    default=BINARY_MAX_BYTES,
+    show_default=True,
+    help="Upper bound for a binary download.",
+)
 @click.option("--base-url", default=None)
 @click.option(
     "--token-from-env",
@@ -773,6 +794,9 @@ def read_command(
     operation_id: str,
     raw_params: str,
     raw_query: str | None,
+    raw_body: str | None,
+    destination: str | None,
+    max_bytes: int,
     base_url: str | None,
     token_from_env: bool,
     allow_http_loopback: bool,
@@ -787,6 +811,7 @@ def read_command(
     try:
         arguments = _operation_json_object(raw_params)
         query = _operation_json_object(raw_query) if raw_query is not None else None
+        body = _operation_json_object(raw_body) if raw_body is not None else None
     except click.ClickException as exc:
         click.echo(
             json.dumps(
@@ -846,6 +871,31 @@ def read_command(
             )
         )
         raise click.exceptions.Exit(2) from None
+    allowed_body = {
+        str(field["name"]) for field in cast(list[dict[str, object]], described["body"])
+    }
+    if body is not None and (not allowed_body or set(body) - allowed_body):
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message="The request body is invalid.",
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
+    if described["method"] == "POST" and body is None:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message="This operation requires --body.",
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
     try:
         resolved_url, token = _product_base_url_and_token(
             product, base_url, token_from_env, allow_http_loopback
@@ -862,6 +912,46 @@ def read_command(
         )
         raise click.exceptions.Exit(2) from None
 
+    response_kind = cast(dict[str, object], described["response"])["kind"]
+    if response_kind == "binary":
+        if not destination:
+            click.echo(
+                json.dumps(
+                    _error_envelope(
+                        product,
+                        code="validation_error",
+                        message="This operation writes a file; pass --out.",
+                    )
+                )
+            )
+            raise click.exceptions.Exit(2) from None
+        try:
+            receipt = read_binary(
+                operation_id,
+                resolved_url,
+                token=token,
+                arguments=arguments,
+                destination=destination,
+                max_bytes=max_bytes,
+                allow_http_loopback=allow_http_loopback,
+            )
+        except SdkRequestError as exc:
+            click.echo(json.dumps(exc.to_dict(product=product, token=token)))
+            raise click.exceptions.Exit(1) from None
+        except AtlaWireError as exc:
+            click.echo(
+                json.dumps(
+                    _error_envelope(
+                        product,
+                        code="validation_error",
+                        message=str(exc),
+                    )
+                )
+            )
+            raise click.exceptions.Exit(2) from None
+        click.echo(json.dumps({"ok": True, "product": product, "data": receipt}))
+        return
+
     try:
         result = read_operation(
             operation_id,
@@ -869,6 +959,7 @@ def read_command(
             token=token,
             arguments=arguments,
             query=query,
+            body=body,
             allow_http_loopback=allow_http_loopback,
             use_library=True,
         )
@@ -4119,6 +4210,20 @@ def page_url(
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
     click.echo(url)
+
+
+# BBK exposed a one-shot `selftest` for all three products. AtlaWire already
+# reports per-product identity and failures through `whoami`, so expose the
+# same probe under that name instead of duplicating it.
+_WHOAMI = cli.commands["whoami"]
+cli.add_command(
+    click.Command(
+        "selftest",
+        callback=_WHOAMI.callback,
+        params=_WHOAMI.params,
+        help="Check authentication for all three products (same probe as whoami).",
+    )
+)
 
 
 def main() -> None:

@@ -52,14 +52,17 @@ from atlawire.http import (
     get_json_object_allow_no_content,
     normalize_base_url,
 )
-from atlawire.sdk import get_json_with_status as sdk_get_json_with_status
+from atlawire.sdk import download_to_file as sdk_download_to_file
+from atlawire.sdk import request_json_with_status as sdk_request_json_with_status
 
 __all__ = [
+    "BINARY_MAX_BYTES",
     "CANONICAL_IDS",
     "OperationShapeError",
     "canonical_operations",
     "describe_operation",
     "list_operations",
+    "read_binary",
     "read_operation",
 ]
 
@@ -77,9 +80,10 @@ class OperationShapeError(AtlaWireError):
         self.status = status
 
 
-type ResponseKind = Literal["object", "array"]
+type ResponseKind = Literal["object", "array", "json", "binary"]
 type FieldKind = Literal["string", "integer", "boolean", "object"]
 type QueryKind = Literal["string", "integer"]
+type BodyKind = Literal["string", "integer", "integer_array"]
 
 _UNKNOWN_ID = "Unknown operation ID."
 _INVALID_ARGUMENTS = "Expected a mapping of registered path arguments."
@@ -95,6 +99,11 @@ _UNSAFE_SEGMENT = re.compile(r"[%/\\?#\x00-\x20\x7f]")
 _UNSAFE_QUERY_TEXT = re.compile(r"[\x00-\x20\x7f-\x9f]")
 _UNSAFE_QUERY_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _MAX_ARGUMENT_LENGTH = 255
+_MAX_WORKLOG_IDS = 1000
+BINARY_MAX_BYTES = 32 * 1024 * 1024
+_BINARY_TARGET = "This operation writes a file; pass an explicit destination."
+_NOT_BINARY = "This operation is not a binary read."
+_INVALID_BODY = "The request body is invalid."
 _MAX_QUERY_INTEGER = 2**31 - 1
 
 _JIRA_PROJECT_ID_OR_KEY = re.compile(r"(?:[A-Z][A-Z0-9_]*|[1-9][0-9]*)")
@@ -114,6 +123,9 @@ _JIRA_COMMENT_ID = re.compile(r"[1-9][0-9]*")
 _JIRA_WORKLOG_ID = re.compile(r"[1-9][0-9]*")
 _JIRA_ISSUE_LINK_ID = re.compile(r"[1-9][0-9]*")
 _CONFLUENCE_CONTENT_ID = re.compile(r"[1-9][0-9]*")
+_CONFLUENCE_CONVERSION_TARGET = re.compile(
+    r"(?:storage|view|export_view|styled_view|editor2)"
+)
 
 # The initial agent-facing surface. These remain ordinary registry entries:
 # the legacy read path and its tests are unchanged.
@@ -178,8 +190,20 @@ class _QueryField:
 
 
 @dataclass(frozen=True, slots=True)
+class _BodyField:
+    """One declared JSON body field for a semantic-read POST."""
+
+    name: str
+    kind: BodyKind
+    required: bool
+    description: str
+    allowed: tuple[str, ...] = ()
+    maximum: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class _Operation:
-    """One audited fixed GET route."""
+    """One audited fixed read route."""
 
     id: str
     product: str
@@ -197,6 +221,7 @@ class _Operation:
     query_exactly_one: tuple[str, ...] = ()
     null_on_204: bool = False
     method: str = "GET"
+    body: tuple[_BodyField, ...] = ()
 
 
 _JIRA_VERSION = "Jira Server 8.22.0 REST API 2"
@@ -353,6 +378,230 @@ _CONTENT_PAGING_QUERY = (
 _OPERATIONS: dict[str, _Operation] = {
     operation.id: operation
     for operation in (
+        _Operation(
+            id="jira.attachment.content",
+            product="jira",
+            path="/rest/api/2/attachment/{id}/content",
+            description=(
+                "Download one Jira attachment's content to an explicit destination."
+            ),
+            documented_version=_JIRA_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "id",
+                    _JIRA_ATTACHMENT_ID,
+                    "Positive decimal Jira attachment ID.",
+                ),
+            ),
+        ),
+        _Operation(
+            id="jira.attachment.expand.raw",
+            product="jira",
+            path="/rest/api/2/attachment/{id}/expand/raw",
+            description=(
+                "Read the raw expanded content of one Jira attachment; writes "
+                "bytes to an explicit destination."
+            ),
+            documented_version=_JIRA_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "id",
+                    _JIRA_ATTACHMENT_ID,
+                    "Positive decimal Jira attachment ID.",
+                ),
+            ),
+        ),
+        _Operation(
+            id="jira.avatar.system",
+            product="jira",
+            path="/rest/api/2/avatar/{type}/system",
+            description="Read one system avatar image as bytes.",
+            documented_version=_JIRA_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "type",
+                    re.compile(r"(?:project|user)"),
+                    "Avatar type: project or user.",
+                ),
+            ),
+        ),
+        _Operation(
+            id="bitbucket.hooks.avatar",
+            product="bitbucket",
+            path="/rest/api/1.0/hooks/{hookKey}/avatar",
+            description="Read one Bitbucket hook avatar image as bytes.",
+            documented_version=_BITBUCKET_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "hookKey",
+                    re.compile(r"[A-Za-z0-9._-]+"),
+                    "Bitbucket hook key.",
+                ),
+            ),
+        ),
+        _Operation(
+            id="bitbucket.project.avatar",
+            product="bitbucket",
+            path="/rest/api/1.0/projects/{projectKey}/avatar.png",
+            description="Read one Bitbucket project avatar image as bytes.",
+            documented_version=_BITBUCKET_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "projectKey",
+                    _BITBUCKET_PROJECT_KEY,
+                    (
+                        "Bitbucket project key, optionally prefixed with ~ "
+                        "for a personal project."
+                    ),
+                ),
+            ),
+        ),
+        _Operation(
+            id="bitbucket.repository.archive",
+            product="bitbucket",
+            path=("/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/archive"),
+            description=("Download a repository archive to an explicit destination."),
+            documented_version=_BITBUCKET_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "projectKey",
+                    _BITBUCKET_PROJECT_KEY,
+                    "Bitbucket project key.",
+                ),
+                _Argument(
+                    "repositorySlug",
+                    _BITBUCKET_REPOSITORY_SLUG,
+                    "Bitbucket repository slug.",
+                ),
+            ),
+        ),
+        _Operation(
+            id="bitbucket.repository.raw",
+            product="bitbucket",
+            path=("/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw"),
+            description="Download the repository root as raw bytes.",
+            documented_version=_BITBUCKET_VERSION,
+            kind="binary",
+            required=(),
+            arguments=(
+                _Argument(
+                    "projectKey",
+                    _BITBUCKET_PROJECT_KEY,
+                    "Bitbucket project key.",
+                ),
+                _Argument(
+                    "repositorySlug",
+                    _BITBUCKET_REPOSITORY_SLUG,
+                    "Bitbucket repository slug.",
+                ),
+            ),
+        ),
+        _Operation(
+            id="jira.search.post",
+            product="jira",
+            path="/rest/api/2/search",
+            description=(
+                "Search Jira issues with JQL through the documented read-only "
+                "POST; does not change any issue."
+            ),
+            documented_version=_JIRA_VERSION,
+            kind="object",
+            required=(),
+            method="POST",
+            body=(
+                _BodyField(
+                    "jql",
+                    "string",
+                    True,
+                    "JQL query text; the server evaluates it as a search.",
+                ),
+                _BodyField(
+                    "startAt",
+                    "integer",
+                    False,
+                    "Zero-based index of the first result.",
+                    maximum=_MAX_QUERY_INTEGER,
+                ),
+                _BodyField(
+                    "maxResults",
+                    "integer",
+                    False,
+                    "Requested page size; the server may apply a lower limit.",
+                    maximum=_MAX_QUERY_INTEGER,
+                ),
+            ),
+        ),
+        _Operation(
+            id="jira.worklog.list",
+            product="jira",
+            path="/rest/api/2/worklog/list",
+            description="List worklogs for up to 1000 issue IDs in one read.",
+            documented_version=_JIRA_VERSION,
+            kind="array",
+            required=(),
+            method="POST",
+            body=(
+                _BodyField(
+                    "issueIds",
+                    "integer_array",
+                    True,
+                    "Issue IDs whose worklogs are returned (at most 1000).",
+                ),
+            ),
+        ),
+        _Operation(
+            id="confluence.content.convert",
+            product="confluence",
+            path="/rest/api/contentbody/convert/{to}",
+            description=(
+                "Convert stored content to another representation; returns "
+                "the converted text and does not modify the content."
+            ),
+            documented_version=_CONFLUENCE_VERSION,
+            kind="object",
+            required=(),
+            method="POST",
+            arguments=(
+                _Argument(
+                    "to",
+                    _CONFLUENCE_CONVERSION_TARGET,
+                    "Target representation.",
+                ),
+            ),
+            body=(
+                _BodyField(
+                    "value",
+                    "string",
+                    True,
+                    "Content to convert.",
+                ),
+                _BodyField(
+                    "representation",
+                    "string",
+                    True,
+                    "Representation of value.",
+                    allowed=(
+                        "storage",
+                        "view",
+                        "export_view",
+                        "styled_view",
+                        "editor2",
+                    ),
+                ),
+            ),
+        ),
         _Operation(
             id="bitbucket.project.get",
             product="bitbucket",
@@ -1337,7 +1586,7 @@ def _manifest_entries() -> list[dict[str, object]]:
     """Load the generated read manifest, or nothing if it is unusable."""
     try:
         document = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return []
     entries = document.get("operations")
     return entries if isinstance(entries, list) else []
@@ -1459,6 +1708,17 @@ def _describe(operation: _Operation) -> dict[str, object]:
             "at_least_one": list(operation.query_at_least_one),
             "exactly_one": list(operation.query_exactly_one),
         },
+        "body": [
+            {
+                "name": field.name,
+                "type": field.kind,
+                "required": field.required,
+                "description": field.description,
+                "enum": list(field.allowed),
+                "maximum": field.maximum,
+            }
+            for field in operation.body
+        ],
         "query": [
             {
                 "name": field.name,
@@ -1536,6 +1796,97 @@ def canonical_operations() -> list[dict[str, object]]:
     ]
 
 
+def _validated_body(
+    operation: _Operation, body: Mapping[str, object] | None
+) -> dict[str, object] | None:
+    """Accept only declared body fields with their documented types."""
+    if operation.method == "GET":
+        if body is not None:
+            raise AtlaWireError(_INVALID_BODY)
+        return None
+    if not isinstance(body, Mapping) or not operation.body:
+        raise AtlaWireError(_INVALID_BODY)
+    declared = {field.name: field for field in operation.body}
+    if any(not isinstance(name, str) or name not in declared for name in body):
+        raise AtlaWireError(_INVALID_BODY)
+    validated: dict[str, object] = {}
+    for field in operation.body:
+        if field.name not in body:
+            if field.required:
+                raise AtlaWireError(_INVALID_BODY)
+            continue
+        value = body[field.name]
+        if field.kind == "integer":
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or (field.maximum is not None and value > field.maximum)
+                or value < 0
+            ):
+                raise AtlaWireError(_INVALID_BODY)
+        elif field.kind == "integer_array":
+            if (
+                not isinstance(value, list)
+                or not value
+                or len(value) > _MAX_WORKLOG_IDS
+                or any(
+                    not isinstance(item, int) or isinstance(item, bool) or item < 1
+                    for item in value
+                )
+            ):
+                raise AtlaWireError(_INVALID_BODY)
+        elif (
+            not isinstance(value, str)
+            or not value
+            or (field.allowed and value not in field.allowed)
+            or any(ord(char) < 0x20 and ord(char) not in (9, 10, 13) for char in value)
+        ):
+            raise AtlaWireError(_INVALID_BODY)
+        validated[field.name] = value
+    return validated
+
+
+def read_binary(
+    operation_id: str,
+    base_url: str,
+    *,
+    token: str,
+    arguments: Mapping[str, object],
+    destination: str,
+    max_bytes: int = BINARY_MAX_BYTES,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Stream one registered binary read into ``destination``.
+
+    The destination must not exist. Nothing is published on failure, and the
+    returned receipt describes the complete file that was written.
+    """
+    operation = _operation(operation_id)
+    if operation.kind != "binary":
+        raise AtlaWireError(_NOT_BINARY)
+    if not isinstance(destination, str) or not destination:
+        raise AtlaWireError(_BINARY_TARGET)
+    path = _render_path(operation, arguments)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    if not isinstance(token, str):
+        raise AtlaWireError(_INVALID_TOKEN)
+    content_type, written, digest = sdk_download_to_file(
+        operation.product,
+        base,
+        path,
+        token=token,
+        destination=destination,
+        max_bytes=max_bytes,
+        allow_http_loopback=allow_http_loopback,
+    )
+    return {
+        "path": destination,
+        "bytes": written,
+        "sha256": digest,
+        "content_type": content_type,
+    }
+
+
 def read_operation(
     operation_id: str,
     base_url: str,
@@ -1543,6 +1894,7 @@ def read_operation(
     token: str,
     arguments: Mapping[str, object],
     query: Mapping[str, object] | None = None,
+    body: Mapping[str, object] | None = None,
     allow_http_loopback: bool = False,
     use_library: bool = False,
 ) -> dict[str, object] | list[object] | None:
@@ -1566,20 +1918,25 @@ def read_operation(
     operation = _operation(operation_id)
     path = _render_path(operation, arguments)
     params = _validated_query(operation, query)
+    payload_body = _validated_body(operation, body)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if not isinstance(token, str):
         raise AtlaWireError(_INVALID_TOKEN)
     url = f"{base}{path}"
     if use_library:
-        status, payload = sdk_get_json_with_status(
+        status, payload = sdk_request_json_with_status(
             operation.product,
             base,
             path,
+            method=operation.method,
             token=token,
             params=params,
+            body=payload_body,
             allow_http_loopback=allow_http_loopback,
         )
         no_content = status == 204 and payload is None
+    elif operation.method != "GET":
+        raise AtlaWireError("This operation requires the library transport.")
     else:
         status = None
         with bearer_session(token) as session:

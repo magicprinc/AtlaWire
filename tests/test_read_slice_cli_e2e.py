@@ -475,3 +475,14 @@ def test_argument_validation_precedes_credentials(tmp_path: Path) -> None:
     envelope = json.loads(result.stdout)
     assert envelope["error"]["code"] == "validation_error"
     assert "projectIdOrKey" in envelope["error"]["message"]
+
+
+def test_selftest_is_the_whoami_probe_under_the_bbk_name(tmp_path: Path) -> None:
+    """The BBK name stays available without a second probe implementation."""
+    environment = {"BBK_CREDENTIALS": str(tmp_path / "missing.json")}
+    result = run_installed(["selftest"], environment)
+
+    assert result.returncode in {0, 1}
+    payload = json.loads(result.stdout)
+    assert set(payload) == {"bitbucket", "confluence", "jira"}
+    assert all("ok" in check for check in payload.values())

@@ -7,13 +7,16 @@ retry policy, and an error object that keeps the HTTP status and a sanitized
 diagnostic excerpt.
 """
 
+import hashlib
 import json
 import logging
+import os
 import re
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from typing import Literal
 
 import requests
@@ -25,6 +28,7 @@ from atlawire.http import AtlaWireError, normalize_base_url
 __all__ = [
     "SdkRequestError",
     "client_for",
+    "download_to_file",
     "get_json",
     "get_json_with_status",
     "request_json",
@@ -76,6 +80,7 @@ _READ_ONLY_POSTS: dict[str, tuple[frozenset[str], tuple[str, ...]]] = {
 
 # Shared read budgets, measured on content-decoded bytes read from the stream.
 _JSON_LIMIT = 8 * 1024 * 1024
+_BINARY_LIMIT = 32 * 1024 * 1024
 _BODY_LIMIT = 8 * 1024
 _TIMEOUT = (5, 30)
 _CHUNK = 64 * 1024
@@ -359,6 +364,93 @@ def request_json_with_status(
         )
     finally:
         client.close()
+
+
+def download_to_file(
+    product: str,
+    base_url: str,
+    path: str,
+    *,
+    token: str,
+    destination: str | Path,
+    params: Mapping[str, object] | None = None,
+    max_bytes: int = _BINARY_LIMIT,
+    allow_http_loopback: bool = False,
+) -> tuple[str | None, int, str]:
+    """Stream one read-only response into a file and return its receipt.
+
+    The destination must not exist. Bytes are written to a sibling temporary
+    file and published with one replace only after a complete, bounded read;
+    on any failure the temporary file is removed and nothing is published.
+    """
+    target = Path(destination)
+    if target.exists():
+        raise AtlaWireError("The destination already exists.")
+    _validate_path(path)
+    if max_bytes < 1:
+        raise AtlaWireError("The byte limit must be a positive integer.")
+    client = _raw_client_for(
+        product, base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    temporary = target.with_name(f"{target.name}.{os.getpid()}.part")
+    try:
+        response = _send(
+            client,
+            "GET",
+            path,
+            params=_checked_params(params),
+            body=None,
+        )
+        try:
+            status = response.status_code
+            if 300 <= status < 400:
+                raise _error(
+                    response,
+                    path=path,
+                    code=f"http_{status}",
+                    classification="unexpected_redirect",
+                    message="The server returned a redirect; it was not followed.",
+                )
+            if status >= 400:
+                code, classification = _classify(status)
+                raise _error(
+                    response,
+                    path=path,
+                    code=code,
+                    classification=classification,
+                    message=f"HTTP {status}: request failed.",
+                )
+            digest = hashlib.sha256()
+            written = 0
+            temporary.parent.mkdir(parents=True, exist_ok=True)
+            with temporary.open("wb") as stream:
+                for chunk in response.iter_content(chunk_size=_CHUNK):
+                    written += len(chunk)
+                    if written > max_bytes:
+                        raise SdkRequestError(
+                            status=status,
+                            code="invalid_response",
+                            classification="response_too_large",
+                            message=(
+                                f"The response exceeds the {max_bytes}-byte limit."
+                            ),
+                            body=None,
+                            content_type=response.headers.get("Content-Type"),
+                            path=path,
+                            body_truncated=True,
+                        )
+                    digest.update(chunk)
+                    stream.write(chunk)
+        finally:
+            response.close()
+        os.replace(temporary, target)
+        return response.headers.get("Content-Type"), written, digest.hexdigest()
+    finally:
+        client.close()
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
 
 
 def _check_semantic_post(product: str, path: str) -> None:

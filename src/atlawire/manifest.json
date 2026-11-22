@@ -2765,6 +2765,23 @@
       ]
     },
     {
+      "id": "jira.project.projectidorkey.avatars",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/avatars",
+      "description": "Jira read: Project.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": [
+        {
+          "name": "projectIdOrKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+",
+          "allow_slash": false,
+          "description": "Path value for projectIdOrKey."
+        }
+      ]
+    },
+    {
       "id": "jira.project.projectidorkey.components",
       "product": "jira",
       "method": "GET",
@@ -3216,6 +3233,16 @@
       "arguments": []
     },
     {
+      "id": "jira.user.avatars",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/user/avatars",
+      "description": "Jira read: Users.",
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "kind": "json",
+      "arguments": []
+    },
+    {
       "id": "jira.user.columns",
       "product": "jira",
       "method": "GET",
@@ -3393,7 +3420,7 @@
     {
       "product": "jira",
       "path": "/rest/api/2/avatar/{type}/system",
-      "reason": "non-JSON body (/avatar)"
+      "reason": "non-JSON body (/avatar/)"
     },
     {
       "product": "jira",
@@ -3402,28 +3429,18 @@
     },
     {
       "product": "jira",
-      "path": "/rest/api/2/project/{projectIdOrKey}/avatars",
-      "reason": "non-JSON body (/avatar)"
-    },
-    {
-      "product": "jira",
-      "path": "/rest/api/2/user/avatars",
-      "reason": "non-JSON body (/avatar)"
-    },
-    {
-      "product": "jira",
       "path": "/rest/api/2/search",
-      "reason": "semantic POST needs a documented body schema"
+      "reason": "registered separately: semantic POST with declared body schema"
     },
     {
       "product": "jira",
       "path": "/rest/api/2/worklog/list",
-      "reason": "semantic POST needs a documented body schema"
+      "reason": "registered separately: semantic POST with declared body schema"
     },
     {
       "product": "confluence",
       "path": "/rest/api/contentbody/convert/{to}",
-      "reason": "semantic POST needs a documented body schema"
+      "reason": "registered separately: semantic POST with declared body schema"
     },
     {
       "product": "bitbucket",
@@ -3438,7 +3455,7 @@
     {
       "product": "bitbucket",
       "path": "/rest/api/1.0/projects/{projectKey}/avatar.png",
-      "reason": "non-JSON body (/avatar)"
+      "reason": "non-JSON body (avatar.png)"
     },
     {
       "product": "bitbucket",

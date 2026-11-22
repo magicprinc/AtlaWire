@@ -88,7 +88,7 @@ def test_deferred_routes_state_a_reason() -> None:
     assert DEFERRED
     assert all(item.get("product") and item.get("path") for item in DEFERRED)
     assert all(reasons)
-    assert sum("non-JSON body" in reason for reason in reasons) == 8
+    assert sum("non-JSON body" in reason for reason in reasons) == 6
     assert sum("semantic POST" in reason for reason in reasons) == 3
     assert sum("inconsistently" in reason for reason in reasons) == 1
     assert sum("administrative" in reason for reason in reasons) == 9
