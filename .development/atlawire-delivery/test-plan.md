@@ -116,6 +116,7 @@ behavior instead of inventing a failing bug test.
 | Fresh install, no credentials: root help, product help, command `--help`, `--catalog`, `--describe` a known operation | All work offline and show the expected command, usable parameters/defaults and result kind. Catalog retains its existing command metadata and has one `operations` row per supported ID. Unknown describe ID emits `validation_error`, exit `2`, and does not echo the submitted value. Pair the installed test with in-process spies that fail on credential resolution or request dispatch; merely setting a missing credential path does not prove these were never attempted. |
 | Use only installed help/JSON to run a documented example on a synthetic fixture | Launch the actual console from the wheel and execute the advertised argv, not a corrected hand-written call. Use the real loader with a synthetic saved file, not a monkeypatched resolver. Assert documented inputs/defaults, actual request and exact returned object. Wrong ordering, missing options, invalid quoting and help/runtime drift fail. |
 | Agent distinguishes normal results from errors | Test JSON-only stdout and exact exit code for each new machine-facing **entry point**, not a separate error matrix per operation. Verify canonical read/describe success and use malformed args, missing config and HTTP failure to distinguish exits 0/2/1. Valid object, list, empty list, declared text and documented no-content success are distinguishable. Help/version, existing catalog success format and documented legacy behavior follow the delivery plan's explicit rules. A Python-only loopback case is not CLI evidence. |
+| CLI and Python share one operation | Using the same installed wheel, run a canonical CLI command, `AtlaWire.call` with its registry ID, and the corresponding Python wrapper against one independent fixture. Compare the captured requests and success envelopes. Test one shared validation failure: equivalent error code and no requests. Do not port the full CLI matrix to Python. |
 | Conflicting actions or framework-level parse failure | Invoke `--catalog --describe ID`, `--help --catalog`, `--describe ID --version`, and discovery plus a command, in both orders. Assert exactly one JSON `validation_error`, exit `2`, and no credential, log or network activity. Also check an unknown canonical option and a missing positional argument through the real CLI. Run valid command-level `--help`, one known legacy invocation and a literal flag-like argument as positive controls; raw argv scanning must not reject the value. |
 | Discovery authority and metadata | Compare representative registry-backed operations to independent expectations for command path, argument rules, documented/server-chosen defaults, response kind, access conditions and pagination. Use a paged and a non-paged operation; the latter must not advertise a continuation. Help, `--catalog` and `--describe` must point to the same canonical invocation without replacing existing `commands` metadata. |
 
@@ -127,6 +128,7 @@ behavior instead of inventing a failing bug test.
 | Parameter boundaries | Cover a missing required argument, unknown argument, wrong type (including boolean as an integer), documented limits and enum members. For supported parameters, send Unicode, spaces, `+`, `&`, repeated names and an identifier/path that requires encoding. Check parsed query/body **and** the relevant exact wire spelling to catch double encoding and duplicate-key loss. Do not apply a restrictive generic key regex to a documented different identifier domain. |
 | Page 1 advertises page 2 | Fixture returns `nextPageStart=19` after a request with `start=5, limit=2`; assert the client emits the first envelope intact and sends exactly one request on a healthy transport. Explicitly request page 2 from the advertised continuation, then assert `start=19`. Also cover Jira offset and Confluence metadata where those adapters paginate. Reject fetching page 2 automatically, deriving `7`, stripping the cursor, or calling a bare array exhaustive. |
 | Response validation | A valid empty array is successful. A wrong object/array type, malformed late row required by the contract, login HTML for JSON, bad JSON, non-finite number, disallowed 206, unexpected 204 and missing mandatory field fail with exactly one error JSON and no partial success data. In the SDK-backed project lookup, an empty HTTP 200, a 200 with JSON `null`, and a 204 are three failures; a documented 204 for Bitbucket's default branch is a separate positive control and maps to `data:null`. Exercise the registered Python adapter as well as the canonical CLI, not only the legacy `read-operation` path. |
+| Read limits, not just output truncation | Test the shared bounded reader at its limit and just over it. In installed SDK loopback cases, send more than the limit without `Content-Length` and hold the stream open until the CLI exits, with bounded cleanup. An oversized JSON success gives `invalid_response`, received status and no partial success; an oversized HTTP error keeps its status and returns `body_truncated:true` and `body_json:null`. A client that waits for EOF or reports a timeout fails these checks. Check compressed content against decoded bytes; test declared text when its first operation is added. |
 | Positive binary and interrupted download | Start with the first required binary operation, not in the initial JSON slice. Use non-UTF-8 bytes and compare decoded bytes or an independent SHA-256. Test the documented cap on both sides of its boundary. For file output, interrupt after a prefix and check cleanup, no receipt, and no overwrite of an existing file. |
 
 ### C. Read-only and credentials: prove the point of refusal
@@ -139,6 +141,7 @@ behavior instead of inventing a failing bug test.
 | Optional GET side effects | Verify the Jira issue read does not request activity-history updates. Verify listing transitions never invokes an actual transition. The first accepted request is inspected, not inferred from its response. |
 | Credential handling and diagnostics | Supply synthetic credentials through configuration. Assert the tool does not print those stored values or auth headers in startup, CLI results generated by the tool, or logs. Test that local failure diagnostics contain stable codes, not a dump of the exception/request. Preserve ordinary upstream payloads and existing secrecy tests; a synthetic upstream success deliberately containing an echo is not a new release gate or a reason to scan every result. |
 | Human setup, required for handoff but not for the first read slice | Synthetic browser, hidden terminal and private temp store. Verify the documented page/instructions; for unsupported enrollment assert `credentials_error`, exit `2`, and no browser launch or prompt. No clipboard read, token verified only against the selected URL. A `GetPassWarning` or non-interactive invocation stops before visible input. Failed validation, cancellation or failed write preserves the existing store; confirmed replacement changes only the selected pair. Instructions stay off stdout. If optional browser consent is implemented, test success, canceled callback, wrong state and no token output. |
+| Authentication proof before enrollment writes | Use the documented authenticated probe for each product, not a public list. In particular, a valid Confluence HTTP 200 with `type:"anonymous"` must fail, leaving the old store byte-for-byte unchanged; a `known` identity with the required username is the positive control. The setup guide states that credential updates are single-writer; no concurrent enrollment harness is required. |
 
 ### D. Error and retry behavior
 
@@ -182,13 +185,20 @@ behavior instead of inventing a failing bug test.
 
 ### E. Additive workflows and BBK comparison
 
-Use fixtures with a known issue key, page ID, PR ID or pinned repository
+Start from the required read-only Atlassian BBK workflow list in the release
+evidence. Match every required workflow to a check, including the PR review
+packet where required; the existing five comparisons are a starting point,
+not the denominator. Use fixtures with a known issue key, page ID, PR ID or pinned repository
 commit. Assert exact results or a justified projection, not just that a result
 exists. Compare stable BBK observations and expected AtlaWire improvements,
 not the current search ranking of unrelated live datasets. Test a partial
 failure, all requested products failed, unsupported Bitbucket Search,
 pagination/limits vs true errors, ref pinning and documented diff truncation.
-An empty result must not hide an unsupported or failed product.
+An empty result must not hide an unsupported or failed product. For the first
+workflow with a total read cap, use multiple products or terms, a small row
+limit and a fixture requiring more reads than allowed. Assert the actual
+number of reads on healthy transport, retained results and a distinct
+budget-exhausted outcome, not an empty result or HTTP error.
 
 ## 4. Prove the critical tests can fail
 
@@ -258,16 +268,19 @@ invitation to run tests against a live destructive path.
 4. **Real-server proof (`%gates-37`).** The owner runs the updated fixture-scoped live
    read-only runner for the same installed artifact using the saved
    credentials. Record the observed server versions and a sanitized outcome
-   per run. **Pass threshold:** positive shape/identity for each product and
-   each distinct adapter/response kind used in scope, including a real page
-   continuation, semantic POST and binary where applicable, plus successful
-   BBK comparisons for the workflows claimed. One example can satisfy more
-   than one category. The deployment owner also confirms the advertised
-   enrollment method is usable on each deployment claimed for new users; no
+   per run. Before the run, name the representative IDs and expected
+   shapes/identities. **Pass threshold:** cover each product, plus materially
+   different product-specific adapter or response paths, including a real
+   page continuation, semantic POST and binary where applicable. Reuse one
+   example for several categories when it proves them; no Cartesian product.
+   Evidence for one product or deployed version does not stand in for a
+   different product-specific path or another version. Run successful BBK
+   comparisons for required workflows. The deployment owner also confirms the
+   advertised enrollment method is usable on each deployment claimed for new users; no
    requirement to mint or revoke a live token in automated checks.
    No live failure injection or review of real fixture values or tokens.
    Other individual reads need not each run live if they pass offline and
-   their adapter/kind is represented. Mark each unrun ID as such; the owner
+   their live path is represented. Mark each unrun ID as such; the owner
    accepts that disclosed residual risk. Missing a required representative
    check is **INCONCLUSIVE** and blocks release; never count it as a pass.
 5. **Review before handoff.** Implementer self-reviews code **and tests**

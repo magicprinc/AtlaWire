@@ -38,6 +38,8 @@ adapter. The initial installed slice uses `jira.project.get`,
 `confluence.space.get`, and `bitbucket.repository.get`, followed by the
 page, fixed fallback, and semantic POST cases in the test plan. Do not make
 `read <id>` or the prototype's separate registry a second canonical interface.
+Start steps 1–2 now. The final inventory, enrollment, and BBK parity work
+are release gates, not prerequisites to implementing this slice.
 
 ## The agent's acceptance test
 
@@ -96,6 +98,9 @@ atlawire --describe bitbucket.repository.get
   read. Python offers `AtlaWire().call(ID, **params)` and thin product methods
   for common workflows. Both interfaces execute the same entry. Do not add
   a duplicate generic CLI syntax or a Python wrapper by hand for every ID.
+  `%python-contract-31`: The first slice proves this with one representative
+  installed-wheel comparison of a canonical CLI command, `AtlaWire.call`,
+  and one named Python wrapper. Do not duplicate the per-ID CLI suite in Python.
 - Help, JSON discovery and execution use one operation registry. Extend the
   existing `operations.py` registry and let Click consume its metadata for
   the ordinary cases; no generated source or new CLI framework. Do not scale
@@ -171,14 +176,21 @@ atlawire --describe bitbucket.repository.get
   `credentials_error` (exit `2`) with guidance, without opening a browser
   or prompting. An OAuth-only deployment does not require us to build
   OAuth as part of this release.
+- `%auth-proof-31`: Before saving, reuse the proof criteria already in
+  [`identity.py`](../../src/atlawire/identity.py): Jira `/myself` must
+  identify a user, Confluence must return a `known` user with a nonempty
+  username, and Bitbucket must pass an authenticated dashboard read rather
+  than a public route. HTTP 200 alone does not prove authentication.
 - Save the verified URL/token pair to the same private BBK-compatible store
   only after explicit owner setup. Replacing a configured pair requires
   confirmation. Preserve other products and existing fields. Validate first,
   then atomically publish the completed private file. Cancellation or failure
-  before that publish point leaves the old file intact. Do not run a
-  concurrent BBK configuration write during enrollment; do not build shared
-  storage coordination for ordinary reads. Test with a synthetic browser
-  launcher, prompt and store. If the owner
+  before that publish point leaves the old file intact. `%credential-writers-31`:
+  Enrollment is a manual single-writer operation: finish one AtlaWire or BBK
+  configuration update before starting another against the same store.
+  Document that restriction rather than adding cross-tool locking. Reads
+  may still run during enrollment. Test with a synthetic browser launcher,
+  prompt and store. If the owner
   created a token in the browser but local saving failed, do not claim it
   was revoked.
 - `%live-fixtures-8`: The owner confirms existing tokens are available. Use
@@ -333,8 +345,16 @@ serialize strictly; `NaN`/`Infinity` are not JSON.
   unconditional promise of byte-for-byte upstream text. Include `body_json`
   only for a complete, safe, parseable body, not a truncated fragment.
   Never serialize raw exception strings, header dumps, saved credentials or
-  request query/body as diagnostics. Apply actual response/read bounds where
-  required and prove cleanup on failure.
+  request query/body as diagnostics.
+- `%response-bound-31`: Preserve the existing read budgets in the canonical
+  SDK adapter: **8 MiB for JSON, 1 MiB for declared text**, measured on
+  HTTP content-decoded bytes before parsing. Count bytes from the stream,
+  not only `Content-Length`; close the response on the first read over the
+  limit, return `invalid_response` with the received HTTP status for an
+  oversized success, and emit no partial success. For HTTP errors keep the
+  original status and read only enough for the diagnostic excerpt and its
+  truncation flag. Reuse the bounded-reader helper where applicable; do not
+  add a separate transport or weaken the existing limits.
 - `%token-scope-26`: A loopback server deliberately reflected a synthetic
   bearer value in a valid success payload; no live token exposure was shown.
   This is not a separate release gate or a reason to add generic token
@@ -507,6 +527,18 @@ shared-host transport failure without conflating per-product 401/403 errors.
 Keep results compact, preserve links/IDs as data, and offer detail by stable
 reference. No local cache/FTS or new framework before the base is complete.
 
+`%bbk-denominator-31`: In the existing release evidence, record the required
+read-only Atlassian BBK workflows and the replacement, check and result for
+each. Start from the BBK inventory, not from the subset already implemented.
+An unimplemented required workflow stays visible. This is not another
+runtime registry; non-Atlassian BBK integrations stay outside AtlaWire.
+
+`%federated-budget-31`: When the first multi-product workflow is implemented,
+bound its total logical reads across products and terms, not just rows
+returned. Choose and document the cap for that workflow, use the existing
+per-read retry policy, and report an exhausted budget separately from an
+HTTP failure or an empty result. No general scheduler or budget engine.
+
 ### 8. `%distribution-1`, `%verification-1`: The wheel and the installed CLI are not verified by a checkout
 
 [`pyproject.toml:11–16`](../../pyproject.toml#L11) pins 5.0.5;
@@ -542,7 +574,7 @@ and a fake-subprocess parity test are not fresh live evidence.
 | 1. Recover the baseline | Integrator records tracked and untracked candidate changes, keeps the verified Jira compatibility fix, and fixes the catalog round-trip and lock. In parallel gather live versions and safe fixtures through the owner. | Focused Jira, SDK, facade and catalog selection green; `uv lock --check` passes. Do not build a second throwaway wheel just for this step. |
 | 2. Prove one vertical slice | One owner wires the existing registry, product credential resolution, private SDK transport, JSON boundary and CLI discovery. Add one high-level read per product where compatible, at least one fixed fallback, and one semantic POST. Include a real continuation, an auth error and a recovered network failure. Use the prototype as input rather than making it a second public surface. | Independent documented fixture expectations; unit → installed loopback → owner-run live smoke. Root and command `--help`, `--catalog` and `--describe` work before auth. Invoke a documented example outside the checkout; exact request, response, failed-output and retry oracles pass. |
 | 3. Complete the base by product | Split Jira, Confluence and Bitbucket into non-overlapping product batches. Each batch owns its operation data, adapter exceptions and tests. Integrator owns the release inventory, shared dispatcher, credentials, CLI and docs. Classify binary, semantic POST and ambiguous permissions early rather than leave difficult routes to the end. | Reconcile the frozen inventory with discoverable canonical reads. Every required ID passes an independent installed-loopback case; record separate live status. Apply the live minimum in the test plan. No silent exclusions. |
-| 4. Finish setup and verify additive workflows | Implement the simple browser + hidden-paste setup without requiring OAuth. Reuse implemented Jira comment search, Confluence rendering, Bitbucket repo grep, PR review/diff and search work where it passes its contract. Compare BBK and AtlaWire against stable fixtures. | Setup survives cancellation/failed verification without replacing stored credentials. The deployment owner verifies enrollment for the configurations advertised at handoff. Partial-result tests, bounded work and real BBK parity evidence pass for the workflows claimed. Base discovery and calls remain available. |
+| 4. Finish setup and verify additive workflows | Implement the simple browser + hidden-paste setup without requiring OAuth. Reuse implemented Jira comment search, Confluence rendering, Bitbucket repo grep, PR review/diff and search work where it passes its contract. Compare required BBK workflows against stable fixtures. | Setup survives cancellation/failed verification without replacing stored credentials. The deployment owner verifies advertised enrollment. Partial-result tests, bounded work and required BBK parity evidence pass. Base discovery and calls remain available. |
 | 5. Freeze and hand off | Run the complete offline suite and project quality checks on the reconciled candidate. Build the final wheel, repeat clean-install discovery and smoke, and collect the owner's sanitized live receipt. Have the requested fresh PonyTail reviewer challenge the original requirements, code and tests. Independent verification of the credential/read boundary uses the approved isolated candidate, not HEAD alone. | Publish a local release report: exact artifact, commands, versions, failures/skips, known unsupported scope, quickstart and feedback. No release/sign-off with unresolved material failures or missing decisive live evidence. |
 
 Per-operation tests should share a harness, not an oracle. The harness can
