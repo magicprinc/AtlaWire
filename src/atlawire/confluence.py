@@ -1,15 +1,19 @@
 """Read operations for self-hosted Confluence.
 
-These adapters issue one fixed GET per call, return the server JSON object
-unchanged, and never follow returned links. They follow the Confluence 6.6.0
-documentation; the live version and exact response shapes are not verified.
+These adapters read only the configured instance and never follow returned
+links. Raw readers return the server JSON object unchanged; bounded readers
+expose their rows together with the server's own ``truncated``, ``total``, and
+``next`` signal so a short page cannot pass for a complete listing. Legacy
+list and raw-object shapes are kept for existing consumers. They follow the
+Confluence 6.6.0 documentation; the live version and exact response shapes are
+not verified.
 """
 
 import json
 import re
 from collections.abc import Callable, Mapping
 from hashlib import sha256
-from typing import TypedDict
+from typing import NamedTuple, TypedDict
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import requests
@@ -132,6 +136,31 @@ class ChildRow(TypedDict):
     id: str | int | None
     title: str | None
     version: int | None
+
+
+class ChildRows(TypedDict):
+    """A bounded child listing plus the server's own truncation signal.
+
+    ``total`` is the server's ``totalSize`` when it sends one and ``None``
+    otherwise; it is never derived from the returned page size.
+    """
+
+    rows: list[ChildRow]
+    truncated: bool
+    total: int | None
+
+
+class RawContentPage(TypedDict):
+    """One bounded raw comment/attachment page plus its completeness signal.
+
+    ``total`` is the server's ``totalSize`` when present and ``next`` is its
+    continuation link when it sends one; neither is followed or derived.
+    """
+
+    rows: list[dict[str, object]]
+    truncated: bool
+    total: int | None
+    next: str | None
 
 
 def page_id(value: str | int) -> str:
@@ -394,7 +423,7 @@ def search_cql(
     if limit == 0:
         return []
     with bearer_session(token) as session:
-        return _read_rows(
+        collected = _read_rows(
             session,
             f"{base}{_SEARCH_PATH}",
             {"cql": query},
@@ -404,6 +433,7 @@ def search_cql(
             project=_content_row,
             identity=_content_identity,
         )
+    return collected.rows
 
 
 def list_spaces(
@@ -425,7 +455,7 @@ def list_spaces(
     if limit == 0:
         return []
     with bearer_session(token) as session:
-        return _read_rows(
+        collected = _read_rows(
             session,
             f"{base}{_SPACE_PATH}",
             {},
@@ -435,6 +465,7 @@ def list_spaces(
             project=_space_row,
             identity=_space_identity,
         )
+    return collected.rows
 
 
 def get_space(
@@ -510,6 +541,9 @@ def list_children(
     or an empty page proves exhaustion, and any error discards rows already read
     instead of returning a partial result. A zero limit returns no rows and
     creates no session, but the base URL and parent are still validated.
+
+    Use [list_children_with_metadata][atlawire.confluence.list_children_with_metadata]
+    when a short list must not be mistaken for a complete one.
     """
     _validate_limit(limit, CHILD_LIMIT_MIN, CHILD_LIMIT_MAX)
     requested_id = page_id(page_id_or_url)
@@ -517,7 +551,7 @@ def list_children(
     if limit == 0:
         return []
     with bearer_session(token) as session:
-        return _read_rows(
+        collected = _read_rows(
             session,
             f"{base}{_CHILD_PATH.format(id=requested_id)}",
             {"expand": _CHILD_EXPAND},
@@ -527,6 +561,52 @@ def list_children(
             project=_child_row,
             identity=_child_identity,
         )
+    return collected.rows
+
+
+def list_children_with_metadata(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    limit: int = CHILD_LIMIT_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> ChildRows:
+    """Return up to ``limit`` direct child pages plus the server's own signal.
+
+    The request sequence matches
+    [list_children][atlawire.confluence.list_children], but ``truncated`` shows
+    that the server still had rows instead of returning a short list that looks
+    complete. The signal comes from ``totalSize`` when the server sends it and
+    otherwise from ``_links.next``; ``total`` is that ``totalSize`` or ``None``
+    and is never derived from a page size. A zero limit returns an empty listing
+    and creates no session.
+
+    This is a separate function because ``list_children`` returns a plain
+    ``list`` that existing callers index, iterate, and serialize; widening that
+    shape would break them, so completeness-aware callers opt in here.
+    """
+    _validate_limit(limit, CHILD_LIMIT_MIN, CHILD_LIMIT_MAX)
+    requested_id = page_id(page_id_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    if limit == 0:
+        return ChildRows(rows=[], truncated=False, total=None)
+    with bearer_session(token) as session:
+        collected = _read_rows(
+            session,
+            f"{base}{_CHILD_PATH.format(id=requested_id)}",
+            {"expand": _CHILD_EXPAND},
+            limit,
+            label="child page",
+            empty_hint="retry the request.",
+            project=_child_row,
+            identity=_child_identity,
+        )
+    return ChildRows(
+        rows=collected.rows,
+        truncated=collected.truncated,
+        total=collected.total,
+    )
 
 
 def get_page_attachments(
@@ -544,6 +624,9 @@ def get_page_attachments(
     object, including pagination metadata and unknown fields, is returned
     unchanged; continuation links are never followed. The 6.6.0 docs show a flat
     object, but fields are not guaranteed across Confluence versions.
+
+    [get_page_attachments_with_metadata][atlawire.confluence.get_page_attachments_with_metadata]
+    reports the same rows with the server's completeness signal.
     """
     return _read_content_page(
         base_url,
@@ -554,6 +637,43 @@ def get_page_attachments(
         start=start,
         limit=limit,
         allow_http_loopback=allow_http_loopback,
+    )
+
+
+def get_page_attachments_with_metadata(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    start: int = PAGE_START_MIN,
+    limit: int = ATTACHMENT_LIMIT_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> RawContentPage:
+    """Return one bounded attachment page plus its explicit completeness signal.
+
+    Sends only ``start`` and ``limit``, like
+    [get_page_attachments][atlawire.confluence.get_page_attachments], and
+    returns the page's ``results`` rows with ``truncated``, the server's
+    ``totalSize`` (as ``total``), and its ``_links.next`` continuation (as
+    ``next``). ``truncated`` comes from ``totalSize`` when the server sends it
+    and otherwise from ``next``; ``total`` stays ``None`` when the server omits
+    ``totalSize`` and is never guessed from the page size. A continuation is
+    never followed.
+
+    This is a separate function because ``get_page_attachments`` returns the
+    raw server object unchanged, which existing consumers and the CLI raw-JSON
+    output rely on; the explicit metadata is opt-in.
+    """
+    return _read_content_page_rows(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_ATTACHMENT_PATH,
+        fixed_params={},
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+        label="attachment",
     )
 
 
@@ -575,6 +695,9 @@ def get_page_comments(
     default. The raw JSON object is returned unchanged and links are never
     followed; one page may still be incomplete. The 6.6.0 docs show a
     content-type-keyed map, but no response shape is assumed.
+
+    [get_page_comments_with_metadata][atlawire.confluence.get_page_comments_with_metadata]
+    reports the same rows with the server's completeness signal.
     """
     _validate_include_replies(include_replies)
     fixed_params = {"expand": _COMMENT_EXPAND}
@@ -589,6 +712,47 @@ def get_page_comments(
         start=start,
         limit=limit,
         allow_http_loopback=allow_http_loopback,
+    )
+
+
+def get_page_comments_with_metadata(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    start: int = PAGE_START_MIN,
+    limit: int = COMMENT_LIMIT_DEFAULT,
+    include_replies: bool = True,
+    allow_http_loopback: bool = False,
+) -> RawContentPage:
+    """Return one bounded comment page plus its explicit completeness signal.
+
+    Sends ``start``, ``limit``, ``expand=body.storage``, and by default
+    ``depth=all``, like
+    [get_page_comments][atlawire.confluence.get_page_comments]. ``truncated``
+    comes from the server's ``totalSize`` when present and otherwise from its
+    ``_links.next``; ``total`` is that ``totalSize`` or ``None`` and is never
+    derived locally. The raw comment rows are returned as ``rows`` and a
+    continuation is never followed.
+
+    This is a separate function because ``get_page_comments`` returns the raw
+    server object unchanged, which existing consumers and the CLI raw-JSON
+    output rely on; the explicit metadata is opt-in.
+    """
+    _validate_include_replies(include_replies)
+    fixed_params = {"expand": _COMMENT_EXPAND}
+    if include_replies:
+        fixed_params["depth"] = _COMMENT_DEPTH_ALL
+    return _read_content_page_rows(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_COMMENT_PATH,
+        fixed_params=fixed_params,
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+        label="comment",
     )
 
 
@@ -643,6 +807,42 @@ def _read_content_page(
         )
 
 
+def _read_content_page_rows(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    path: str,
+    fixed_params: Mapping[str, str],
+    start: int,
+    limit: int,
+    allow_http_loopback: bool,
+    label: str,
+) -> RawContentPage:
+    """Read one content page and project its rows plus the server's signal."""
+    document = _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=path,
+        fixed_params=fixed_params,
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+    results, total = _page(document, start, limit, label)
+    links = document.get("_links", {})
+    next_link = links.get("next") if isinstance(links, dict) else None
+    if next_link is not None:
+        _check_next(next_link, len(results), start, label)
+    return RawContentPage(
+        rows=results,
+        truncated=_page_has_more(document, total, start + len(results)),
+        total=total,
+        next=next_link if isinstance(next_link, str) else None,
+    )
+
+
 def _validate_include_replies(include_replies: bool) -> None:
     if not isinstance(include_replies, bool):
         raise AtlaWireError("The include_replies option must be a boolean.")
@@ -664,6 +864,14 @@ def _validate_limit(limit: int, minimum: int, maximum: int) -> None:
         raise AtlaWireError(f"The row limit must be between {minimum} and {maximum}.")
 
 
+class _RowsPage[RowT](NamedTuple):
+    """Rows collected by the pager plus the last page's own completeness signal."""
+
+    rows: list[RowT]
+    truncated: bool
+    total: int | None
+
+
 def _read_rows[RowT](
     session: requests.Session,
     url: str,
@@ -674,7 +882,8 @@ def _read_rows[RowT](
     empty_hint: str,
     project: Callable[[dict[str, object]], RowT],
     identity: Callable[[dict[str, object]], str | None],
-) -> list[RowT]:
+) -> _RowsPage[RowT]:
+    """Read up to ``limit`` rows and report whether the server had more."""
     rows: list[RowT] = []
     seen_ids: set[str] = set()
     seen_fallback_pages: set[bytes] = set()
@@ -703,11 +912,18 @@ def _read_rows[RowT](
                     f"Confluence {label} returned an empty page before all "
                     f"matches; {empty_hint}"
                 )
-            return rows
+            return _RowsPage(rows=rows, truncated=False, total=known_total)
         _check_repeated_rows(results, identity, seen_ids, seen_fallback_pages, label)
         # A server cap may shorten a page; the next offset uses the actual rows.
         rows.extend(project(result) for result in results)
-    return rows
+        if len(rows) >= limit:
+            return _RowsPage(
+                rows=rows,
+                truncated=_page_has_more(page, known_total, len(rows)),
+                total=known_total,
+            )
+    # The validated limits are positive, so this fallback only serves limit=0.
+    return _RowsPage(rows=rows, truncated=False, total=known_total)
 
 
 def _check_repeated_rows(
