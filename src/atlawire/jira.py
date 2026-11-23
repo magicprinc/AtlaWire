@@ -5,14 +5,17 @@ from typing import TypedDict, TypeGuard
 from urllib.parse import urlsplit
 
 import requests
+from atlassian.errors import ApiError
 
 from atlawire.http import (
+    _TRANSPORT_MESSAGE,
     AtlaWireError,
     bearer_session,
     get_json_array,
     get_json_object,
     normalize_base_url,
 )
+from atlawire.sdk import ReadOnlyClient, client_for
 
 _ISSUE_KEY = r"[A-Z][A-Z0-9_]*-[0-9]+"
 _SEARCH_FIELDS = "summary,status,priority,issuetype,assignee,updated"
@@ -88,22 +91,71 @@ def _issue_key(key_or_url: str) -> str:
     raise AtlaWireError(message)
 
 
+def _sdk_error(error: BaseException) -> AtlaWireError:
+    """Translate one library failure into a sanitized AtlaWireError.
+
+    The library puts the response text, and for some routes the bearer token,
+    into its own exception message. Only the arrived status is read from it, so
+    neither reaches the diagnostic or the traceback. An HTTP status keeps the
+    shared 401/403 meaning and its real value; a failure before a response is a
+    transport error.
+    """
+    if isinstance(error, requests.HTTPError):
+        response = error.response
+        status = response.status_code if response is not None else None
+        if status is None:
+            return AtlaWireError("Jira request failed.", method="GET")
+        if status == 401:
+            message = "HTTP 401: authentication rejected."
+        elif status == 403:
+            message = "HTTP 403: access denied."
+        else:
+            message = f"HTTP {status}: request failed."
+        return AtlaWireError(
+            message,
+            category="http",
+            http_status=status,
+            method="GET",
+        )
+    if isinstance(error, requests.Timeout):
+        return AtlaWireError("Request timed out.", category="transport", method="GET")
+    if isinstance(error, requests.RequestException):
+        return AtlaWireError(_TRANSPORT_MESSAGE, category="transport", method="GET")
+    return AtlaWireError("Jira request failed.", method="GET")
+
+
+def _json_object(value: object) -> dict[str, object]:
+    """Return one library payload only when it is a JSON object."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a JSON object.", category="upstream")
+    return value
+
+
 def get_issue(
     base_url: str,
     key_or_url: str,
     *,
     token: str,
+    expand: str = "renderedFields",
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
-    """Return the Jira issue JSON with rendered fields from the configured instance."""
+    """Return the Jira issue JSON with rendered fields from the configured instance.
+
+    The one read goes through the library ``Jira.get_issue``; its failures are
+    translated into one sanitized [AtlaWireError][atlawire.http.AtlaWireError]
+    that keeps the real HTTP status. Every response field is returned unchanged.
+    """
     key = _issue_key(key_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        issue = get_json_object(
-            session,
-            f"{base}/rest/api/2/issue/{key}",
-            params={"expand": "renderedFields"},
-        )
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            issue = _json_object(client.get_issue(key, expand=expand, fields=None))
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     # The returned key can legitimately differ from the requested one after a
     # move, so only its own syntax is checked; equality is not pinned.
     if not _valid_issue_key(issue.get("key")) or not isinstance(
@@ -346,10 +398,82 @@ def search_issues(
         raise AtlaWireError(
             f"The row limit must be between {SEARCH_LIMIT_MIN} and {SEARCH_LIMIT_MAX}."
         )
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    url = f"{base}/rest/api/2/search"
-    with bearer_session(token) as session:
-        return _read_search(session, url, query, limit)
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            return _read_search(client, query, limit)
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
+
+
+def search_raw(
+    base_url: str,
+    jql: str,
+    *,
+    token: str,
+    fields: str = "*all",
+    limit: int | None = None,
+    start: int = 0,
+    expand: str | None = None,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one Jira search envelope exactly as the server sent it.
+
+    A thin parity call for consumers that read ``issues`` themselves: no
+    projection and no pagination. ``fields="*all"`` and the other query values
+    are forwarded to the library ``Jira.jql``; exactly one request is sent, so a
+    capped envelope stays visible instead of being reported as complete.
+    """
+    _check_raw_search(jql, fields, limit, start, expand)
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            return _json_object(
+                client.jql(
+                    jql,
+                    fields=fields,
+                    start=start,
+                    limit=limit,
+                    expand=expand,
+                )
+            )
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
+
+
+def _check_raw_search(
+    jql: object, fields: object, limit: object, start: object, expand: object
+) -> None:
+    """Reject unusable raw search input before a client or request exists."""
+    if not isinstance(jql, str) or not jql.strip():
+        raise AtlaWireError("Expected a non-empty JQL query.")
+    try:
+        jql.encode("utf-8")
+    except UnicodeEncodeError:
+        raise AtlaWireError("Expected the JQL query as valid UTF-8 text.") from None
+    if not isinstance(fields, str) or not fields.strip():
+        raise AtlaWireError("Expected non-empty Jira search fields.")
+    if limit is not None and (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not SEARCH_LIMIT_MIN <= limit <= SEARCH_LIMIT_MAX
+    ):
+        raise AtlaWireError(
+            "The row limit must be between "
+            f"{SEARCH_LIMIT_MIN} and {SEARCH_LIMIT_MAX}, or null."
+        )
+    if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+        raise AtlaWireError("Expected a non-negative Jira search start index.")
+    if expand is not None and (not isinstance(expand, str) or not expand.strip()):
+        raise AtlaWireError("Expected non-empty Jira search expand text.")
 
 
 def _check_status_name(status: str) -> None:
@@ -759,24 +883,20 @@ def _user_text(value: object, label: str) -> str:
     return value
 
 
-def _read_search(
-    session: requests.Session, url: str, query: str, limit: int
-) -> list[IssueRow]:
+def _read_search(client: ReadOnlyClient, query: str, limit: int) -> list[IssueRow]:
     rows: list[IssueRow] = []
     seen_keys: set[str] = set()
     known_total: int | None = None
     while len(rows) < limit:
         start = len(rows)
         requested = limit - start
-        page = get_json_object(
-            session,
-            url,
-            params={
-                "jql": query,
-                "fields": _SEARCH_FIELDS,
-                "startAt": start,
-                "maxResults": requested,
-            },
+        page = _json_object(
+            client.jql(
+                query,
+                fields=_SEARCH_FIELDS,
+                start=start,
+                limit=requested,
+            )
         )
         issues, reported_total = _search_page(page, start)
         if reported_total is not None:

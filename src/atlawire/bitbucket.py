@@ -8,6 +8,7 @@ from typing import TypedDict
 from urllib.parse import quote
 
 import requests
+from atlassian.errors import ApiError
 
 from atlawire.http import (
     AtlaWireError,
@@ -18,6 +19,7 @@ from atlawire.http import (
     normalize_base_url,
     reject_credential_echo,
 )
+from atlawire.sdk import client_for
 
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
@@ -69,6 +71,9 @@ _DIFF_TEXT_UNSAFE = re.compile(
     r"\ud800-\udfff]"
 )
 _DIFF_LINE_BREAKS = ("\r", "\n", "\u2028", "\u2029")
+# The repository file read keeps the shared 1 MiB text budget; the library
+# returns the whole body as bytes, so the cap applies to its byte length.
+_FILE_TEXT_LIMIT = 1024 * 1024
 
 
 class DeclaredTruncationError(AtlaWireError):
@@ -345,21 +350,60 @@ def get_repository_file(
 
     ``repo`` is ``PROJECT/slug`` and ``path`` is a relative Git path with safe
     segments. The revision defaults to ``master`` and is sent only as the
-    ``at`` query parameter. The call makes one streamed raw request with
-    ``Accept: text/plain``; content is limited and validated by
-    [get_text][atlawire.http.get_text], so an oversize, non-text, or non-UTF-8
-    response raises without returning partial text.
+    ``at`` query parameter. One read runs through the library's
+    [get_content_of_file][atlassian.Bitbucket.get_content_of_file] method on a
+    client from [client_for][atlawire.sdk.client_for]; the library returns the
+    body as bytes, so the 1 MiB cap applies to its byte length and the bytes
+    must be strict UTF-8. An oversize or non-UTF-8 response raises without
+    returning partial text. The client is closed in a ``finally`` and a
+    library HTTP failure is translated to a sanitized
+    [AtlaWireError][atlawire.http.AtlaWireError] that keeps the status.
     """
     revision = _revision(at)
     segments = _file_segments(path)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
-    with bearer_session(token) as session:
-        return get_text(
-            session,
-            _raw_file_url(base, project, slug, segments),
-            params={"at": revision},
+    client = client_for(
+        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        payload = client.get_content_of_file(
+            project, slug, _encoded_path(segments), at=revision, markup=None
         )
+    except (requests.HTTPError, ApiError) as error:
+        response = getattr(error, "response", None)
+        status = getattr(response, "status_code", None)
+        if status == 401:
+            message = "HTTP 401: authentication rejected."
+        elif status == 403:
+            message = "HTTP 403: access denied."
+        elif status is None:
+            message = "The server rejected the request."
+        else:
+            message = f"HTTP {status}: request failed."
+        raise AtlaWireError(
+            message, category="http", http_status=status, method="GET"
+        ) from None
+    except requests.Timeout:
+        raise AtlaWireError(
+            "Request timed out.", category="transport", method="GET"
+        ) from None
+    except requests.RequestException:
+        raise AtlaWireError(
+            "Request failed; check connectivity and TLS settings.",
+            category="transport",
+            method="GET",
+        ) from None
+    finally:
+        client.close()
+    if len(payload) > _FILE_TEXT_LIMIT:
+        raise AtlaWireError(
+            "The text response exceeds the 1 MiB limit.", category="upstream"
+        )
+    try:
+        return payload.decode("utf-8")
+    except UnicodeDecodeError:
+        raise AtlaWireError("Expected UTF-8 text.", category="upstream") from None
 
 
 def get_file_blame(

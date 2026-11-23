@@ -32,6 +32,7 @@ from atlawire.http import (
     _TRANSPORT_MESSAGE,
     AtlaWireError,
     _NoRedirectSession,
+    bearer_session,
     normalize_base_url,
 )
 
@@ -260,10 +261,17 @@ def _raw_client_for(
     no-redirect session with ``trust_env`` disabled and handed to the library,
     which then applies its own headers, auth, verify/cert and proxy state on top
     of it.
+
+    The token is validated by the shared session factory before any client
+    exists, and the library's own 429 retry is disabled: this adapter owns
+    attempts and delays.
     """
     client_class = _CLIENTS.get(product)
     if client_class is None:
         raise AtlaWireError("Unknown Atlassian product.", category="validation")
+    # One authoritative credential rule: creating and closing this session
+    # performs no request, so an invalid token fails closed before the client.
+    bearer_session(token).close()
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     session = _NoRedirectSession()
     # Ambient netrc/proxy/CA state must not alter the explicit transport.
@@ -277,6 +285,8 @@ def _raw_client_for(
         session=session,
         # The library must not retry: this module owns attempts and delays.
         backoff_and_retry=False,
+        # A Retry-After 429 retry inside the library would double one request.
+        retry_with_header=False,
     )
 
 

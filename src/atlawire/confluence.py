@@ -13,6 +13,7 @@ from typing import TypedDict
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import requests
+from atlassian.errors import ApiError
 
 from atlawire.http import (
     AtlaWireError,
@@ -20,6 +21,7 @@ from atlawire.http import (
     get_json_object,
     normalize_base_url,
 )
+from atlawire.sdk import client_for
 
 _PAGE_EXPAND = "body.storage,version,space,ancestors"
 _HISTORY_PATH = "/rest/api/content/{id}/history"
@@ -137,18 +139,51 @@ def get_page(
 ) -> dict[str, object]:
     """Return the Confluence page JSON from the configured instance.
 
-    The server payload is returned unchanged; only its identity, type, title,
-    and ``body.storage.value`` are validated. The configured base URL is always
-    the request destination, even when a page link is supplied.
+    Reads one page through the library client's ``get_page_by_id`` method; the
+    payload is returned unchanged, and the configured base URL stays the
+    destination. Only its identity, type, title, and storage body are validated.
     """
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        page = get_json_object(
-            session,
-            f"{base}/rest/api/content/{requested_id}",
-            params={"expand": _PAGE_EXPAND},
-        )
+    client = client_for(
+        "confluence", base, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        page = client.get_page_by_id(requested_id, expand=_PAGE_EXPAND)
+    except (requests.HTTPError, ApiError) as error:
+        # Keep only the real status: the library message may quote the body.
+        cause = error.reason if isinstance(error, ApiError) else error
+        status = getattr(getattr(cause, "response", None), "status_code", None)
+        if status is None:
+            raise AtlaWireError(
+                "Request failed; check connectivity and TLS settings.",
+                category="transport",
+                method="GET",
+            ) from None
+        known = {
+            401: "HTTP 401: authentication rejected.",
+            403: "HTTP 403: access denied.",
+        }
+        raise AtlaWireError(
+            known.get(status, f"HTTP {status}: request failed."),
+            category="http",
+            http_status=status,
+            method="GET",
+        ) from None
+    except requests.Timeout:
+        raise AtlaWireError(
+            "Request timed out.", category="transport", method="GET"
+        ) from None
+    except requests.RequestException:
+        raise AtlaWireError(
+            "Request failed; check connectivity and TLS settings.",
+            category="transport",
+            method="GET",
+        ) from None
+    finally:
+        client.close()
+    if not isinstance(page, dict):
+        raise AtlaWireError("Expected a JSON object.", category="upstream")
     return _validated_page(page, requested_id)
 
 
