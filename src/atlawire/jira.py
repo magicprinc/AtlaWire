@@ -26,6 +26,10 @@ COMMENT_PAGES_MAX = 1000
 COMMENT_PAGES_DEFAULT = 100
 _COMMENT_PAGE_SIZE = 50
 _SEARCH_ALL_PAGE_SIZE = 100
+_WORKLOG_PAGE_SIZE = 50
+WORKLOG_PAGES_MIN = 1
+WORKLOG_PAGES_MAX = 1000
+WORKLOG_PAGES_DEFAULT = 100
 USER_RESULTS_MIN = 1
 USER_RESULTS_MAX = 1000
 USER_RESULTS_DEFAULT = 50
@@ -43,6 +47,28 @@ class IssueRow(TypedDict):
     assignee: str | None
     updated: str
     summary: str
+
+
+class IssueSearchMetadata(TypedDict):
+    """Результат поиска задач с признаком неполноты и заявленным ``total``.
+
+    ``truncated`` истинно, когда выдача заведомо или возможно урезана:
+    известный ``total`` больше ``rows`` либо сервер не сообщил ``total``, а
+    лимит достигнут. ``total`` — последнее значение, которое прислал сервер;
+    ``None`` означает, что сервер его не сообщил.
+    """
+
+    rows: list[IssueRow]
+    truncated: bool
+    total: int | None
+
+
+class RawIssueSearchMetadata(TypedDict):
+    """Сырые задачи Jira с тем же признаком неполноты, что у IssueSearchMetadata."""
+
+    rows: list[dict[str, object]]
+    truncated: bool
+    total: int | None
 
 
 class TransitionRow(TypedDict):
@@ -194,7 +220,8 @@ def get_issue_worklogs(
     configured ``base_url``. ``startAt``, ``maxResults``, ``total``, and every
     worklog row are preserved unchanged, so a capped page stays visible
     instead of being reported as complete. The fixed read is the 8.22
-    ``/rest/api/2/issue/{key}/worklog`` endpoint.
+    ``/rest/api/2/issue/{key}/worklog`` endpoint. Use
+    :func:`list_issue_worklogs` for a validated full traversal with a budget.
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
@@ -223,7 +250,9 @@ def get_issue_changelog(
     the key is taken from ``key_or_url``; every request goes to the configured
     ``base_url``. The returned document keeps ``startAt``, ``maxResults``,
     ``total``, all histories, and unknown fields unchanged. A capped history
-    therefore stays visible instead of being reported as complete.
+    therefore stays visible instead of being reported as complete. Use
+    :func:`list_issue_changelog` for the complete history or an explicit
+    truncation error.
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
@@ -242,6 +271,176 @@ def get_issue_changelog(
     for value in histories:
         _reference_object(value, "change history")
     return changelog
+
+
+def list_issue_worklogs(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    max_pages: int = WORKLOG_PAGES_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Вернуть все записи о трудозатратах задачи или явно сообщить об обрезке.
+
+    Читается ``GET /rest/api/2/issue/{key}/worklog`` со смещением ``startAt``:
+    обход идёт, пока прочитанные строки не покроют заявленный ``total``,
+    поэтому неполная выдача не возвращается молча. ``max_pages`` ограничивает
+    число запросов (1..1000, по умолчанию 100); исчерпанный бюджет —
+    ``AtlaWireError``, а не частичный список. Каждая страница проверяется до
+    публикации: ``startAt`` должен совпасть с запрошенным, ``total`` — не
+    меняться, строк не больше ``maxResults`` и запрошенного размера. Сервер,
+    игнорирующий ``startAt`` (таков проверенный 8.22.2), отвергается по
+    несовпадению эха, а не превращается в тихий повтор первой страницы. Строки
+    возвращаются как пришли, включая неизвестные поля.
+    """
+    key = _issue_key(key_or_url)
+    _check_worklog_pages(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{base}/rest/api/2/issue/{key}/worklog"
+    with bearer_session(token) as session:
+        return _read_worklogs(session, url, max_pages)
+
+
+def _check_worklog_pages(max_pages: int) -> None:
+    if (
+        not isinstance(max_pages, int)
+        or isinstance(max_pages, bool)
+        or not WORKLOG_PAGES_MIN <= max_pages <= WORKLOG_PAGES_MAX
+    ):
+        raise AtlaWireError(
+            "The page limit must be between "
+            f"{WORKLOG_PAGES_MIN} and {WORKLOG_PAGES_MAX}."
+        )
+
+
+def _read_worklogs(
+    session: requests.Session, url: str, max_pages: int
+) -> list[dict[str, object]]:
+    """Прочитать все страницы worklog и вернуть строки без потерь."""
+    rows: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+    start = 0
+    total: int | None = None
+    for _ in range(max_pages):
+        page = get_json_object(
+            session,
+            url,
+            params={"startAt": start, "maxResults": _WORKLOG_PAGE_SIZE},
+        )
+        worklogs, reported_total = _worklog_page(page, start, total)
+        total = reported_total
+        if not worklogs:
+            return rows
+        for value in worklogs:
+            row = _reference_object(value, "worklog")
+            row_id = row.get("id")
+            if isinstance(row_id, str):
+                if row_id in seen_ids:
+                    raise AtlaWireError("Jira returned duplicate worklog IDs.")
+                seen_ids.add(row_id)
+            rows.append(row)
+        start += len(worklogs)
+        if start == total:
+            return rows
+    raise AtlaWireError(
+        "Jira worklogs exceeded the page limit; raise max_pages or retry."
+    )
+
+
+def _worklog_page(
+    page: dict[str, object], start: int, expected_total: int | None
+) -> tuple[list[object], int]:
+    """Проверить одну страницу worklog и вернуть её строки и общий ``total``."""
+    reported_start = page.get("startAt")
+    if (
+        not isinstance(reported_start, int)
+        or isinstance(reported_start, bool)
+        or reported_start != start
+    ):
+        raise AtlaWireError(
+            "Expected Jira worklogs startAt to match the requested offset."
+        )
+    total = page.get("total")
+    if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+        raise AtlaWireError("Invalid Jira worklogs total.")
+    if expected_total is not None and total != expected_total:
+        raise AtlaWireError("Jira worklogs total changed between pages.")
+    worklogs = page.get("worklogs")
+    if not isinstance(worklogs, list):
+        raise AtlaWireError("Expected a Jira worklogs array.")
+    if not worklogs:
+        if total != start:
+            raise AtlaWireError(
+                "Jira worklogs ended before all worklogs were read."
+            )
+        return worklogs, total
+    advertised = page.get("maxResults")
+    if (
+        not isinstance(advertised, int)
+        or isinstance(advertised, bool)
+        or advertised <= 0
+    ):
+        raise AtlaWireError("Invalid Jira worklogs maxResults.")
+    if len(worklogs) > advertised:
+        raise AtlaWireError("Jira returned more worklogs than maxResults.")
+    if len(worklogs) > _WORKLOG_PAGE_SIZE:
+        raise AtlaWireError("Jira returned more worklogs than requested.")
+    if total < start + len(worklogs):
+        raise AtlaWireError("Inconsistent Jira worklogs pagination metadata.")
+    return worklogs, total
+
+
+def list_issue_changelog(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Вернуть полную историю changelog задачи или явно сообщить об обрезке.
+
+    Читается ``GET /rest/api/2/issue/{key}?expand=changelog``. На проверенном
+    8.22.2 этот ответ содержит всю историю (``maxResults`` равен ``total``), а
+    отдельного ресурса пагинации changelog у этой версии нет
+    (``/rest/api/2/issue/{key}/changelog`` отвечает 404). Поэтому неполная
+    страница не выдаётся как результат: если ``total`` больше числа
+    ``histories``, поднимается ``AtlaWireError`` с обоими числами. Полная
+    история возвращается как пришла, включая неизвестные поля.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        issue = get_json_object(
+            session,
+            f"{base}/rest/api/2/issue/{key}",
+            params={"expand": "changelog"},
+        )
+    changelog = issue.get("changelog")
+    if not isinstance(changelog, dict):
+        raise AtlaWireError("Expected a Jira changelog document.")
+    histories = changelog.get("histories")
+    if not isinstance(histories, list):
+        raise AtlaWireError("Expected a Jira changelog histories array.")
+    total = changelog.get("total")
+    if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+        raise AtlaWireError("Invalid Jira changelog total.")
+    reported_start = changelog.get("startAt")
+    if reported_start is not None and (
+        not isinstance(reported_start, int)
+        or isinstance(reported_start, bool)
+        or reported_start != 0
+    ):
+        raise AtlaWireError("Expected Jira changelog startAt to be zero.")
+    if len(histories) > total:
+        raise AtlaWireError("Inconsistent Jira changelog pagination metadata.")
+    if len(histories) < total:
+        raise AtlaWireError(
+            "Jira returned an incomplete changelog: "
+            f"{len(histories)} of {total} histories; "
+            "this Jira version offers no changelog paging endpoint."
+        )
+    return [_reference_object(value, "change history") for value in histories]
 
 
 def list_issue_comments(
@@ -395,7 +594,7 @@ def search_raw(
     jql: str,
     *,
     token: str,
-    fields: str = "*all",
+    fields: str | list[str] = "*all",
     limit: int | None = None,
     start: int = 0,
     expand: str | None = None,
@@ -406,11 +605,13 @@ def search_raw(
     Exactly one GET is sent: ``limit`` and ``expand`` are omitted when ``None``,
     the body is returned unchanged including unknown keys, and nothing is
     paginated or projected. Every argument is checked before a session exists.
+    ``fields`` is either a string sent verbatim or a list joined with commas in
+    the given order, matching :func:`search_all_issues`; an empty selection is
+    rejected before any request.
     """
     if not isinstance(jql, str) or not jql.strip():
         raise AtlaWireError("Expected a non-empty JQL query.")
-    if not isinstance(fields, str) or not fields.strip():
-        raise AtlaWireError("Expected non-empty Jira search fields.")
+    selected = _search_fields_value(fields)
     if not isinstance(start, int) or isinstance(start, bool) or start < 0:
         raise AtlaWireError("Expected a non-negative Jira search start index.")
     if limit is not None and (
@@ -423,7 +624,11 @@ def search_raw(
         )
     if expand is not None and not isinstance(expand, str):
         raise AtlaWireError("Expected the Jira search expand as text.")
-    params: dict[str, str | int] = {"jql": jql, "fields": fields, "startAt": start}
+    params: dict[str, str | int] = {
+        "jql": jql,
+        "fields": selected,
+        "startAt": start,
+    }
     if limit is not None:
         params["maxResults"] = limit
     if expand is not None:
@@ -449,7 +654,36 @@ def search_issues(
     page short of it fails instead of claiming a complete result. The page
     size follows the ``maxResults`` echo, and the undocumented ``isLast``
     flag is ignored. Any error discards rows already read instead of
-    returning a partial result.
+    returning a partial result. The list itself cannot show that more rows
+    exist; use :func:`search_issues_with_metadata` when a capped result must
+    be visible to the caller.
+    """
+    return search_issues_with_metadata(
+        base_url,
+        query,
+        token=token,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )["rows"]
+
+
+def search_issues_with_metadata(
+    base_url: str,
+    query: str,
+    *,
+    token: str,
+    limit: int = 50,
+    allow_http_loopback: bool = False,
+) -> IssueSearchMetadata:
+    """Вернуть строки поиска вместе с признаком неполноты и заявленным ``total``.
+
+    Форма ответа — ``{"rows": [...], "truncated": bool, "total": int | None}``;
+    :func:`search_issues` остаётся прежним списком и делегирует сюда. Если
+    известный ``total`` больше числа строк, выдача урезана лимитом; если
+    сервер не прислал ``total`` и лимит достигнут, полноту доказать нельзя,
+    поэтому ``truncated`` тоже истинно — ложного «всё прочитано» нет.
+    Дополнительного запроса ради признака неполноты не делается; ``total`` —
+    последнее значение, которое прислал сервер (``None``, если не прислал).
     """
     if not query.strip():
         raise AtlaWireError("Expected a non-empty JQL query.")
@@ -464,7 +698,8 @@ def search_issues(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/search"
     with bearer_session(token) as session:
-        return _read_search(session, url, query, limit)
+        rows, truncated, total = _read_search(session, url, query, limit)
+    return IssueSearchMetadata(rows=rows, truncated=truncated, total=total)
 
 
 def search_all_issues(
@@ -497,10 +732,43 @@ def search_all_issues(
     ``isLast`` is not part of the documented Jira 8.22 search response and is
     ignored. Every issue is returned unchanged, so unknown and nested fields
     are preserved; no projection, deduplication, or extra request is performed.
+    The list itself cannot show that ``limit`` cut the traversal; use
+    :func:`search_all_issues_with_metadata` when that must be visible.
+    """
+    return search_all_issues_with_metadata(
+        base_url,
+        jql,
+        token=token,
+        fields=fields,
+        limit=limit,
+        max_pages=max_pages,
+        allow_http_loopback=allow_http_loopback,
+    )["rows"]
+
+
+def search_all_issues_with_metadata(
+    base_url: str,
+    jql: str,
+    *,
+    token: str,
+    fields: str | list[str] = "*all",
+    limit: int | None = None,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> RawIssueSearchMetadata:
+    """Вернуть сырые задачи вместе с признаком неполноты и заявленным ``total``.
+
+    Форма ответа — ``{"rows": [...], "truncated": bool, "total": int | None}``;
+    :func:`search_all_issues` остаётся прежним списком и делегирует сюда. При
+    ``limit=None`` обход полный и ``truncated`` ложно. Если лимит достигнут,
+    ``truncated`` истинно при известном ``total`` больше числа строк, а при
+    отсутствии ``total`` — консервативно, потому что полноту доказать нельзя.
+    Дополнительного запроса ради метаданных не делается. Прочие параметры и
+    ограничения совпадают с :func:`search_all_issues`.
     """
     if not isinstance(jql, str) or not jql.strip():
         raise AtlaWireError("Expected a non-empty JQL query.")
-    selected = _all_search_fields(fields)
+    selected = _search_fields_value(fields)
     if limit is not None and (
         not isinstance(limit, int) or isinstance(limit, bool) or limit < 1
     ):
@@ -514,7 +782,10 @@ def search_all_issues(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/search"
     with bearer_session(token) as session:
-        return _read_all_issues(session, url, jql, selected, limit, max_pages)
+        rows, truncated, total = _read_all_issues(
+            session, url, jql, selected, limit, max_pages
+        )
+    return RawIssueSearchMetadata(rows=rows, truncated=truncated, total=total)
 
 
 def titles(
@@ -1205,7 +1476,14 @@ def _user_text(value: object, label: str) -> str:
 
 def _read_search(
     session: requests.Session, url: str, query: str, limit: int
-) -> list[IssueRow]:
+) -> tuple[list[IssueRow], bool, int | None]:
+    """Прочитать не более ``limit`` строк и вернуть ``(rows, truncated, total)``.
+
+    ``truncated`` считается из уже полученных ответов: известный ``total``
+    больше числа строк означает обрезку лимитом; если сервер не прислал
+    ``total``, а лимит достигнут, полноту доказать нельзя, поэтому результат
+    тоже помечается неполным. Второго запроса ради этого флага нет.
+    """
     rows: list[IssueRow] = []
     seen_keys: set[str] = set()
     known_total: int | None = None
@@ -1235,7 +1513,7 @@ def _read_search(
             raise AtlaWireError("Inconsistent Jira search pagination metadata.")
         if not issues:
             _check_search_end(start, known_total)
-            return rows
+            return rows, False, known_total
         if advertised is not None:
             page_size = advertised
         # A server cap can return fewer rows than requested, so advance by what
@@ -1249,8 +1527,9 @@ def _read_search(
             seen_keys.add(row["key"])
             rows.append(row)
         if known_total is not None and len(rows) == known_total:
-            return rows
-    return rows
+            return rows, False, known_total
+    # Лимит достигнут: без серверного ``total`` полнота не доказана.
+    return rows, known_total is None or known_total > len(rows), known_total
 
 
 def _check_search_end(offset: int, known_total: int | None) -> None:
@@ -1305,14 +1584,19 @@ def _search_page(
     return issues, total, advertised
 
 
-def _all_search_fields(fields: str | list[str]) -> str:
-    """Return the ``fields`` query value, rejecting empty selections."""
+def _search_fields_value(fields: str | list[str]) -> str:
+    """Вернуть значение ``fields`` для query, отвергая пустой выбор.
+
+    Одна проверка на :func:`search_raw` и :func:`search_all_issues`: строка
+    уходит как есть, список — через запятую в заданном порядке, пустая строка
+    или список падают до запроса.
+    """
     if isinstance(fields, str):
         if not fields.strip():
             raise AtlaWireError("Expected non-empty Jira search fields.")
         return fields
     if not isinstance(fields, list) or not fields:
-        raise AtlaWireError("Expected Jira search fields as a non-empty list.")
+        raise AtlaWireError("Expected non-empty Jira search fields.")
     for field in fields:
         if not isinstance(field, str) or not field.strip():
             raise AtlaWireError("Expected non-empty Jira search fields.")
@@ -1326,11 +1610,13 @@ def _read_all_issues(
     fields: str,
     limit: int | None,
     max_pages: int,
-) -> list[dict[str, object]]:
-    """Page the JQL search and return every raw issue object in order.
+) -> tuple[list[dict[str, object]], bool, int | None]:
+    """Page the JQL search and return ``(rows, truncated, total)``.
 
     At most ``max_pages`` requests are sent; an exhausted budget raises
-    instead of returning the rows read so far.
+    instead of returning the rows read so far. ``truncated`` is true only when
+    ``limit`` stopped the traversal before the server proved completeness, so
+    a caller sees a cut result without an extra request.
     """
     rows: list[dict[str, object]] = []
     start = 0
@@ -1357,12 +1643,14 @@ def _read_all_issues(
             raise AtlaWireError("Inconsistent Jira search pagination metadata.")
         rows.extend(issues)
         if limit is not None and len(rows) >= limit:
-            return rows
+            # Лимит остановил обход: полноту подтверждает только ``total``.
+            truncated = total is None or total > len(rows)
+            return rows, truncated, total
         if not issues:
             _check_search_end(start, total)
-            return rows
+            return rows, False, total
         if total is not None and start + len(issues) >= total:
-            return rows
+            return rows, False, total
         start += len(issues)
     raise AtlaWireError(
         "Jira search exceeded the page limit; narrow the query or raise max_pages."
