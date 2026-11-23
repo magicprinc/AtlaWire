@@ -24,6 +24,10 @@ BIDI_CONTROLS = (
 )
 BIDI_ESCAPES = "".join(f"\\u{ord(char):04x}" for char in BIDI_CONTROLS)
 
+# Environment mode validates the bearer token before any request, so the CLI
+# tests that never reach the network still need a syntactically valid value.
+SYNTHETIC_JIRA_TOKEN = "synthetic-test-token"
+
 
 def assert_no_raw_controls(text: str) -> None:
     for char in text:
@@ -472,6 +476,7 @@ def test_cli_default_keeps_json_and_markdown_flag_renders(
 ) -> None:
     value = issue()
     monkeypatch.setattr(cli_module, "get_issue", lambda *args, **kwargs: value)
+    monkeypatch.setenv("ATLAWIRE_JIRA_TOKEN", SYNTHETIC_JIRA_TOKEN)
 
     default = CliRunner().invoke(
         cli,
@@ -509,6 +514,7 @@ def test_cli_malformed_issue_publishes_no_markdown(
         "get_issue",
         lambda *args, **kwargs: issue(renderedFields=[]),
     )
+    monkeypatch.setenv("ATLAWIRE_JIRA_TOKEN", SYNTHETIC_JIRA_TOKEN)
 
     result = CliRunner().invoke(
         cli,

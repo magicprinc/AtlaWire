@@ -862,11 +862,11 @@ class _CanonicalReadCommand(click.Command):
     exception text.
     """
 
-    def parse_args(self, context: click.Context, args: list[str]) -> list[str]:
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         try:
-            return super().parse_args(context, args)
+            return super().parse_args(ctx, args)
         except click.UsageError:
-            operation_id = context.params.get("operation_id")
+            operation_id = ctx.params.get("operation_id")
             product = (
                 _product_of_operation(operation_id)
                 if isinstance(operation_id, str)

@@ -267,7 +267,12 @@ class ReadOnlyClient:
     client stays reachable only through the private ``_client`` attribute.
     """
 
-    def __init__(self, client: object) -> None:
+    # Класс-аннотация обязательна: без неё обращение к ``self._client``
+    # разрешается через ``__getattr__`` и получает выведенный тип возврата,
+    # а не реальный близкий клиент библиотеки.
+    _client: AtlassianRestAPI
+
+    def __init__(self, client: AtlassianRestAPI) -> None:
         object.__setattr__(self, "_client", client)
 
     def __getattr__(self, name: str):

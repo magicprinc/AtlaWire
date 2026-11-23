@@ -549,12 +549,17 @@ def _failure(product: str, exc: AtlaWireError) -> AtlaWireError:
     return AtlaWireError(f"{product} search failed. {exc}")
 
 
-def _page_key(row: ContentRow) -> str:
-    """Return the stable page key, rejecting an unusable row."""
+def _page_id(row: ContentRow) -> str | int:
+    """Return the validated page ID exactly as Confluence reported it."""
     page_id = row["id"]
     if isinstance(page_id, bool) or page_id is None or str(page_id) == "":
         raise AtlaWireError("Confluence search returned a page without a stable ID.")
-    return str(page_id)
+    return page_id
+
+
+def _page_key(row: ContentRow) -> str:
+    """Return the stable page key, rejecting an unusable row."""
+    return str(_page_id(row))
 
 
 def _merge_page(
@@ -562,8 +567,11 @@ def _merge_page(
 ) -> None:
     entry = pages.get(key)
     if entry is None:
+        # The batch already validated this row's ID, so the check here cannot
+        # fail; the raw value is kept because a numeric Confluence ID must stay
+        # numeric, exactly as `search cql` reports it.
         pages[key] = PageRow(
-            id=row["id"],
+            id=_page_id(row),
             title=row["title"],
             space=row["space"],
             type=row["type"],
