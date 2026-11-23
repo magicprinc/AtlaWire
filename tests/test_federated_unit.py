@@ -1,7 +1,7 @@
 """Unit checks for federated read-only search across the three products."""
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import cast
 
 import pytest
@@ -93,8 +93,15 @@ def install_search(
     files: Rows | None = None,
     fail: str | None = None,
     paging: list[bool] | None = None,
+    page_requests: list[str] | None = None,
+    extra_pages: dict[str, int] | None = None,
 ) -> list[Call]:
-    """Replace the three adapters with recorders and term-keyed fixtures."""
+    """Replace the three adapters with recorders and term-keyed fixtures.
+
+    ``extra_pages`` makes the fake Bitbucket adapter walk more pages than one
+    for a term, calling the production ``on_page`` hook before each page request
+    exactly like [atlawire.bitbucket_search._search_pages][] does.
+    """
     calls: list[Call] = []
 
     def confluence_search(
@@ -130,11 +137,17 @@ def install_search(
         token: str,
         limit: int,
         every_page: bool = False,
+        on_page: Callable[[], None] | None = None,
         allow_http_loopback: bool = False,
     ) -> list[dict[str, object]]:
         calls.append(("Bitbucket", base_url, query, token, limit))
         if paging is not None:
             paging.append(every_page)
+        for _ in range((extra_pages or {}).get(query, 1)):
+            if on_page is not None:
+                on_page()
+            if page_requests is not None:
+                page_requests.append(query)
         if fail == "Bitbucket":
             raise AtlaWireError("HTTP 503: request failed.")
         return list((files or {}).get(query, []))
@@ -302,6 +315,58 @@ def test_bitbucket_paging_is_requested_for_every_term(
     assert paging == [True, True]
 
 
+INVALID_SECOND_ROW = {
+    "confluence": lambda: page(None),
+    "jira": lambda: issue(""),
+    "bitbucket": lambda: code(path=""),
+}
+
+
+@pytest.mark.parametrize(
+    ("slot", "product", "detail"),
+    [
+        ("confluence", "Confluence", "stable ID"),
+        ("jira", "Jira", "stable key"),
+        ("bitbucket", "Bitbucket", "without a path"),
+    ],
+)
+def test_term_that_fails_after_a_valid_row_contributes_no_rows(
+    monkeypatch: pytest.MonkeyPatch, slot: str, product: str, detail: str
+) -> None:
+    """A late per-row validation error must discard that term's whole batch.
+
+    The failed term is the second one, so it also proves that an earlier
+    successful term's rows survive instead of being dropped with the failure.
+    """
+    pages: Rows = {"first": [page("1")], "second": [page("2")]}
+    issues: Rows = {"first": [issue("FED-1")], "second": [issue("FED-2")]}
+    files: Rows = {"first": [code(path="a.py")], "second": [code(path="b.py")]}
+    per_product: dict[str, Rows] = {
+        "confluence": pages,
+        "jira": issues,
+        "bitbucket": files,
+    }
+    per_product[slot]["second"] = [
+        *per_product[slot]["second"],
+        INVALID_SECOND_ROW[slot](),
+    ]
+    install_search(monkeypatch, pages=pages, issues=issues, files=files)
+
+    result = search(["first", "second"])
+
+    assert result["complete"] is False
+    errors = cast(dict[str, str], result["errors"])
+    assert list(errors) == [slot]
+    assert product in errors[slot]
+    assert detail in errors[slot]
+    failed_rows = product_rows(result, slot)
+    assert counts(result)[slot] == 1
+    assert [row["terms"] for row in failed_rows] == [["first"]]
+    for other in {"confluence", "jira", "bitbucket"} - {slot}:
+        other_rows = product_rows(result, other)
+        assert [row["terms"] for row in other_rows] == [["first"], ["second"]]
+
+
 def test_bitbucket_cursor_failure_keeps_its_earlier_rows_and_reports_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -324,6 +389,7 @@ def test_bitbucket_cursor_failure_keeps_its_earlier_rows_and_reports_it(
         token: str,
         limit: int,
         every_page: bool = False,
+        on_page: Callable[[], None] | None = None,
         allow_http_loopback: bool = False,
     ) -> list[dict[str, object]]:
         calls.append(("Bitbucket", base_url, query, token, limit))
@@ -659,3 +725,91 @@ def test_file_without_stable_path_fails_only_its_product(
     assert result["complete"] is False
     assert "without a path" in result["errors"]["bitbucket"]
     assert product_rows(result, "bitbucket") == []
+
+
+def test_read_budget_stops_scheduling_and_keeps_completed_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Rejects the regression where a long term list keeps scheduling reads after
+    # the cap and then reports the skipped products as failures.
+    monkeypatch.setattr(federated, "READ_BUDGET", 4)
+    calls = install_search(
+        monkeypatch,
+        pages={"first": [page("1")], "second": [page("2")]},
+        issues={"first": [issue("FED-1")], "second": [issue("FED-2")]},
+        files={"first": [code(path="a.py")], "second": [code(path="b.py")]},
+    )
+
+    result = search(["first", "second"])
+
+    assert [call[0] for call in calls] == [
+        "Confluence",
+        "Jira",
+        "Bitbucket",
+        "Confluence",
+    ]
+    assert result["budget"] == {"limit": 4, "used": len(calls), "exhausted": True}
+    assert result["complete"] is False
+    # Exhaustion is not a product failure: every product answered what it was asked.
+    assert result["errors"] == {}
+    assert [row["id"] for row in product_rows(result, "confluence")] == ["1", "2"]
+    assert [row["key"] for row in product_rows(result, "jira")] == ["FED-1"]
+    assert [row["file"] for row in product_rows(result, "bitbucket")] == ["a.py"]
+    assert counts(result) == {"confluence": 2, "jira": 1, "bitbucket": 1}
+
+
+def test_bitbucket_page_that_exceeds_the_budget_discards_the_term(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The term's second page is refused before it becomes a request, so its
+    # first-page rows must not be merged on their own.
+    monkeypatch.setattr(federated, "READ_BUDGET", 3)
+    page_requests: list[str] = []
+    install_search(
+        monkeypatch,
+        files={"paged": [code(path="a.py")]},
+        page_requests=page_requests,
+        extra_pages={"paged": 2},
+    )
+
+    result = search(["paged"])
+
+    assert page_requests == ["paged"]
+    assert len(page_requests) <= result["budget"]["limit"]
+    assert result["budget"] == {"limit": 3, "used": 3, "exhausted": True}
+    assert result["complete"] is False
+    assert result["errors"] == {}
+    assert product_rows(result, "bitbucket") == []
+    assert counts(result)["bitbucket"] == 0
+
+
+def test_search_that_fits_the_budget_reports_the_reads_it_charged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The block is always present, so an operator can tell "not exhausted" from
+    # an older binary that never reported a budget.
+    calls = install_search(monkeypatch)
+
+    result = search(["ported"])
+
+    assert result["budget"] == {"limit": 60, "used": len(calls), "exhausted": False}
+    assert result["complete"] is True
+    assert result["errors"] == {}
+
+
+def test_exhausted_budget_before_any_completed_read_uses_a_distinct_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # One read fails, the rest are refused: the run is not "failed for every
+    # product", and the message must not echo a term or a token.
+    monkeypatch.setattr(federated, "READ_BUDGET", 1)
+    install_search(monkeypatch, fail="Confluence")
+
+    with pytest.raises(AtlaWireError) as caught:
+        search(["ported numbers", "ported"])
+
+    message = str(caught.value)
+    assert "budget" in message
+    assert "failed for every product" not in message
+    for detail in (CONFLUENCE.token, JIRA.token, BITBUCKET.token, "ported numbers"):
+        assert detail not in message

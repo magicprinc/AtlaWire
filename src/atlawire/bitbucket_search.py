@@ -7,6 +7,7 @@ request with no write semantics.
 """
 
 import re
+from collections.abc import Callable
 from html import unescape
 from typing import Literal, TypedDict
 
@@ -56,6 +57,7 @@ def search_code(
     repo: str | None = None,
     limit: int = SEARCH_LIMIT_DEFAULT,
     every_page: bool = False,
+    on_page: Callable[[], None] | None = None,
     token: str,
     allow_http_loopback: bool = False,
 ) -> list[SearchRow]:
@@ -75,6 +77,12 @@ def search_code(
     next cursor on the final page. Any later transport, cursor, or malformed
     page failure raises without returning partial rows.
 
+    ``on_page`` is an optional hook called immediately before each page request,
+    including the first. An exception it raises propagates unchanged, so a
+    caller can refuse a page it will not pay for without this module knowing
+    about a page budget; the session is still closed. ``on_page`` is not a
+    substitute for ``every_page``: without it only one page is read.
+
     Rows keep the legacy fields ``project``, ``repository``, ``file``,
     ``hitCount``, ``matchEvidence``, ``hits`` and ``context``. Only a raw,
     paired ``<em>...</em>`` literal marks a highlighted line. Entity decoding
@@ -91,6 +99,8 @@ def search_code(
     _validate_limit(limit)
     if not isinstance(every_page, bool):
         raise AtlaWireError("The search paging option must be a boolean.")
+    if on_page is not None and not callable(on_page):
+        raise AtlaWireError("The search page hook must be callable.")
     effective = _effective_query(query, scope_project, scope_slug)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/search/latest/search"
@@ -103,6 +113,7 @@ def search_code(
             every_page=every_page,
             project=scope_project,
             slug=scope_slug,
+            on_page=on_page,
         )
         # Highlight and entity decoding happens after the shared transport has
         # already inspected the wire body, so re-check the fully projected rows
@@ -175,10 +186,13 @@ def _search_pages(
     every_page: bool,
     project: str | None,
     slug: str | None,
+    on_page: Callable[[], None] | None,
 ) -> list[SearchRow]:
     rows: list[SearchRow] = []
     start = 0
     for _ in range(_MAX_REQUESTS):
+        if on_page is not None:
+            on_page()
         size = min(_PAGE_SIZE, limit - len(rows))
         page = post_json_object(
             session,

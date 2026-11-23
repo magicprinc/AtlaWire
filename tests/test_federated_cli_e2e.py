@@ -11,7 +11,9 @@ POST. No other method or route is allowed.
 """
 
 import json
+import os
 import subprocess
+import sys
 from collections.abc import Sequence
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -34,6 +36,18 @@ JIRA_TOKEN = "fixture-federated-jira"
 BITBUCKET_TOKEN = "fixture-federated-bitbucket"
 SECRET_SENTINEL = "RESPONSE-SENTINEL"
 JIRA_FIELDS = "summary,status,priority,issuetype,assignee,updated"
+
+# The installed console script cannot receive a patched constant, so budget runs
+# start the installed package's real `main` and set only
+# `atlawire.federated.READ_BUDGET` before the command parses its arguments. The
+# rest of the command path, adapters, HTTP, and exit codes stay untouched.
+PATCHED_ENTRYPOINT = (
+    "import sys\n"
+    "from atlawire import federated\n"
+    "federated.READ_BUDGET = int(sys.argv.pop(1))\n"
+    "from atlawire.cli import main\n"
+    "main()\n"
+)
 
 Request = tuple[str, str, dict[str, list[str]], str | None, dict[str, object] | None]
 
@@ -118,6 +132,11 @@ def jql_term(query: str) -> str:
     return cql_term(query[: -len(suffix)])
 
 
+def page_without_id() -> dict[str, object]:
+    """A search result whose ``content`` object carries no ID."""
+    return {"content": {"type": "page", "title": "No ID", "space": {"key": "ENG"}}}
+
+
 def fixture(
     scenario: str,
     method: str,
@@ -131,6 +150,12 @@ def fixture(
         start = int(params["start"][0])
         limit = int(params["limit"][0])
         rows = PAGES.get(term, [])
+        if scenario == "budget":
+            # One row per term keeps each read to exactly one request, so the
+            # observed request count can be compared with the read budget.
+            rows = rows[:1]
+        if scenario == "confluence-row-without-id":
+            rows = [page_fixture("103", "Porting notes"), page_without_id()]
         returned = rows[start : start + limit]
         return 200, {
             "start": start,
@@ -146,6 +171,8 @@ def fixture(
         start_at = int(params["startAt"][0])
         max_results = int(params["maxResults"][0])
         rows = ISSUES.get(term, [])
+        if scenario == "budget":
+            rows = rows[:1]
         return 200, {
             "startAt": start_at,
             "maxResults": max_results,
@@ -157,7 +184,10 @@ def fixture(
         term = cast(str, body["query"])
         if scenario == "bitbucket-cursor-gap":
             return cursor_gap_page(body)
-        return 200, {"code": {"values": FILES.get(term, []), "isLastPage": True}}
+        values = FILES.get(term, [])
+        if scenario == "budget":
+            values = values[:1]
+        return 200, {"code": {"values": values, "isLastPage": True}}
     return 400, {"unexpected": SECRET_SENTINEL}
 
 
@@ -184,10 +214,22 @@ def cursor_gap_page(body: dict[str, object]) -> tuple[int, dict[str, object]]:
 
 
 def run_find(
-    missing_credentials: Path, scenario: str, *terms: str
+    missing_credentials: Path,
+    scenario: str,
+    *terms: str,
+    budget: int | None = None,
+    limit: int | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], list[Request]]:
-    """Run the installed command against one loopback origin with three contexts."""
+    """Run the installed command against one loopback origin with three contexts.
+
+    ``budget`` patches [READ_BUDGET][atlawire.federated.READ_BUDGET] in the child
+    interpreter before the command runs; ``None`` runs the console script with
+    the module's own default.
+    """
     seen: list[Request] = []
+    arguments = ["find", *terms, "--json", "--allow-http-loopback", "--token-from-env"]
+    if limit is not None:
+        arguments += ["--limit", str(limit)]
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
@@ -238,16 +280,17 @@ def run_find(
             "ATLAWIRE_BITBUCKET_TOKEN": BITBUCKET_TOKEN,
             "BBK_CREDENTIALS": str(missing_credentials),
         }
-        result = run_installed(
-            [
-                "find",
-                *terms,
-                "--json",
-                "--allow-http-loopback",
-                "--token-from-env",
-            ],
-            environment,
-        )
+        if budget is None:
+            result = run_installed(arguments, environment)
+        else:
+            result = subprocess.run(
+                [sys.executable, "-c", PATCHED_ENTRYPOINT, str(budget), *arguments],
+                env={**os.environ, **environment},
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
     return result, seen
 
 
@@ -388,6 +431,7 @@ def expected_payload() -> dict[str, object]:
         "counts": {"confluence": 3, "jira": 3, "bitbucket": 3},
         "errors": {},
         "complete": True,
+        "budget": {"limit": 60, "used": 6, "exhausted": False},
         "limits": {"per_term_per_product": 20},
         "limitations": list(LIMITATIONS),
     }
@@ -440,6 +484,37 @@ def test_find_bitbucket_cursor_failure_publishes_nothing(
         BITBUCKET_TOKEN,
         SECRET_SENTINEL,
     ):
+        assert detail not in result.stdout
+
+
+def test_find_confluence_row_without_id_contributes_no_rows(
+    missing_credentials: Path,
+) -> None:
+    # One valid page is followed by a page without an ID. Confluence fails for
+    # the only term, and the contract allows no rows from a failed read even
+    # though the first row of that same page was valid.
+    result, seen = run_find(
+        missing_credentials, "confluence-row-without-id", "ported"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["complete"] is False
+    assert "stable ID" in payload["errors"]["confluence"]
+    assert payload["confluence"] == []
+    assert payload["counts"] == {"confluence": 0, "jira": 2, "bitbucket": 2}
+    assert [row["key"] for row in payload["jira"]] == ["FED-1", "FED-3"]
+    assert [row["file"] for row in payload["bitbucket"]] == ["src/a.py", "src/c.py"]
+    assert seen == [
+        confluence_call("ported", 0, 20),
+        confluence_call("ported", 2, 18),
+        jira_call("ported"),
+        bitbucket_call("ported"),
+    ]
+    assert [record[1] for record in seen].count(JIRA_PATH) == 1
+    assert [record[1] for record in seen].count(BITBUCKET_PATH) == 1
+    for detail in (CONFLUENCE_TOKEN, JIRA_TOKEN, BITBUCKET_TOKEN):
         assert detail not in result.stdout
 
 
@@ -515,3 +590,48 @@ def test_find_jira_failure_on_second_term_keeps_the_other_products(
         BITBUCKET_TOKEN,
     ):
         assert detail not in result.stdout
+
+
+def test_find_read_budget_stops_scheduling_and_reports_exhaustion(
+    missing_credentials: Path,
+) -> None:
+    # Rejects an unbounded run, and rejects reporting the skipped product as a
+    # failed one: no product answered with an error here.
+    result, seen = run_find(
+        missing_credentials, "budget", "ported numbers", "ported", budget=4, limit=1
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["budget"] == {"limit": 4, "used": 4, "exhausted": True}
+    assert payload["complete"] is False
+    assert payload["errors"] == {}
+    assert payload["confluence"] and payload["jira"] and payload["bitbucket"]
+    assert len(seen) <= 4
+    # The fifth read (second term, Jira) was never started.
+    assert [record[1] for record in seen] == [
+        CONFLUENCE_PATH,
+        JIRA_PATH,
+        BITBUCKET_PATH,
+        CONFLUENCE_PATH,
+    ]
+    for detail in (CONFLUENCE_TOKEN, JIRA_TOKEN, BITBUCKET_TOKEN):
+        assert detail not in result.stdout
+
+
+def test_find_reports_an_unexhausted_budget_when_every_read_fits(
+    missing_credentials: Path,
+) -> None:
+    # Control with the module's own default: same fixtures, no patched cap.
+    result, seen = run_find(
+        missing_credentials, "budget", "ported numbers", "ported", limit=1
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["budget"] == {"limit": 60, "used": 6, "exhausted": False}
+    assert payload["complete"] is True
+    assert payload["errors"] == {}
+    assert len(seen) == 6

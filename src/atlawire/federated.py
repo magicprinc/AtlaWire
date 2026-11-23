@@ -25,13 +25,17 @@ https://developer.atlassian.com/server/confluence/advanced-searching-using-cql/
 * **Deterministic output.** Rows keep first-seen order; pages merge by ID, issues
   by key, and Bitbucket files by project/repository/path. Every row lists the
   terms that found it.
+* **Bounded work.** One call charges a fixed number of logical reads, and a run
+  that runs out stops scheduling instead of overspending. Exhaustion is
+  reported in its own ``budget`` block rather than as a product error, because
+  no product failed.
 
 The result is deliberately incomplete: every product is capped per term, and
 Bitbucket can return only indexed code, so ``limitations`` is always present.
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TypedDict
 
@@ -46,6 +50,7 @@ __all__ = [
     "LIMIT_DEFAULT",
     "LIMIT_MAX",
     "LIMIT_MIN",
+    "READ_BUDGET",
     "ProductTarget",
     "federated_search",
 ]
@@ -54,6 +59,13 @@ LIMIT_MIN = 1
 # Intersection of the three adapters' ceilings (Bitbucket search caps at 999).
 LIMIT_MAX = 999
 LIMIT_DEFAULT = 20
+# One logical read is one product/term adapter invocation, plus one more for
+# every Bitbucket page after the first in that term's every_page traversal.
+# 60 covers the useful case (up to 20 terms across three products) in one call
+# while still bounding an operator who pastes many formulations of one query.
+# A long term list is not a request for more work per term; it is a fallback
+# list, so the cap is a call bound, not a per-term guarantee.
+READ_BUDGET = 60
 JIRA_ORDER = "created DESC"
 _PRODUCT_SLOTS = (
     ("confluence", "Confluence"),
@@ -159,6 +171,13 @@ def federated_search(
     Deduplication happens after those caps, so the rows returned never prove
     that a product holds no further match.
 
+    One call performs at most
+    [READ_BUDGET][atlawire.federated.READ_BUDGET] logical reads across every
+    product and term. Each product/term adapter invocation costs one read, and a
+    Bitbucket term costs one more for every page it reads after the first. The
+    budget is checked before a read starts, so an exhausted run stops scheduling
+    work, keeps every completed result, and reports ``complete: false``.
+
     Confluence is queried with ``text ~ "<term>"``, Jira with the same clause
     ordered by ``created DESC`` (BBK's default), and Bitbucket with the term as
     the plugin's free-text query; the term itself is never rewritten except for
@@ -180,14 +199,18 @@ def federated_search(
     * ``counts`` — unique merged rows per product;
     * ``errors`` — one message per product that was unavailable or failed for
       at least one term;
-    * ``complete`` — true only when no product is unavailable and no error was
-      recorded;
+    * ``complete`` — true only when no product is unavailable, no error was
+      recorded, and the read budget was not exhausted;
+    * ``budget`` — ``{limit, used, exhausted}``: the cap, how many logical reads
+      were charged, and whether a read was refused. Exhaustion is reported here
+      alone: no product failed, so it never becomes a per-product error;
     * ``limits`` — the per-term cap actually used;
     * ``limitations`` — the always-present coverage warnings.
 
     Raises [AtlaWireError][atlawire.http.AtlaWireError] for invalid input, an
-    invalid supplied pair, or when no product/term read completed at all. A
-    failed product/term keeps no rows, while earlier successful terms and the
+    invalid supplied pair, or when no product/term read completed at all; the
+    last case uses a distinct message when the read budget stopped the run.
+    A failed product/term keeps no rows, while earlier successful terms and the
     other products stay.
     """
     searched = _search_terms(terms)
@@ -197,25 +220,34 @@ def federated_search(
     )
     # Build every query before the first request, so no term can fail late.
     queries = tuple((term, _cql_query(term), _jql_query(term)) for term in searched)
-    pages, issues, files, completed = _collect(
-        queries, targets, errors, limit, allow_http_loopback
-    )
-    if completed == 0:
+    budget = _ReadBudget(READ_BUDGET)
+    merged = _collect(queries, targets, errors, limit, allow_http_loopback, budget)
+    if merged.completed == 0:
+        if budget.refused:
+            raise AtlaWireError(
+                "Federated search read budget was exhausted before any product "
+                "answered; nothing was returned."
+            )
         raise AtlaWireError(
             "Federated search failed for every product; nothing was returned."
         )
     return {
         "terms": list(searched),
-        "confluence": list(pages.values()),
-        "jira": list(issues.values()),
-        "bitbucket": list(files.values()),
+        "confluence": list(merged.pages.values()),
+        "jira": list(merged.issues.values()),
+        "bitbucket": list(merged.files.values()),
         "counts": {
-            "confluence": len(pages),
-            "jira": len(issues),
-            "bitbucket": len(files),
+            "confluence": len(merged.pages),
+            "jira": len(merged.issues),
+            "bitbucket": len(merged.files),
         },
         "errors": errors,
-        "complete": not errors,
+        "complete": not errors and not budget.refused,
+        "budget": {
+            "limit": budget.limit,
+            "used": budget.used,
+            "exhausted": budget.refused,
+        },
         "limits": {"per_term_per_product": limit},
         "limitations": list(LIMITATIONS),
     }
@@ -243,58 +275,194 @@ def _validated_targets(
     return targets, errors
 
 
+class _BudgetExhausted(Exception):
+    """Internal signal: a read was refused, so its product/term is not started.
+
+    This is deliberately not an [AtlaWireError][atlawire.http.AtlaWireError]:
+    nothing failed, and a refused read must not be reported as a product error.
+    """
+
+
+@dataclass(slots=True)
+class _ReadBudget:
+    """Charges logical reads and records the first refusal."""
+
+    limit: int
+    used: int = 0
+    refused: bool = False
+
+    def take(self) -> bool:
+        """Charge one read, or refuse it and remember that work was skipped."""
+        if self.used < self.limit:
+            self.used += 1
+            return True
+        self.refused = True
+        return False
+
+
+@dataclass(slots=True)
+class _Merged:
+    """Rows merged so far plus the number of product/term reads that finished."""
+
+    pages: dict[str, PageRow] = field(default_factory=dict)
+    issues: dict[str, IssueRow] = field(default_factory=dict)
+    files: dict[tuple[str, str, str], FileRow] = field(default_factory=dict)
+    completed: int = 0
+
+
 def _collect(
     queries: Sequence[tuple[str, str, str]],
     targets: dict[str, ProductTarget],
     errors: dict[str, str],
     limit: int,
     allow_http_loopback: bool,
-) -> tuple[
-    dict[str, PageRow],
-    dict[str, IssueRow],
-    dict[tuple[str, str, str], FileRow],
-    int,
-]:
+    budget: _ReadBudget,
+) -> _Merged:
     """Merge one term at a time; keep surviving products on failure.
 
-    The returned count is the number of product/term reads that completed, so
-    partial failures are not mistaken for a total failure when rows happen to
-    be empty.
+    Each product/term batch is fetched and validated in full before the first
+    row is merged, so a late validation error in that batch cannot publish rows
+    from the failed read. The budget is checked before every product/term read;
+    a refusal stops all further scheduling, while every completed read keeps its
+    rows. ``completed`` counts finished product/term reads, so partial failures
+    are not mistaken for a total failure when rows happen to be empty.
     """
-    pages: dict[str, PageRow] = {}
-    issues: dict[str, IssueRow] = {}
-    files: dict[tuple[str, str, str], FileRow] = {}
-    completed = 0
-    confluence = targets.get("confluence")
-    jira = targets.get("jira")
-    bitbucket = targets.get("bitbucket")
+    merged = _Merged()
     for term, cql, jql in queries:
-        if confluence is not None:
-            try:
-                for page in _confluence_rows(
-                    confluence, cql, limit, allow_http_loopback
-                ):
-                    _merge_page(pages, page, term)
-                completed += 1
-            except AtlaWireError as exc:
-                errors.setdefault("confluence", str(exc))
-        if jira is not None:
-            try:
-                for issue in _jira_rows(jira, jql, limit, allow_http_loopback):
-                    _merge_issue(issues, issue, term)
-                completed += 1
-            except AtlaWireError as exc:
-                errors.setdefault("jira", str(exc))
-        if bitbucket is not None:
-            try:
-                for code in _bitbucket_rows(
-                    bitbucket, term, limit, allow_http_loopback
-                ):
-                    _merge_file(files, code, term)
-                completed += 1
-            except AtlaWireError as exc:
-                errors.setdefault("bitbucket", str(exc))
-    return pages, issues, files, completed
+        keep_going = _collect_confluence(
+            merged,
+            errors,
+            budget,
+            targets.get("confluence"),
+            term,
+            cql,
+            limit,
+            allow_http_loopback,
+        )
+        if keep_going:
+            keep_going = _collect_jira(
+                merged,
+                errors,
+                budget,
+                targets.get("jira"),
+                term,
+                jql,
+                limit,
+                allow_http_loopback,
+            )
+        if keep_going:
+            keep_going = _collect_bitbucket(
+                merged,
+                errors,
+                budget,
+                targets.get("bitbucket"),
+                term,
+                limit,
+                allow_http_loopback,
+            )
+        if not keep_going:
+            break
+    return merged
+
+
+def _collect_confluence(
+    merged: _Merged,
+    errors: dict[str, str],
+    budget: _ReadBudget,
+    target: ProductTarget | None,
+    term: str,
+    query: str,
+    limit: int,
+    allow_http_loopback: bool,
+) -> bool:
+    """Read and merge one Confluence term; return false when the budget refused."""
+    if target is None:
+        return True
+    if not budget.take():
+        return False
+    try:
+        batch = _confluence_batch(target, query, limit, allow_http_loopback)
+    except AtlaWireError as exc:
+        errors.setdefault("confluence", str(exc))
+        return True
+    for key, page in batch:
+        _merge_page(merged.pages, key, page, term)
+    merged.completed += 1
+    return True
+
+
+def _collect_jira(
+    merged: _Merged,
+    errors: dict[str, str],
+    budget: _ReadBudget,
+    target: ProductTarget | None,
+    term: str,
+    query: str,
+    limit: int,
+    allow_http_loopback: bool,
+) -> bool:
+    """Read and merge one Jira term; return false when the budget refused."""
+    if target is None:
+        return True
+    if not budget.take():
+        return False
+    try:
+        batch = _jira_batch(target, query, limit, allow_http_loopback)
+    except AtlaWireError as exc:
+        errors.setdefault("jira", str(exc))
+        return True
+    for key, issue in batch:
+        _merge_issue(merged.issues, key, issue, term)
+    merged.completed += 1
+    return True
+
+
+def _collect_bitbucket(
+    merged: _Merged,
+    errors: dict[str, str],
+    budget: _ReadBudget,
+    target: ProductTarget | None,
+    term: str,
+    limit: int,
+    allow_http_loopback: bool,
+) -> bool:
+    """Read and merge one Bitbucket term, charging every page after the first.
+
+    The page hook charges before the adapter asks for the next page, so a term
+    whose remaining pages do not fit the budget is refused before an extra
+    request exists. Its first-page rows are then discarded with the rest of that
+    term's batch, exactly like any other failed read.
+    """
+    if target is None:
+        return True
+    if not budget.take():
+        return False
+    try:
+        batch = _bitbucket_batch(
+            target, term, limit, allow_http_loopback, _page_reader(budget)
+        )
+    except _BudgetExhausted:
+        return False
+    except AtlaWireError as exc:
+        errors.setdefault("bitbucket", str(exc))
+        return True
+    for key, code in batch:
+        _merge_file(merged.files, key, code, term)
+    merged.completed += 1
+    return True
+
+
+def _page_reader(budget: _ReadBudget) -> Callable[[], None]:
+    """Return a Bitbucket page hook that charges each page after the first."""
+    pages = 0
+
+    def on_page() -> None:
+        nonlocal pages
+        pages += 1
+        if pages > 1 and not budget.take():
+            raise _BudgetExhausted
+
+    return on_page
 
 
 def _confluence_rows(
@@ -328,7 +496,11 @@ def _jira_rows(
 
 
 def _bitbucket_rows(
-    target: ProductTarget, query: str, limit: int, allow_http_loopback: bool
+    target: ProductTarget,
+    query: str,
+    limit: int,
+    allow_http_loopback: bool,
+    on_page: Callable[[], None] | None = None,
 ) -> list[SearchRow]:
     try:
         return search_code(
@@ -337,10 +509,39 @@ def _bitbucket_rows(
             token=target.token,
             limit=limit,
             every_page=True,
+            on_page=on_page,
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
         raise _failure("Bitbucket", exc) from None
+
+
+def _confluence_batch(
+    target: ProductTarget, query: str, limit: int, allow_http_loopback: bool
+) -> list[tuple[str, ContentRow]]:
+    """Fetch one Confluence term and validate every row before any merge."""
+    rows = _confluence_rows(target, query, limit, allow_http_loopback)
+    return [(_page_key(row), row) for row in rows]
+
+
+def _jira_batch(
+    target: ProductTarget, query: str, limit: int, allow_http_loopback: bool
+) -> list[tuple[str, JiraIssueRow]]:
+    """Fetch one Jira term and validate every row before any merge."""
+    rows = _jira_rows(target, query, limit, allow_http_loopback)
+    return [(_issue_key(row), row) for row in rows]
+
+
+def _bitbucket_batch(
+    target: ProductTarget,
+    query: str,
+    limit: int,
+    allow_http_loopback: bool,
+    on_page: Callable[[], None] | None = None,
+) -> list[tuple[tuple[str, str, str], SearchRow]]:
+    """Fetch one Bitbucket term and validate every row before any merge."""
+    rows = _bitbucket_rows(target, query, limit, allow_http_loopback, on_page)
+    return [(_file_key(row), row) for row in rows]
 
 
 def _failure(product: str, exc: AtlaWireError) -> AtlaWireError:
@@ -348,15 +549,21 @@ def _failure(product: str, exc: AtlaWireError) -> AtlaWireError:
     return AtlaWireError(f"{product} search failed. {exc}")
 
 
-def _merge_page(pages: dict[str, PageRow], row: ContentRow, term: str) -> None:
+def _page_key(row: ContentRow) -> str:
+    """Return the stable page key, rejecting an unusable row."""
     page_id = row["id"]
     if isinstance(page_id, bool) or page_id is None or str(page_id) == "":
         raise AtlaWireError("Confluence search returned a page without a stable ID.")
-    key = str(page_id)
+    return str(page_id)
+
+
+def _merge_page(
+    pages: dict[str, PageRow], key: str, row: ContentRow, term: str
+) -> None:
     entry = pages.get(key)
     if entry is None:
         pages[key] = PageRow(
-            id=page_id,
+            id=row["id"],
             title=row["title"],
             space=row["space"],
             type=row["type"],
@@ -367,10 +574,17 @@ def _merge_page(pages: dict[str, PageRow], row: ContentRow, term: str) -> None:
     _merge_term(entry["terms"], term)
 
 
-def _merge_issue(issues: dict[str, IssueRow], row: JiraIssueRow, term: str) -> None:
+def _issue_key(row: JiraIssueRow) -> str:
+    """Return the stable issue key, rejecting an unusable row."""
     key = row["key"]
     if not isinstance(key, str) or not key:
         raise AtlaWireError("Jira search returned an issue without a stable key.")
+    return key
+
+
+def _merge_issue(
+    issues: dict[str, IssueRow], key: str, row: JiraIssueRow, term: str
+) -> None:
     entry = issues.get(key)
     if entry is None:
         issues[key] = IssueRow(
@@ -387,9 +601,8 @@ def _merge_issue(issues: dict[str, IssueRow], row: JiraIssueRow, term: str) -> N
     _merge_term(entry["terms"], term)
 
 
-def _merge_file(
-    files: dict[tuple[str, str, str], FileRow], row: SearchRow, term: str
-) -> None:
+def _file_key(row: SearchRow) -> tuple[str, str, str]:
+    """Return the case-folded file key, rejecting an unusable row."""
     project = row["project"]
     repository = row["repository"]
     path = row["file"]
@@ -401,13 +614,21 @@ def _merge_file(
         raise AtlaWireError("Bitbucket search returned a file without a path.")
     # Project keys and repository slugs are case-insensitive in Bitbucket; the
     # path is not. The first row keeps its spelling for deterministic output.
-    key = (project.lower(), repository.lower(), path)
+    return (project.lower(), repository.lower(), path)
+
+
+def _merge_file(
+    files: dict[tuple[str, str, str], FileRow],
+    key: tuple[str, str, str],
+    row: SearchRow,
+    term: str,
+) -> None:
     entry = files.get(key)
     if entry is None:
         files[key] = FileRow(
-            project=project,
-            repository=repository,
-            file=path,
+            project=row["project"],
+            repository=row["repository"],
+            file=row["file"],
             hitCount=row["hitCount"],
             matchEvidence=row["matchEvidence"],
             terms=[term],
