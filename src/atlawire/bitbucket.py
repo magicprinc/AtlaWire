@@ -197,6 +197,36 @@ class Commit(TypedDict):
     message: str
 
 
+class CommitListing(TypedDict):
+    """Коммиты репозитория вместе с честным признаком полноты выборки.
+
+    ``complete=True`` значит, что сервер отдал терминальную страницу
+    (``isLastPage=True``) и все строки уложились в ``limit``; ``complete=False``
+    значит, что выборка оборвана лимитом и коммитов может быть больше.
+    Общее число не сообщается: Bitbucket Server 5.10 не отдаёт ``totalCount``
+    в ответе ``/commits``, поэтому признак неполноты — единственный надёжный
+    сигнал.
+    """
+
+    commits: list[Commit]
+    limit: int
+    complete: bool
+
+
+class TagListing(TypedDict):
+    """Теги репозитория вместе с честным признаком полноты выборки.
+
+    ``complete=True`` значит, что сервер отдал терминальную страницу
+    (``isLastPage=True``) и все теги уложились в ``limit``; ``complete=False``
+    значит, что выборка оборвана лимитом и тегов может быть больше. Общее число
+    не сообщается: ответ ``/tags`` 5.10 не содержит ``totalCount``.
+    """
+
+    tags: list[dict[str, object]]
+    limit: int
+    complete: bool
+
+
 class DirectoryEntry(TypedDict):
     path: str
     type: str | None
@@ -704,46 +734,72 @@ def get_last_modified(
     at: str | None = None,
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
-    """Return last-modification metadata for a repository or relative path.
+    """Вернуть метаданные последних изменений репозитория или относительного пути.
 
-    ``repo`` is ``PROJECT/slug``. ``None`` and the empty string select the
-    repository root; otherwise ``path`` is a relative Git path whose safe
-    segments are encoded exactly once. A nonempty ``at`` is sent only as the
-    ``at`` query parameter, while ``None`` and the empty string omit it so the
-    server uses the tip of the default branch.
+    ``repo`` — ``PROJECT/slug``. ``None`` и пустая строка выбирают корень
+    репозитория; иначе ``path`` — относительный Git-путь, каждый сегмент
+    которого кодируется ровно один раз. Явный ``at`` уходит единственным
+    query-параметром ``at``.
 
-    Exactly one GET targets the fixed ``/last-modified`` route, with the
-    selected path suffix when present. The decoded object is returned
-    unchanged, so the ``files`` map, ``latestCommit``, and unknown nested fields
-    are preserved, and response links are never followed.
+    Документация 5.10 обещает 200 и без ``at``, но живая проверка (2026-11-23)
+    показывает HTTP 400 «No at commit was specified» на обеих формах: маршрут
+    всегда требует стартовый коммит. Поэтому при ``None``/пустой строке ``at``
+    библиотека сама разрешает ветку по умолчанию через
+    [get_default_branch][atlawire.bitbucket.get_default_branch] и отправляет её
+    ``latestCommit`` как явный полный 40-hex коммит. Нет ветки или её коммит не
+    является полным 40-hex ID — понятная ошибка до запроса last-modified.
 
-    Bitbucket Server 5.10 documents ``at`` as the route's only query parameter
-    and states in its documented 400 that "when streaming modifications, an
-    explicit starting commit must be supplied". A path read therefore requires
-    an explicit nonempty ``at`` and is rejected before any request when it is
-    missing; the repository-root form still omits ``at`` and lets the server
-    start from the default branch tip.
+    Ровно один GET уходит на ``/last-modified`` с выбранным path-суффиксом и
+    обязательным ``at``. Декодированный объект возвращается без изменений:
+    ``files``, ``latestCommit`` и неизвестные вложенные поля сохраняются, ссылки
+    ответа не открываются.
 
-    Live read-only observation (2026-11-23): the path form with an explicit full
-    merge commit and the documented ``?at=`` query answered HTTP 500, while the
-    same path/commit read through the ``/raw`` route and the root form at the
-    same commit both answered 200. The 5.10 reference lists only 200, 400, 401,
-    and 404 for this route, so the 500 is not a documented request-shape defect;
-    it is recorded as a server-side limitation and the documented request is not
-    changed to work around it.
+    Живая проверка (2026-11-23) показала серверный дефект: path-форма для пути,
+    который указывает на файл, отвечает HTTP 500, хотя для каталога и для
+    root-формы с тем же коммитом сервер отвечает 200. Сырой HTTP 500 наружу не
+    отдаётся: он преобразуется в понятную ошибку с подсказкой использовать
+    root-форму или путь каталога. Это остаётся ошибкой — тихого успеха нет.
     """
     suffix = _last_modified_suffix(path)
-    params = _revision_params(at)
-    if suffix and not params:
-        raise AtlaWireError(
-            "Expected an explicit at commit for the last-modified path form.",
-            category="validation",
-            method="GET",
-        )
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
+    if at is None or at == "":
+        project, slug = _split_repo(repo)
+        branch = get_default_branch(
+            base,
+            project,
+            slug,
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+        if branch is None:
+            raise AtlaWireError("The repository has no default branch.")
+        commit = branch.get("latestCommit")
+        if not isinstance(commit, str) or not _COMMIT_SHA1.fullmatch(commit):
+            raise AtlaWireError(
+                "The repository default branch does not carry a full commit ID."
+            )
+        revision = commit
+    else:
+        revision = _revision(at)
     with bearer_session(token) as session:
-        return get_json_object(session, f"{url}/last-modified{suffix}", params=params)
+        try:
+            return get_json_object(
+                session, f"{url}/last-modified{suffix}", params={"at": revision}
+            )
+        except AtlaWireError as exc:
+            if not suffix or exc.http_status != 500:
+                raise
+            # Подтверждено живым сервером: path-форма для файла падает внутри
+            # сервера, хотя документированный запрос совпадает с каталогом.
+            raise AtlaWireError(
+                "Bitbucket Server failed the last-modified path form; this server "
+                "fails when the path names a file. Use the repository-root form "
+                "or pass a directory path.",
+                category="upstream",
+                http_status=500,
+                method="GET",
+            ) from None
 
 
 def get_pull_request_file(
@@ -1315,6 +1371,48 @@ def list_tags(
     final page's unused next-page hint. Exactly ``limit`` rows therefore only
     proves that the cap was reached, not that the repository has no more tags;
     completeness needs a larger limit or a traversal to the terminal page.
+    Признак полноты в списке не передаётся: его сообщает
+    [list_tags_with_metadata][atlawire.bitbucket.list_tags_with_metadata].
+    """
+    return list_tags_with_metadata(
+        base_url,
+        repo,
+        token=token,
+        filter_text=filter_text,
+        order_by=order_by,
+        limit=limit,
+        max_pages=max_pages,
+        allow_http_loopback=allow_http_loopback,
+    )["tags"]
+
+
+def list_tags_with_metadata(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    filter_text: str | None = None,
+    order_by: str | None = None,
+    limit: int = _TAG_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> TagListing:
+    """Вернуть теги вместе с признаком полноты выборки.
+
+    Вызов и пагинация совпадают с [list_tags][atlawire.bitbucket.list_tags]:
+    ``/tags`` читается от ``start=0``, каждый следующий курсор берётся только
+    из серверного ``nextPageStart``, а ``isLastPage`` обязан быть boolean.
+    Фильтры ``filter_text``/``order_by`` повторяются на каждой странице.
+
+    В отличие от голого списка, ``complete`` отделяет честную полную выборку
+    от обрезанной лимитом: ``True`` только когда сервер отдал терминальную
+    страницу и все строки поместились в ``limit``. Это позволяет агенту не
+    считать ``limit`` доказательством полноты: ``complete=False`` значит, что
+    тегов может быть больше.
+
+    Любая ошибка страницы, битый курсор или превышение ``max_pages``
+    поднимают [AtlaWireError][atlawire.http.AtlaWireError] без частичного
+    результата; ``limit`` 1-1000 и ``max_pages`` 1-1000 проверяются до запроса.
     """
     _validate_page_limit(max_pages)
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
@@ -1323,7 +1421,7 @@ def list_tags(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_repository_url(base, repo)}/tags"
     with bearer_session(token) as session:
-        return _read_pages(
+        rows, complete = _read_pages_result(
             session,
             url,
             max_pages,
@@ -1331,6 +1429,7 @@ def list_tags(
             params=params,
             limit=limit,
         )
+    return TagListing(tags=rows, limit=limit, complete=complete)
 
 
 def get_tag(
@@ -1380,6 +1479,49 @@ def list_commits(
     as soon as ``limit`` rows are projected, so an unused next-page hint on the
     final page is never required. Every projected row carries the raw commit
     message; only the TSV view normalizes it.
+    Признак полноты в списке не передаётся: его сообщает
+    [list_commits_with_metadata][atlawire.bitbucket.list_commits_with_metadata].
+    """
+    return list_commits_with_metadata(
+        base_url,
+        repo,
+        token=token,
+        at=at,
+        path=path,
+        limit=limit,
+        max_pages=max_pages,
+        allow_http_loopback=allow_http_loopback,
+    )["commits"]
+
+
+def list_commits_with_metadata(
+    base_url: str,
+    repo: str,
+    *,
+    token: str,
+    at: str | None = None,
+    path: str | None = None,
+    limit: int = _COMMIT_LIMIT_DEFAULT,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> CommitListing:
+    """Вернуть коммиты вместе с признаком полноты выборки.
+
+    Вызов и пагинация совпадают с [list_commits][atlawire.bitbucket.list_commits]:
+    ``at`` уходит только как ``until``, ``path`` — только как ``path``;
+    каждый следующий курсор берётся из серверного ``nextPageStart``, а не
+    вычисляется из ``start + size``.
+
+    В отличие от голого списка, ``complete`` отделяет полную выборку от
+    обрезанной лимитом: ``True`` только когда сервер отдал терминальную
+    страницу и все строки поместились в ``limit``. Для репозитория с 971
+    коммитом запрос с ``limit=100`` честно возвращает ``complete=False``, чтобы
+    агент не считал 100 строк всей историей. ``totalCount`` в ответе 5.10
+    отсутствует, поэтому состояние ограничивается этим признаком.
+
+    Любая ошибка страницы, битый курсор или превышение ``max_pages``
+    поднимают [AtlaWireError][atlawire.http.AtlaWireError] без частичного
+    результата; ``limit`` 1-1000 и ``max_pages`` 1-1000 проверяются до запроса.
     """
     _validate_page_limit(max_pages)
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
@@ -1388,7 +1530,7 @@ def list_commits(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
     with bearer_session(token) as session:
-        return _read_pages(
+        rows, complete = _read_pages_result(
             session,
             f"{url}/commits",
             max_pages,
@@ -1396,6 +1538,7 @@ def list_commits(
             params=params,
             limit=limit,
         )
+    return CommitListing(commits=rows, limit=limit, complete=complete)
 
 
 def get_commit(
@@ -2996,27 +3139,66 @@ def _read_pages[RowT](
     on_page: Callable[[], None] | None = None,
     before_page: Callable[[], None] | None = None,
 ) -> list[RowT]:
-    """Read cursor pages, optionally stopping after ``limit`` projected rows.
+    """Прочитать страницы курсора и вернуть только спроецированные строки.
 
-    ``params`` are fixed filters repeated on every request; ``start`` and
-    ``limit`` are always set here. Every page must carry an exact
-    ``isLastPage`` boolean. With a row ``limit`` each request asks for no more
-    than the rows still missing and a wider page is rejected. A filtering
-    projector can opt into ``read_full_pages`` to request normal-sized pages
-    even if only one match remains. Every fetched page is validated, and the
-    call returns at the projected row cap without needing the unused next-page
-    hint. An optional ``transform`` replaces the fetched page before its cursor
-    and rows are read. ``on_page`` observes completed requests so callers can
-    share one page budget across several calls. ``before_page`` runs before each
-    request, including the first, and propagates its exception; it cannot cancel
-    a request already in flight.
+    Тонкая обёртка над [_read_pages_result]: признак полноты не нужен
+    большинству вызывающих, которые либо требуют всю коллекцию, либо падают.
+    """
+    rows, _ = _read_pages_result(
+        session,
+        url,
+        max_pages,
+        project=project,
+        params=params,
+        limit=limit,
+        read_full_pages=read_full_pages,
+        transform=transform,
+        on_page=on_page,
+        before_page=before_page,
+    )
+    return rows
 
-    A present ``start`` echo must equal the cursor requested for that page and a
-    present ``size`` echo must equal the number of values; an omitted echo is not
-    required. Both are validated for every consumed page, including a terminal
-    one, before any row is projected. The next cursor is always the server's
-    opaque ``nextPageStart``, never arithmetic on the requested start or the
-    echoed page size.
+
+def _read_pages_result[RowT](
+    session: requests.Session,
+    url: str,
+    max_pages: int,
+    *,
+    project: Callable[[object], RowT | None],
+    params: Mapping[str, str] | None = None,
+    limit: int | None = None,
+    read_full_pages: bool = False,
+    transform: Callable[[dict[str, object]], dict[str, object]] | None = None,
+    on_page: Callable[[], None] | None = None,
+    before_page: Callable[[], None] | None = None,
+) -> tuple[list[RowT], bool]:
+    """Прочитать страницы курсора и сообщить, полон ли результат.
+
+    ``params`` — фиксированные фильтры, повторяемые в каждом запросе;
+    ``start`` и ``limit`` выставляет сама функция. Каждая страница обязана
+    нести точный boolean ``isLastPage``; при строковом ``limit`` в запрос
+    уходит не больше недостающих строк, а страница шире запроса отклоняется.
+    Проектор с фильтрацией может включить ``read_full_pages``, чтобы просить
+    страницы обычного размера, даже когда нужна одна строка. Каждая полученная
+    страница валидируется, а при достижении лимита строк вызов возвращается без
+    неиспользованной подсказки следующей страницы. ``transform`` заменяет
+    страницу до чтения курсора и строк; ``on_page`` наблюдает завершённые
+    запросы; ``before_page`` выполняется перед каждым запросом, включая первый,
+    и пробрасывает своё исключение, но не отменяет уже летящий запрос.
+
+    Второй элемент результата — признак полноты: ``True`` только когда сервер
+    отдал терминальную страницу (``isLastPage=True``) и ни одна строка не была
+    отброшена лимитом. ``False`` значит, что строк может быть больше, и
+    вызывающий не имеет права считать выборку полной. Битый курсор, отсутствие
+    ``isLastPage``, ошибка HTTP или страничный предел поднимают
+    [AtlaWireError][atlawire.http.AtlaWireError] без частичного результата.
+
+    Присутствующий эхо-``start`` обязан равняться курсору этого запроса, а
+    присутствующий эхо-``size`` — числу значений; отсутствующее эхо не
+    требуется. Оба проверяются на каждой прочитанной странице, включая
+    терминальную, до проекции строк. Следующий курсор всегда берётся только из
+    серверного ``nextPageStart``, никогда из арифметики над запрошенным start
+    или эхом размера страницы.
     """
     extras = {} if params is None else dict(params)
     start = 0
@@ -3047,9 +3229,10 @@ def _read_pages[RowT](
             if row is not None:
                 rows.append(row)
         if limit is not None and len(rows) >= limit:
-            return rows[:limit] if len(rows) > limit else rows
+            capped = rows[:limit] if len(rows) > limit else rows
+            return capped, last and len(rows) == limit
         if last:
-            return rows
+            return rows, True
         start = _next_page_start(page, start)
     raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
 

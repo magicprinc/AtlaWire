@@ -36,8 +36,10 @@ Essential contract:
   branch page request, after the listing, after the scan, and around every file
   read. An in-flight HTTP request is not cancelled, only bounded by the shared
   5 s connect/30 s read timeouts.
-* Every listing failure, page-cap hit, read failure, ref failure or timeout
-  raises [AtlaWireError][atlawire.http.AtlaWireError] without a result. Every
+* Every listing failure, page-cap hit, read failure or ref failure raises
+  [AtlaWireError][atlawire.http.AtlaWireError] without a result; an exhausted
+  total budget raises only before the first hit, while later hits are kept.
+  Every
   success reports ``files_eligible``, ``files_scanned``, ``files_excluded``,
   ``truncated`` and ``complete``. In regex mode ``complete`` means every
   eligible file was searched and each hit keeps at most ``HIT_TEXT_LIMIT``
@@ -52,7 +54,7 @@ import math
 import re
 from collections.abc import Callable, Mapping
 from time import monotonic as _monotonic
-from typing import Literal, Never, TypedDict
+from typing import Literal, TypedDict
 
 from atlawire import regex_helper
 from atlawire.bitbucket import (
@@ -68,7 +70,11 @@ from atlawire.operations import read_operation
 GREP_LIMIT_MIN = 1
 GREP_LIMIT_MAX = 1000
 GREP_LIMIT_DEFAULT = 200
-GREP_TIMEOUT_DEFAULT = 20.0
+# Замер на живом Bitbucket (AB/address-book-api, 87 подходящих файлов):
+# полный скан занимает около 20.7 с, поэтому дефолт 20 с падал на обычном
+# запросе. 120 с — примерно шестикратный запас на более крупные репозитории
+# и сетевые задержки, при этом вызов не висит минутами.
+GREP_TIMEOUT_DEFAULT = 120.0
 REGEX_TIMEOUT_DEFAULT = 5.0
 HIT_TEXT_LIMIT = 300
 TEXT_SUFFIXES = frozenset(
@@ -96,6 +102,8 @@ _DEFAULT_BRANCH_OPERATION = "bitbucket.repository.default-branch"
 
 type RefKind = Literal["default", "commit", "branch", "tag"]
 type Selection = Literal["text-suffixes", "explicit", "all-paths"]
+type GrepStatus = Literal["complete", "truncated", "timeout"]
+
 
 # Compatibility aliases retained for the existing line-mode tests while the
 # implementation lives in the reusable helper module.
@@ -134,6 +142,8 @@ class GrepResult(TypedDict):
     hits: list[GrepHit]
     truncated: bool
     complete: bool
+    status: GrepStatus
+    message: str | None
 
 
 def grep_repository(
@@ -189,6 +199,14 @@ def grep_repository(
     ``regex_timeout_s`` bounds one file's helper. ``files_eligible``,
     ``files_excluded``, ``files_scanned``, ``truncated`` and ``complete`` state
     the actual coverage. Every failure raises without a result.
+
+    Бюджет. Исчерпанный общий бюджет без найденных хитов поднимает
+    [AtlaWireError][atlawire.http.AtlaWireError] с подсказкой увеличить
+    ``timeout_s`` или сузить область через ``glob``/``path``. Если хиты уже
+    найдены, они не теряются: вызов возвращает их вместе с ``status="timeout"``,
+    ``complete=False`` и тем же действием в ``message``. ``status`` также равен
+    ``"truncated"`` при достигнутом ``limit`` и ``"complete"`` для полной
+    выборки.
     """
     normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _repo_segments(repo)
@@ -242,6 +260,7 @@ def grep_repository(
         files = selected[:limit]
         truncated = len(selected) > limit
         _require_budget(deadline)
+        status: GrepStatus = "truncated" if truncated else "complete"
         return GrepResult(
             engine="listing",
             repo=repo,
@@ -259,9 +278,11 @@ def grep_repository(
             hits=[],
             truncated=truncated,
             complete=not truncated,
+            status=status,
+            message=None,
         )
     eligible, selection = _select_paths(names, selected_path, selected_glob)
-    hits, scanned, truncated = _scan(
+    hits, scanned, status = _scan(
         base_url,
         repo,
         eligible,
@@ -274,7 +295,12 @@ def grep_repository(
         deadline=deadline,
         allow_http_loopback=allow_http_loopback,
     )
-    _require_budget(deadline)
+    message = None
+    if status == "timeout":
+        message = _budget_message(scanned=scanned, eligible=len(eligible))
+        if not hits:
+            raise AtlaWireError(f"{message} No result was produced.")
+    truncated = status != "complete"
     return GrepResult(
         engine="fanout",
         repo=repo,
@@ -291,7 +317,9 @@ def grep_repository(
         files_scanned=scanned,
         hits=hits,
         truncated=truncated,
-        complete=not truncated,
+        complete=status == "complete",
+        status=status,
+        message=message,
     )
 
 
@@ -308,14 +336,22 @@ def _scan(
     regex_timeout_s: float,
     deadline: float,
     allow_http_loopback: bool,
-) -> tuple[list[GrepHit], int, bool]:
-    """Read and search every eligible file or raise without a result."""
+) -> tuple[list[GrepHit], int, GrepStatus]:
+    """Прочитать и обыскать каждый подходящий файл, сохраняя найденные хиты.
+
+    ``timeout`` возвращается, когда общий бюджет исчерпан между файлами или на
+    чтении очередного файла: уже собранные хиты остаются в результате, а
+    недочитанный файл не считается обысканным. ``truncated`` сообщает, что
+    достигнут ``limit``; ``complete`` — что просмотрены все файлы без упора в
+    лимит. Ошибки чтения и regex без исчерпания бюджета по-прежнему поднимаются.
+    """
     hits: list[GrepHit] = []
     scanned = 0
     for name in names:
         if len(hits) >= limit:
-            return hits, scanned, True
-        _require_budget(deadline)
+            return hits, scanned, "truncated"
+        if _remaining_budget(deadline) is None:
+            return hits, scanned, "timeout"
         try:
             text = get_repository_file(
                 base_url,
@@ -329,27 +365,34 @@ def _scan(
             raise AtlaWireError(
                 f"Repository grep aborted without a result: {exc}"
             ) from None
-        scanned += 1
-        remaining = limit - len(hits)
         lines = _split_lines(text)
-        timeout_s = min(regex_timeout_s, _require_budget(deadline))
+        remaining = _remaining_budget(deadline)
+        if remaining is None:
+            return hits, scanned, "timeout"
+        hit_budget = limit - len(hits)
+        timeout_s = min(regex_timeout_s, remaining)
         try:
             numbers = _match_line_numbers(
                 text,
                 pattern,
                 ignore_case=ignore_case,
-                limit=remaining,
+                limit=hit_budget,
                 timeout_s=timeout_s,
                 line_count=len(lines),
             )
         except _HelperTimeout:
-            _raise_timeout(timeout_s, regex_timeout_s)
+            if timeout_s < regex_timeout_s:
+                return hits, scanned, "timeout"
+            raise AtlaWireError(
+                "Repository regex evaluation timed out; no result was produced."
+            ) from None
         except _HelperInvalidRegex:
             raise AtlaWireError("The repository regex is invalid.") from None
         except _HelperFailure:
             raise AtlaWireError(
                 "Repository regex evaluation failed; no result was produced."
             ) from None
+        scanned += 1
         for number in numbers:
             line = lines[number - 1]
             hits.append(
@@ -360,9 +403,9 @@ def _scan(
                     text_truncated=len(line) > HIT_TEXT_LIMIT,
                 )
             )
-        if len(numbers) == remaining:
-            return hits, scanned, True
-    return hits, scanned, False
+        if len(numbers) == hit_budget:
+            return hits, scanned, "truncated"
+    return hits, scanned, "complete"
 
 
 def _resolve_ref(
@@ -689,24 +732,39 @@ def _validate_pattern(pattern: str, *, ignore_case: bool, timeout_s: float) -> N
         ) from None
 
 
-def _raise_timeout(timeout_s: float, regex_timeout_s: float) -> Never:
-    """Raise the timeout message that matches the binding limit."""
-    if timeout_s < regex_timeout_s:
-        raise AtlaWireError(
-            "Repository grep time budget exhausted; no result was produced."
-        )
-    raise AtlaWireError(
-        "Repository regex evaluation timed out; no result was produced."
+def _remaining_budget(deadline: float) -> float | None:
+    """Вернуть остаток общего бюджета или ``None``, если он уже исчерпан."""
+    remaining = deadline - _monotonic()
+    return None if remaining <= 0 else remaining
+
+
+def _budget_message(*, scanned: int, eligible: int) -> str:
+    """Собрать понятное действие при исчерпанном бюджете без утечки данных.
+
+    Текст называет счётчики и два реальных способа получить полный результат;
+    никакие тело ответа, путь или токен в сообщение не попадают.
+    """
+    return (
+        f"Repository grep time budget exhausted after {scanned} of {eligible} "
+        "eligible files. Increase timeout_s (for example to 120) or narrow the "
+        "scope with glob/path."
+    )
+
+
+def _budget_error() -> AtlaWireError:
+    """Вернуть ошибку бюджета, когда ни одного хита ещё не найдено."""
+    return AtlaWireError(
+        "Repository grep time budget exhausted before any hit; no result was "
+        "produced. Increase timeout_s (for example to 120) or narrow the scope "
+        "with glob/path."
     )
 
 
 def _require_budget(deadline: float) -> float:
-    """Return remaining budget seconds or fail before starting more work."""
-    remaining = deadline - _monotonic()
-    if remaining <= 0:
-        raise AtlaWireError(
-            "Repository grep time budget exhausted; no result was produced."
-        )
+    """Вернуть остаток бюджета или упасть до начала следующей работы."""
+    remaining = _remaining_budget(deadline)
+    if remaining is None:
+        raise _budget_error()
     return remaining
 
 

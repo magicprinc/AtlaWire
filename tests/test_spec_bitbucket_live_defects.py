@@ -233,13 +233,19 @@ def test_pull_request_file_reads_text_markdown(server):
     )
 
 
-# The documented 400 states that a streaming (path) read needs an explicit
-# starting commit, so a missing or empty at must fail before any request.
+# Live 400 states that a streaming read needs an explicit starting commit, so a
+# missing or empty at is resolved from the default branch tip before the call.
 @pytest.mark.parametrize("at", [None, ""])
-def test_last_modified_path_requires_explicit_at(server, at):
+def test_last_modified_path_resolves_missing_at(server, at):
     httpd, base = server
-    route(httpd, ROOT + "/last-modified/README.md", body={"files": {}, "latestCommit": {}})
-    with pytest.raises(AtlaWireError) as caught:
+    route(
+        httpd,
+        ROOT + "/branches/default",
+        body={"latestCommit": SHA, "displayId": "main", "id": "refs/heads/main"},
+    )
+    value = {"files": {}, "latestCommit": {}}
+    route(httpd, ROOT + "/last-modified/README.md", body=value)
+    assert (
         bitbucket.get_last_modified(
             base,
             "PROJ/repo",
@@ -248,10 +254,19 @@ def test_last_modified_path_requires_explicit_at(server, at):
             at=at,
             allow_http_loopback=True,
         )
-    assert caught.value.category == "validation"
-    assert httpd.calls == []
-    assert httpd.unexpected == []
-
+        == value
+    )
+    assert [urlsplit(call.target).path for call in httpd.calls] == [
+        ROOT + "/branches/default",
+        ROOT + "/last-modified/README.md",
+    ]
+    assert_call(
+        httpd,
+        ROOT + "/last-modified/README.md",
+        {"at": [SHA]},
+        accept="application/json",
+        calls=2,
+    )
 
 # Regression guard for the documented request shape: one GET on the path
 # template with at as the only query parameter, and the response preserved.
@@ -280,10 +295,15 @@ def test_last_modified_path_sends_documented_request(server):
     )
 
 
-# The repository-root form is documented to fall back to the default branch
-# tip, so the new path-only validation must not change it.
-def test_last_modified_root_keeps_omitted_at(server):
+# The repository-root form also needs a starting commit at runtime, so a
+# missing at is resolved from the default branch and sent as a full 40-hex ID.
+def test_last_modified_root_resolves_missing_at(server):
     httpd, base = server
+    route(
+        httpd,
+        ROOT + "/branches/default",
+        body={"latestCommit": SHA, "displayId": "main", "id": "refs/heads/main"},
+    )
     value = {"files": {}, "latestCommit": {}}
     route(httpd, ROOT + "/last-modified", body=value)
     assert (
@@ -292,9 +312,14 @@ def test_last_modified_root_keeps_omitted_at(server):
         )
         == value
     )
+    assert [urlsplit(call.target).path for call in httpd.calls] == [
+        ROOT + "/branches/default",
+        ROOT + "/last-modified",
+    ]
     assert_call(
         httpd,
         ROOT + "/last-modified",
-        {},
+        {"at": [SHA]},
         accept="application/json",
+        calls=2,
     )
