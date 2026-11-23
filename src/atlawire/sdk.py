@@ -31,7 +31,7 @@ from atlawire.file_publication import (
 from atlawire.http import (
     _TRANSPORT_MESSAGE,
     AtlaWireError,
-    library_session,
+    _NoRedirectSession,
     normalize_base_url,
 )
 
@@ -74,10 +74,6 @@ _ADMIN_SEGMENTS = frozenset(
     }
 )
 logging.getLogger("atlassian").setLevel(logging.WARNING)
-# ``atlassian.rest_client`` logs the request line and the whole response text at
-# DEBUG; keep this child above DEBUG so a response body is never published while
-# application loggers stay untouched.
-logging.getLogger("atlassian.rest_client").setLevel(logging.WARNING)
 
 _CLIENTS = {
     "jira": Jira,
@@ -264,21 +260,14 @@ def _raw_client_for(
     no-redirect session with ``trust_env`` disabled and handed to the library,
     which then applies its own headers, auth, verify/cert and proxy state on top
     of it.
-
-    The token is validated by the shared session factory before any client
-    exists, and the library's own 429 retry is disabled: this adapter owns
-    attempts and delays. The session also returns every library response through
-    the shared status, size, and UTF-8/JSON guards, so individual library
-    methods cannot bypass them.
     """
     client_class = _CLIENTS.get(product)
     if client_class is None:
         raise AtlaWireError("Unknown Atlassian product.", category="validation")
-    # One authoritative credential rule and one guarded transport session: the
-    # factory validates the token and creates the session whose every response
-    # the library returns through the shared read policy.
-    session = library_session(token, body_limit=_BINARY_LIMIT)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    session = _NoRedirectSession()
+    # Ambient netrc/proxy/CA state must not alter the explicit transport.
+    session.trust_env = False
     return client_class(
         url=base,
         token=token,
@@ -288,8 +277,6 @@ def _raw_client_for(
         session=session,
         # The library must not retry: this module owns attempts and delays.
         backoff_and_retry=False,
-        # A Retry-After 429 retry inside the library would double one request.
-        retry_with_header=False,
     )
 
 

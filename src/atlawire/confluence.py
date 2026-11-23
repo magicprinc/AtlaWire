@@ -7,23 +7,33 @@ documentation; the live version and exact response shapes are not verified.
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from hashlib import sha256
 from typing import TypedDict
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import requests
-from atlassian.errors import ApiError
 
-from atlawire.http import AtlaWireError, normalize_base_url
-from atlawire.sdk import client_for
+from atlawire.http import (
+    AtlaWireError,
+    bearer_session,
+    get_json_object,
+    normalize_base_url,
+)
 
 _PAGE_EXPAND = "body.storage,version,space,ancestors"
+_HISTORY_PATH = "/rest/api/content/{id}/history"
 _PAGE_VERSION_EXPAND = "body.storage,version"
 _PAGE_VERSION_STATUS = "historical"
+_CHILD_PATH = "/rest/api/content/{id}/child/page"
 _CHILD_EXPAND = "version"
+_ATTACHMENT_PATH = "/rest/api/content/{id}/child/attachment"
+_COMMENT_PATH = "/rest/api/content/{id}/child/comment"
 _COMMENT_EXPAND = "body.storage"
 _COMMENT_DEPTH_ALL = "all"
+_LABEL_PATH = "/rest/api/content/{id}/label"
+_SEARCH_PATH = "/rest/api/search"
+_SPACE_PATH = "/rest/api/space"
 # One explicit page; the server may cap the limit. Defaults follow Confluence
 # 6.6.0 documentation.
 PAGE_START_MIN = 0
@@ -127,51 +137,18 @@ def get_page(
 ) -> dict[str, object]:
     """Return the Confluence page JSON from the configured instance.
 
-    Reads one page through the library client's ``get_page_by_id`` method; the
-    payload is returned unchanged, and the configured base URL stays the
-    destination. Only its identity, type, title, and storage body are validated.
+    The server payload is returned unchanged; only its identity, type, title,
+    and ``body.storage.value`` are validated. The configured base URL is always
+    the request destination, even when a page link is supplied.
     """
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        page = client.get_page_by_id(requested_id, expand=_PAGE_EXPAND)
-    except (requests.HTTPError, ApiError) as error:
-        # Keep only the real status: the library message may quote the body.
-        cause = error.reason if isinstance(error, ApiError) else error
-        status = getattr(getattr(cause, "response", None), "status_code", None)
-        if status is None:
-            raise AtlaWireError(
-                "Request failed; check connectivity and TLS settings.",
-                category="transport",
-                method="GET",
-            ) from None
-        known = {
-            401: "HTTP 401: authentication rejected.",
-            403: "HTTP 403: access denied.",
-        }
-        raise AtlaWireError(
-            known.get(status, f"HTTP {status}: request failed."),
-            category="http",
-            http_status=status,
-            method="GET",
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if not isinstance(page, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
+    with bearer_session(token) as session:
+        page = get_json_object(
+            session,
+            f"{base}/rest/api/content/{requested_id}",
+            params={"expand": _PAGE_EXPAND},
+        )
     return _validated_page(page, requested_id)
 
 
@@ -284,28 +261,19 @@ def get_page_history(
 ) -> dict[str, object]:
     """Return the raw history object for a Confluence page.
 
-    Reads the history through the library client's ``get_content_history``
-    method: one fixed GET to ``/rest/api/content/{id}/history`` with no query
+    Makes one fixed GET to ``/rest/api/content/{id}/history`` with no query
     parameters. The object is returned unchanged and links are never followed.
     This is not a complete version list: Confluence 6.6.0 documents only a
     history representation, not a full field set or all versions.
     """
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        history = client.get_content_history(requested_id)
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
-    return _json_object(history)
+    with bearer_session(token) as session:
+        return get_json_object(
+            session,
+            f"{base}{_HISTORY_PATH.format(id=requested_id)}",
+            params={},
+        )
 
 
 def get_page_version(
@@ -318,37 +286,28 @@ def get_page_version(
 ) -> dict[str, object]:
     """Return one explicit historical page version.
 
-    Reads the version through the library client's ``get_page_by_id`` method,
-    which sends one GET to ``/rest/api/content/{id}`` with
-    ``status=historical``, ``version=N``, and ``expand=body.storage,version``.
-    Confluence 6.6.0 documents these parameters individually but not this exact
-    combination; the historical status is the value Atlassian's history payload
-    uses for version content links. The raw page object is returned unchanged
-    after its id, page shape, and ``version.number`` are validated. Links are
-    never followed, and live version support is unverified.
+    Sends one GET to ``/rest/api/content/{id}`` with ``status=historical``,
+    ``version=N``, and ``expand=body.storage,version``. Confluence 6.6.0
+    documents these parameters individually but not this exact combination;
+    the historical status is the value Atlassian's history payload uses for
+    version content links. The raw page object is returned unchanged after its
+    id, page shape, and ``version.number`` are validated. Links are never
+    followed, and live version support is unverified.
     """
     _validate_requested_version(version)
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        page = client.get_page_by_id(
-            requested_id,
-            status=_PAGE_VERSION_STATUS,
-            version=version,
-            expand=_PAGE_VERSION_EXPAND,
+    with bearer_session(token) as session:
+        page = get_json_object(
+            session,
+            f"{base}/rest/api/content/{requested_id}",
+            params={
+                "status": _PAGE_VERSION_STATUS,
+                "version": version,
+                "expand": _PAGE_VERSION_EXPAND,
+            },
         )
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
-    return _validated_page_version(_json_object(page), requested_id, version)
+    return _validated_page_version(page, requested_id, version)
 
 
 def _validated_page_version(
@@ -384,12 +343,11 @@ def search_cql(
 ) -> list[ContentRow]:
     """Return up to ``limit`` short content rows in Confluence search order.
 
-    Each page is read through the library client's ``cql`` method; the
-    configured base URL is always the request destination and continuation
-    links are never followed. Pagination stops when the limit is reached or an
-    empty page proves exhaustion, and any error discards rows already read
-    instead of returning a partial result. A zero limit returns no rows and
-    creates no client, matching the legacy behavior.
+    The configured base URL is always the request destination; a continuation
+    link only supplies the next offset. Pagination stops when the limit is
+    reached or an empty page proves exhaustion, and any error discards rows
+    already read instead of returning a partial result. A zero limit returns
+    no rows and creates no session, matching the legacy behavior.
     """
     if not query.strip():
         raise AtlaWireError("Expected a non-empty CQL query.")
@@ -397,31 +355,17 @@ def search_cql(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return []
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
+    with bearer_session(token) as session:
         return _read_rows(
-            lambda start, requested: _page(
-                _json_object(client.cql(query, start=start, limit=requested)),
-                start,
-                requested,
-                "search",
-            ),
+            session,
+            f"{base}{_SEARCH_PATH}",
+            {"cql": query},
             limit,
             label="search",
             empty_hint="narrow the query or retry.",
             project=_content_row,
             identity=_content_identity,
         )
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
 
 
 def list_spaces(
@@ -433,43 +377,26 @@ def list_spaces(
 ) -> list[SpaceRow]:
     """Return up to ``limit`` spaces in Confluence order.
 
-    Each page is read through the library client's ``get_spaces`` method; only
-    ``start`` and ``limit`` are sent to the configured instance's space
+    Only ``start`` and ``limit`` are sent to the configured instance's space
     endpoint. Pagination stops when the limit is reached or an empty page proves
     exhaustion, and any error discards rows already read instead of returning a
-    partial result. A zero limit returns no rows and creates no client.
+    partial result. A zero limit returns no rows and creates no session.
     """
     _validate_limit(limit, SPACE_LIMIT_MIN, SPACE_LIMIT_MAX)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return []
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
+    with bearer_session(token) as session:
         return _read_rows(
-            lambda start, requested: _page(
-                _json_object(
-                    client.get_spaces(params={"start": start, "limit": requested})
-                ),
-                start,
-                requested,
-                "space",
-            ),
+            session,
+            f"{base}{_SPACE_PATH}",
+            {},
             limit,
             label="space",
             empty_hint="retry the request.",
             project=_space_row,
             identity=_space_identity,
         )
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
 
 
 def list_children(
@@ -483,50 +410,28 @@ def list_children(
     """Return up to ``limit`` direct child pages in Confluence order.
 
     Only the configured instance is read; a page link supplies nothing but the
-    parent ID. Each page is read through the library client's
-    ``get_page_child_by_type`` method with the fixed ``version`` expansion plus
-    the ``start`` and ``limit`` offsets. The method returns only the
-    ``results`` array, so the response envelope's ``start``, ``size``,
-    ``totalSize`` and continuation links are not validated. Pagination stops
-    when the limit is reached or an empty page proves exhaustion, and any error
-    discards rows already read instead of returning a partial result. A zero
-    limit returns no rows and creates no client, but the base URL and parent are
-    still validated.
+    parent ID. The request asks for the fixed ``version`` expansion plus the
+    ``start`` and ``limit`` offsets. Pagination stops when the limit is reached
+    or an empty page proves exhaustion, and any error discards rows already read
+    instead of returning a partial result. A zero limit returns no rows and
+    creates no session, but the base URL and parent are still validated.
     """
     _validate_limit(limit, CHILD_LIMIT_MIN, CHILD_LIMIT_MAX)
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return []
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
+    with bearer_session(token) as session:
         return _read_rows(
-            lambda start, requested: _child_page(
-                client.get_page_child_by_type(
-                    requested_id,
-                    type="page",
-                    start=start,
-                    limit=requested,
-                    expand=_CHILD_EXPAND,
-                ),
-                requested,
-            ),
+            session,
+            f"{base}{_CHILD_PATH.format(id=requested_id)}",
+            {"expand": _CHILD_EXPAND},
             limit,
             label="child page",
             empty_hint="retry the request.",
             project=_child_row,
             identity=_child_identity,
         )
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
 
 
 def get_page_attachments(
@@ -540,32 +445,21 @@ def get_page_attachments(
 ) -> dict[str, object]:
     """Return one bounded page of attachment metadata.
 
-    Reads one page through the library client's ``get_attachments`` method; only
-    ``start`` and ``limit`` are sent to the configured instance. The raw JSON
+    Sends only ``start`` and ``limit`` to the configured instance. The raw JSON
     object, including pagination metadata and unknown fields, is returned
     unchanged; continuation links are never followed. The 6.6.0 docs show a flat
     object, but fields are not guaranteed across Confluence versions.
     """
-    _validate_start(start)
-    _validate_limit(limit, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX)
-    requested_id = page_id(page_id_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
+    return _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_ATTACHMENT_PATH,
+        fixed_params={},
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
     )
-    try:
-        page = client.get_attachments(
-            requested_id, params={"start": start, "limit": limit}
-        )
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
-    return _json_object(page)
 
 
 def get_page_comments(
@@ -580,8 +474,7 @@ def get_page_comments(
 ) -> dict[str, object]:
     """Return one bounded page of comment metadata.
 
-    Reads one page through the library client's ``get_comments`` method, which
-    sends ``start``, ``limit``, ``expand=body.storage``, and by default
+    Sends ``start``, ``limit``, ``expand=body.storage``, and by default
     ``depth=all`` so replies and storage bodies are requested. Set
     ``include_replies=False`` to omit ``depth`` and use the documented root-only
     default. The raw JSON object is returned unchanged and links are never
@@ -589,31 +482,19 @@ def get_page_comments(
     content-type-keyed map, but no response shape is assumed.
     """
     _validate_include_replies(include_replies)
-    _validate_start(start)
-    _validate_limit(limit, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX)
-    requested_id = page_id(page_id_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    params: dict[str, str | int] = {
-        "expand": _COMMENT_EXPAND,
-        "start": start,
-        "limit": limit,
-    }
+    fixed_params = {"expand": _COMMENT_EXPAND}
     if include_replies:
-        params["depth"] = _COMMENT_DEPTH_ALL
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
+        fixed_params["depth"] = _COMMENT_DEPTH_ALL
+    return _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_COMMENT_PATH,
+        fixed_params=fixed_params,
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
     )
-    try:
-        page = client.get_comments(requested_id, params=params)
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
-    return _json_object(page)
 
 
 def get_page_labels(
@@ -627,94 +508,44 @@ def get_page_labels(
 ) -> dict[str, object]:
     """Return one bounded page of labels.
 
-    Reads one page through the library client's ``get_page_labels`` method;
-    only ``start`` and ``limit`` are sent to the configured instance. The raw
-    JSON object is returned unchanged and links are never followed. The 6.6.0
-    docs publish no response schema, so no field or pagination shape is assumed.
+    Sends only ``start`` and ``limit`` to the configured instance. The raw JSON
+    object is returned unchanged and links are never followed. The 6.6.0 docs
+    publish no response schema, so no field or pagination shape is assumed.
     """
+    return _read_content_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        path=_LABEL_PATH,
+        fixed_params={},
+        start=start,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )
+
+
+def _read_content_page(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    path: str,
+    fixed_params: Mapping[str, str],
+    start: int,
+    limit: int,
+    allow_http_loopback: bool,
+) -> dict[str, object]:
+    """Read exactly one bounded page from one fixed content subresource."""
     _validate_start(start)
     _validate_limit(limit, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX)
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    client = client_for(
-        "confluence", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        page = client.get_page_labels(requested_id, start=start, limit=limit)
-    except (requests.HTTPError, ApiError) as error:
-        raise _sdk_error(error) from None
-    except requests.Timeout as error:
-        raise _sdk_error(error) from None
-    except requests.RequestException as error:
-        raise _sdk_error(error) from None
-    finally:
-        client.close()
-    return _json_object(page)
-
-
-def _sdk_error(error: BaseException) -> AtlaWireError:
-    """Translate one library failure into a sanitized AtlaWireError.
-
-    Mirrors the mapping used by [get_page][atlawire.confluence.get_page]: only
-    the arrived HTTP status is read from the library failure, because its own
-    message may quote the response body. A failure before any response is a
-    transport error, a timeout keeps its own diagnostic, and 401/403 keep their
-    shared meaning.
-    """
-    if isinstance(error, ApiError):
-        cause: object = error.reason
-    elif isinstance(error, requests.HTTPError):
-        cause = error
-    else:
-        cause = None
-    status = getattr(getattr(cause, "response", None), "status_code", None)
-    if status is None:
-        if isinstance(error, requests.Timeout):
-            return AtlaWireError(
-                "Request timed out.", category="transport", method="GET"
-            )
-        return AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
+    with bearer_session(token) as session:
+        return get_json_object(
+            session,
+            f"{base}{path.format(id=requested_id)}",
+            params={**fixed_params, "start": start, "limit": limit},
         )
-    known = {
-        401: "HTTP 401: authentication rejected.",
-        403: "HTTP 403: access denied.",
-    }
-    return AtlaWireError(
-        known.get(status, f"HTTP {status}: request failed."),
-        category="http",
-        http_status=status,
-        method="GET",
-    )
-
-
-def _json_object(value: object) -> dict[str, object]:
-    """Return one library payload only when it is a JSON object."""
-    if not isinstance(value, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
-    return value
-
-
-def _child_page(
-    value: object, requested: int
-) -> tuple[list[dict[str, object]], int | None]:
-    """Validate the library's result-list form of one child page.
-
-    ``get_page_child_by_type`` returns only the ``results`` array, so the page
-    envelope with ``start``, ``size``, ``totalSize`` and continuation links is
-    not available; the rows themselves are still checked before projection.
-    """
-    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
-        raise AtlaWireError(
-            "Expected a Confluence child page results array of objects."
-        )
-    if len(value) > requested:
-        raise AtlaWireError(
-            "Confluence child page returned more results than requested."
-        )
-    return value, None
 
 
 def _validate_include_replies(include_replies: bool) -> None:
@@ -739,7 +570,9 @@ def _validate_limit(limit: int, minimum: int, maximum: int) -> None:
 
 
 def _read_rows[RowT](
-    fetch: Callable[[int, int], tuple[list[dict[str, object]], int | None]],
+    session: requests.Session,
+    url: str,
+    params: Mapping[str, str],
     limit: int,
     *,
     label: str,
@@ -747,19 +580,18 @@ def _read_rows[RowT](
     project: Callable[[dict[str, object]], RowT],
     identity: Callable[[dict[str, object]], str | None],
 ) -> list[RowT]:
-    """Read rows until ``limit`` is reached or a page proves exhaustion.
-
-    ``fetch`` receives the requested offset and page size and returns the
-    already validated result rows plus the optional server total, so each
-    endpoint keeps its own response-shape checks.
-    """
     rows: list[RowT] = []
     seen_ids: set[str] = set()
     seen_fallback_pages: set[bytes] = set()
     known_total: int | None = None
     while len(rows) < limit:
         requested = limit - len(rows)
-        results, total = fetch(len(rows), requested)
+        page = get_json_object(
+            session,
+            url,
+            params={**params, "start": len(rows), "limit": requested},
+        )
+        results, total = _page(page, len(rows), requested, label)
         if total is not None:
             # The endpoint may omit totalSize on a later page, but an earlier
             # usable total is retained and a different value is a contradiction.

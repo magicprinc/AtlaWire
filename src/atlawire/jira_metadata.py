@@ -25,17 +25,13 @@ createmeta shape fails the documented-shape check instead of being projected.
 
 import re
 
-import requests
-from atlassian.errors import ApiError
-
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
     get_json_object,
     normalize_base_url,
 )
-from atlawire.jira import _issue_key, _json_object, _sdk_error
-from atlawire.sdk import client_for
+from atlawire.jira import _issue_key
 
 _API = "rest/api/2"
 _CREATE_META_EXPAND = "projects.issuetypes.fields"
@@ -66,16 +62,11 @@ def get_edit_meta(
     top-level members and nested values are preserved.
     """
     key = _issue_key(key_or_url)
-    client = client_for(
-        "jira", base_url, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        try:
-            document = _json_object(client.issue_editmeta(key))
-        except (requests.RequestException, ApiError) as error:
-            raise _sdk_error(error) from None
-    finally:
-        client.close()
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/{_API}/issue/{key}/editmeta", params={}
+        )
     _check_field_map(document.get("fields"), "edit metadata")
     return document
 
@@ -136,22 +127,14 @@ def get_transition_fields(
     """
     key = _issue_key(key_or_url)
     _check_transition_id(transition_id)
-    client = client_for(
-        "jira", base_url, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        try:
-            document = _json_object(
-                client.get_issue_transitions_full(
-                    key,
-                    transition_id=transition_id,
-                    expand=_TRANSITION_EXPAND,
-                )
-            )
-        except (requests.RequestException, ApiError) as error:
-            raise _sdk_error(error) from None
-    finally:
-        client.close()
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    params = {"expand": _TRANSITION_EXPAND}
+    if transition_id is not None:
+        params["transitionId"] = transition_id
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/{_API}/issue/{key}/transitions", params=params
+        )
     transitions = document.get("transitions")
     if not isinstance(transitions, list):
         raise AtlaWireError("Expected a Jira transitions array.")

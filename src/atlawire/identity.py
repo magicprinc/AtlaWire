@@ -15,10 +15,8 @@ reports every product independently. BBK's probe is corrected here:
 * No base URL, token, response body, or server-returned link is printed or
   followed. Diagnostics name the product and one closed-set reason only.
 
-Target versions are documented, not live-verified here. Jira reads ``/myself``
-through the library ``Jira.myself`` method (Jira Software Server 8.3), and
-Confluence reads ``user/current`` through ``ConfluenceServer.get_current_user``.
-Confluence requires
+Target versions are documented, not live-verified here. Jira uses the existing
+``/rest/api/2/myself`` adapter (Jira Software Server 8.3). Confluence requires
 the ``CurrentUser`` object of the 6.6.0 REST documentation: ``type`` is exactly
 ``known`` and ``username`` is non-empty. A later Confluence version that returns
 only ``accountId`` fails closed rather than reporting a weak success. Bitbucket
@@ -30,17 +28,15 @@ import re
 from collections.abc import Callable, Mapping
 from typing import TypedDict
 
-import requests
-from atlassian.errors import ApiError
-
 from atlawire.bitbucket import list_my_pull_requests
 from atlawire.federated import ProductTarget
 from atlawire.http import (
-    _TRANSPORT_MESSAGE,
     AtlaWireError,
+    bearer_session,
+    get_json_object,
     normalize_base_url,
 )
-from atlawire.sdk import client_for
+from atlawire.jira import get_current_user
 
 __all__ = [
     "CONFLUENCE_CURRENT_USER_PATH",
@@ -94,33 +90,6 @@ class _InvalidTarget(AtlaWireError):
     """The explicit product pair is missing or invalid; no request was sent."""
 
 
-def _sdk_error(error: BaseException) -> AtlaWireError:
-    """Translate one library failure into a sanitized AtlaWireError.
-
-    The library puts the response text, and on some routes the bearer token,
-    into its own exception message. Only an arrived status is read from it (or
-    from the wrapped ``ApiError.reason``), so neither reaches the diagnostic or
-    the traceback. An HTTP status keeps the shared 401/403 meaning and its real
-    value; a failure before a response is a transport error.
-    """
-    cause = error.reason if isinstance(error, ApiError) else error
-    response = getattr(cause, "response", None)
-    status = getattr(response, "status_code", None)
-    if status is not None:
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        else:
-            message = f"HTTP {status}: request failed."
-        return AtlaWireError(message, category="http", http_status=status, method="GET")
-    if isinstance(error, requests.Timeout):
-        return AtlaWireError("Request timed out.", category="transport", method="GET")
-    if isinstance(error, requests.RequestException):
-        return AtlaWireError(_TRANSPORT_MESSAGE, category="transport", method="GET")
-    return AtlaWireError("The product request failed.", method="GET")
-
-
 def whoami(
     *,
     confluence: ProductTarget | None,
@@ -133,10 +102,8 @@ def whoami(
     ``confluence``, ``jira``, and ``bitbucket`` are separate explicit pairs.
     ``None`` means the caller could not supply that product's matched pair.
     Each product receives only its own base URL and token: Confluence
-    ``GET {base}/rest/api/user/current`` through the library
-    ``ConfluenceServer.get_current_user`` method, Jira
-    ``GET {base}/rest/api/2/myself`` through the library ``Jira.myself``
-    method, and the Bitbucket Server dashboard
+    ``GET {base}/rest/api/user/current``, Jira
+    ``GET {base}/rest/api/2/myself``, and the Bitbucket Server dashboard
     ``GET {base}/rest/api/1.0/dashboard/pull-requests`` through
     [list_my_pull_requests][atlawire.bitbucket.list_my_pull_requests] with
     ``limit=1``.
@@ -198,29 +165,14 @@ def _run(product: str, probe: Callable[[], IdentityCheck]) -> IdentityCheck:
 def _confluence_check(
     target: ProductTarget | None, allow_http_loopback: bool
 ) -> IdentityCheck:
-    """Validate one pair, then read the documented current user.
-
-    The read runs through the library ``ConfluenceServer.get_current_user``
-    method on a client from [client_for][atlawire.sdk.client_for]. The client
-    is closed in a ``finally``, and one library failure becomes a sanitized
-    [AtlaWireError][atlawire.http.AtlaWireError] that keeps the real status.
-    """
+    """Validate one pair, then read the documented current user."""
     resolved = _target("Confluence", target, allow_http_loopback)
-    client = client_for(
-        "confluence",
-        resolved.base_url,
-        resolved.token,
-        allow_http_loopback=allow_http_loopback,
-    )
-    try:
-        try:
-            user = client.get_current_user()
-        except (requests.RequestException, ApiError) as error:
-            raise _sdk_error(error) from None
-    finally:
-        client.close()
-    if not isinstance(user, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
+    with bearer_session(resolved.token) as session:
+        user = get_json_object(
+            session,
+            f"{resolved.base_url}{CONFLUENCE_CURRENT_USER_PATH}",
+            params={},
+        )
     return IdentityCheck(ok=True, identity=_confluence_identity(user))
 
 
@@ -244,27 +196,13 @@ def _confluence_identity(value: dict[str, object]) -> ConfluenceIdentity:
 def _jira_check(
     target: ProductTarget | None, allow_http_loopback: bool
 ) -> IdentityCheck:
-    """Validate one pair, then project only the promised identity fields.
-
-    The read runs through the library ``Jira.myself`` method on a client from
-    [client_for][atlawire.sdk.client_for]. The client is closed in a
-    ``finally``, and one library failure becomes a sanitized
-    [AtlaWireError][atlawire.http.AtlaWireError] that keeps the real status.
-    """
+    """Validate one pair, then project only the promised identity fields."""
     resolved = _target("Jira", target, allow_http_loopback)
-    client = client_for(
-        "jira",
+    user = get_current_user(
         resolved.base_url,
-        resolved.token,
+        token=resolved.token,
         allow_http_loopback=allow_http_loopback,
     )
-    try:
-        try:
-            user = client.myself()
-        except (requests.RequestException, ApiError) as error:
-            raise _sdk_error(error) from None
-    finally:
-        client.close()
     if not isinstance(user, Mapping):
         raise _NoIdentity(_NO_IDENTITY)
     return IdentityCheck(ok=True, identity=_jira_identity(user))

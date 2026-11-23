@@ -8,17 +8,16 @@ from typing import TypedDict
 from urllib.parse import quote
 
 import requests
-from atlassian.errors import ApiError
 
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
     get_json_array,
     get_json_object,
+    get_text,
     normalize_base_url,
     reject_credential_echo,
 )
-from atlawire.sdk import client_for
 
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
@@ -70,9 +69,6 @@ _DIFF_TEXT_UNSAFE = re.compile(
     r"\ud800-\udfff]"
 )
 _DIFF_LINE_BREAKS = ("\r", "\n", "\u2028", "\u2029")
-# The repository file read keeps the shared 1 MiB text budget; the library
-# returns the whole body as bytes, so the cap applies to its byte length.
-_FILE_TEXT_LIMIT = 1024 * 1024
 
 
 class DeclaredTruncationError(AtlaWireError):
@@ -297,42 +293,11 @@ def get_pull_request(
     is the decoded server object, so unknown and nested fields are preserved, and
     links in it are never followed.
     """
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    identifier = _pull_request_id(pr_id)
-    project, slug = _split_repo(repo)
-    client = client_for(
-        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
+    _, url, identifier = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    try:
-        value = client.get_pull_request(project, slug, identifier)
-    except (requests.HTTPError, ApiError) as error:
-        response = getattr(error, "response", None)
-        status = getattr(response, "status_code", None)
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        elif status is None:
-            message = "The server rejected the request."
-        else:
-            message = f"HTTP {status}: request failed."
-        raise AtlaWireError(
-            message, category="http", http_status=status, method="GET"
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if not isinstance(value, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
     _validate_pull_request(value, identifier)
     return value
 
@@ -360,43 +325,11 @@ def get_pull_request_merge_status(
     requests another route, or follows response links. Only the shared object
     shape is required; no additional field validation is applied.
     """
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    identifier = _pull_request_id(pr_id)
-    project, slug = _split_repo(repo)
-    client = client_for(
-        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
+    _, url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    try:
-        value = client.is_pull_request_can_be_merged(project, slug, identifier)
-    except (requests.HTTPError, ApiError) as error:
-        response = getattr(error, "response", None)
-        status = getattr(response, "status_code", None)
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        elif status is None:
-            message = "The server rejected the request."
-        else:
-            message = f"HTTP {status}: request failed."
-        raise AtlaWireError(
-            message, category="http", http_status=status, method="GET"
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if not isinstance(value, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
-    return value
+    with bearer_session(token) as session:
+        return get_json_object(session, f"{url}/merge", params={})
 
 
 def get_repository_file(
@@ -412,60 +345,21 @@ def get_repository_file(
 
     ``repo`` is ``PROJECT/slug`` and ``path`` is a relative Git path with safe
     segments. The revision defaults to ``master`` and is sent only as the
-    ``at`` query parameter. One read runs through the library's
-    [get_content_of_file][atlassian.Bitbucket.get_content_of_file] method on a
-    client from [client_for][atlawire.sdk.client_for]; the library returns the
-    body as bytes, so the 1 MiB cap applies to its byte length and the bytes
-    must be strict UTF-8. An oversize or non-UTF-8 response raises without
-    returning partial text. The client is closed in a ``finally`` and a
-    library HTTP failure is translated to a sanitized
-    [AtlaWireError][atlawire.http.AtlaWireError] that keeps the status.
+    ``at`` query parameter. The call makes one streamed raw request with
+    ``Accept: text/plain``; content is limited and validated by
+    [get_text][atlawire.http.get_text], so an oversize, non-text, or non-UTF-8
+    response raises without returning partial text.
     """
     revision = _revision(at)
     segments = _file_segments(path)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
-    client = client_for(
-        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        payload = client.get_content_of_file(
-            project, slug, _encoded_path(segments), at=revision, markup=None
+    with bearer_session(token) as session:
+        return get_text(
+            session,
+            _raw_file_url(base, project, slug, segments),
+            params={"at": revision},
         )
-    except (requests.HTTPError, ApiError) as error:
-        response = getattr(error, "response", None)
-        status = getattr(response, "status_code", None)
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        elif status is None:
-            message = "The server rejected the request."
-        else:
-            message = f"HTTP {status}: request failed."
-        raise AtlaWireError(
-            message, category="http", http_status=status, method="GET"
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if len(payload) > _FILE_TEXT_LIMIT:
-        raise AtlaWireError(
-            "The text response exceeds the 1 MiB limit.", category="upstream"
-        )
-    try:
-        return payload.decode("utf-8")
-    except UnicodeDecodeError:
-        raise AtlaWireError("Expected UTF-8 text.", category="upstream") from None
 
 
 def get_file_blame(
@@ -638,55 +532,18 @@ def get_pull_request_file(
     """
     selected_side = _file_side(side)
     segments = _file_segments(path)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    identifier = _pull_request_id(pr_id)
-    project, slug = _split_repo(repo)
-    client = client_for(
-        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
+    base, url, identifier = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    try:
-        value = client.get_pull_request(project, slug, identifier)
-        if not isinstance(value, dict):
-            raise AtlaWireError("Expected a JSON object.", category="upstream")
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
         _validate_pull_request(value, identifier)
         project, slug, commit = _selected_file_ref(value, selected_side)
-        payload = client.get_content_of_file(
-            project, slug, _encoded_path(segments), at=commit, markup=None
+        return get_text(
+            session,
+            _raw_file_url(base, project, slug, segments),
+            params={"at": commit},
         )
-    except (requests.HTTPError, ApiError) as error:
-        response = getattr(error, "response", None)
-        status = getattr(response, "status_code", None)
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        elif status is None:
-            message = "The server rejected the request."
-        else:
-            message = f"HTTP {status}: request failed."
-        raise AtlaWireError(
-            message, category="http", http_status=status, method="GET"
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if len(payload) > _FILE_TEXT_LIMIT:
-        raise AtlaWireError(
-            "The text response exceeds the 1 MiB limit.", category="upstream"
-        )
-    try:
-        return payload.decode("utf-8")
-    except UnicodeDecodeError:
-        raise AtlaWireError("Expected UTF-8 text.", category="upstream") from None
 
 
 def list_pull_request_files(
@@ -1256,43 +1113,11 @@ def get_tag(
     """
     segments = _tag_segments(name)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    project, slug = _split_repo(repo)
-    client = client_for(
-        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        value = client.get_project_tags(
-            project, slug, tag_name=_encoded_path(segments)
+    url = _repository_url(base, repo)
+    with bearer_session(token) as session:
+        return get_json_object(
+            session, f"{url}/tags/{_encoded_path(segments)}", params={}
         )
-    except (requests.HTTPError, ApiError) as error:
-        response = getattr(error, "response", None)
-        status = getattr(response, "status_code", None)
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        elif status is None:
-            message = "The server rejected the request."
-        else:
-            message = f"HTTP {status}: request failed."
-        raise AtlaWireError(
-            message, category="http", http_status=status, method="GET"
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if not isinstance(value, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
-    return value
 
 
 def list_commits(
@@ -1358,40 +1183,9 @@ def get_commit(
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     requested = _commit_id(sha)
-    project, slug = _split_repo(repo)
-    client = client_for(
-        "bitbucket", base, token, allow_http_loopback=allow_http_loopback
-    )
-    try:
-        value = client.get_commit_info(project, slug, requested)
-    except (requests.HTTPError, ApiError) as error:
-        response = getattr(error, "response", None)
-        status = getattr(response, "status_code", None)
-        if status == 401:
-            message = "HTTP 401: authentication rejected."
-        elif status == 403:
-            message = "HTTP 403: access denied."
-        elif status is None:
-            message = "The server rejected the request."
-        else:
-            message = f"HTTP {status}: request failed."
-        raise AtlaWireError(
-            message, category="http", http_status=status, method="GET"
-        ) from None
-    except requests.Timeout:
-        raise AtlaWireError(
-            "Request timed out.", category="transport", method="GET"
-        ) from None
-    except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings.",
-            category="transport",
-            method="GET",
-        ) from None
-    finally:
-        client.close()
-    if not isinstance(value, dict):
-        raise AtlaWireError("Expected a JSON object.", category="upstream")
+    url = f"{_repository_url(base, repo)}/commits/{requested}"
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
     _validate_commit_response(value, requested)
     return value
 
@@ -1802,7 +1596,7 @@ def _file_segments(path: str) -> tuple[str, ...]:
 
     Percent followed by two hex digits is rejected rather than encoded so a
     proxy cannot reinterpret a literal name as an escape. A normal literal
-    percent is allowed and is encoded exactly once by ``_encoded_path``.
+    percent is allowed and is encoded exactly once by ``_raw_file_url``.
     """
     invalid = "Expected a relative file path with safe segments."
     if (
@@ -1886,6 +1680,15 @@ def _require_encodable(value: str, label: str) -> str:
 def _optional_encodable(value: str | None, label: str) -> str | None:
     """Reject an optional text field that UTF-8 cannot encode."""
     return None if value is None else _require_encodable(value, label)
+
+
+def _raw_file_url(base: str, project: str, slug: str, segments: tuple[str, ...]) -> str:
+    """Build a repository raw URL with each safe segment encoded once."""
+    encoded = _encoded_path(segments)
+    return (
+        f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
+        f"/repos/{quote(slug, safe='')}/raw/{encoded}"
+    )
 
 
 def _selected_file_ref(value: dict[str, object], side: str) -> tuple[str, str, str]:
