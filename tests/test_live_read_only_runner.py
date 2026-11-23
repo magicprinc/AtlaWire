@@ -8,6 +8,7 @@ or exercised only on paths that cannot start a check.
 import hashlib
 import importlib.util
 import json
+import os
 import site
 import subprocess
 import sys
@@ -655,9 +656,14 @@ def test_secret_bearing_invalid_arguments_are_not_echoed(
 def test_fixed_prefix_runs_installed_cli_outside_checkout(
     tmp_path: Path,
 ) -> None:
-    # Seed only the non-secret user-site location; no product settings or
-    # secrets come from the test process environment.
+    # Seed only the non-secret user-site location and the Windows runtime
+    # variables the child needs to start; no product settings or secrets come
+    # from the test process environment.
     environment = {"PYTHONUSERBASE": site.getuserbase(), "PATH": ""}
+    for name in ("SYSTEMDRIVE", "SYSTEMROOT", "WINDIR"):
+        value = os.environ.get(name)
+        if value:
+            environment[name] = value
     result = subprocess.run(
         [*live.CLI_PREFIX, "--version"],
         cwd=tmp_path,

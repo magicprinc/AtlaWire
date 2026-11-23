@@ -76,6 +76,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from typing import NoReturn
 from urllib.parse import urlsplit
 
 import pytest
@@ -209,13 +210,23 @@ _EXPECTED_CATEGORIES = frozenset(
     }
 )
 
+_FAILED = pytest.fail.Exception
+
+
+def _fail(category: str) -> NoReturn:
+    """Raise one fixed failure without chaining the original exception."""
+    raise _FAILED(category, pytrace=False) from None
+
 
 def _live_test(function: Callable[[], None]) -> Callable[[], None]:
     """Convert every live failure into a fixed-message pytest failure.
 
     ``pytrace=False`` prevents ``--showlocals`` and traceback rendering from
     exposing fixture values, URLs, or captured API output held in local
-    variables.
+    variables. A plain ``pytest.fail`` inside ``except`` would still chain the
+    original exception, and Python 3.13+ renders that chained message even for
+    exception-only reports, so the fixed failure is raised with the chain
+    suppressed.
     """
 
     @functools.wraps(function)
@@ -223,16 +234,16 @@ def _live_test(function: Callable[[], None]) -> Callable[[], None]:
         try:
             function()
         except FixtureError:
-            pytest.fail("missing_fixture", pytrace=False)
+            _fail("missing_fixture")
         except LiveCheckError as exc:
             category = (
                 exc.category
                 if exc.category in _EXPECTED_CATEGORIES
                 else "unexpected_error"
             )
-            pytest.fail(category, pytrace=False)
+            _fail(category)
         except Exception:  # noqa: BLE001 - replace all unexpected text
-            pytest.fail("unexpected_error", pytrace=False)
+            _fail("unexpected_error")
 
     return wrapped
 
@@ -318,10 +329,12 @@ def _plan_error(args: Sequence[str]) -> bool:
     if command in {"jira-edit-meta", "jira-transition-fields"}:
         return len(args) != 2 or _ISSUE_KEY.fullmatch(args[1]) is None
     if command == "jira-create-meta":
+        # The CLI takes the project key only through the leading option:
+        # ``jira-create-meta --project KEY``.
         return (
-            len(args) != 4
-            or args[2] != "--project"
-            or _JIRA_CREATE_PROJECT_KEY.fullmatch(args[3]) is None
+            len(args) != 3
+            or args[1] != "--project"
+            or _JIRA_CREATE_PROJECT_KEY.fullmatch(args[2]) is None
         )
     for index, argument in enumerate(args):
         if argument in _FORBIDDEN_FLAGS or argument.startswith("--base-url="):

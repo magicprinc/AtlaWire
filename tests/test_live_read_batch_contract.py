@@ -8,6 +8,7 @@ process environment, a credential file, or a product endpoint.
 import importlib.util
 import json
 import os
+import site
 import subprocess
 import sys
 from pathlib import Path
@@ -316,6 +317,35 @@ def test_new_command_plans_are_fixed() -> None:
         assert output == b"[]"
         argv, _ = recorder.calls[0]
         assert tuple(argv[len(live.CLI_PREFIX) :]) == plan
+
+
+def test_jira_create_meta_plan_accepts_only_the_project_option() -> None:
+    accepted = ("jira-create-meta", "--project", "DEMO")
+    output, recorder = run(accepted)
+
+    assert output == b"[]"
+    argv, _ = recorder.calls[0]
+    assert tuple(argv[len(live.CLI_PREFIX) :]) == accepted
+
+    # Wrong arity or position, extra options and non-uppercase keys must be
+    # rejected before any subprocess starts.
+    rejected = (
+        ("jira-create-meta",),
+        ("jira-create-meta", "DEMO"),
+        ("jira-create-meta", "DEMO", "--project"),
+        ("jira-create-meta", "--project"),
+        ("jira-create-meta", "--project", "DEMO", "--json"),
+        ("jira-create-meta", "--json", "--project", "DEMO"),
+        ("jira-create-meta", "--project", "demo"),
+        ("jira-create-meta", "--project", "DEMO-1"),
+        ("jira-create-meta", "--project", "DE MO"),
+    )
+    for plan in rejected:
+        forbidden = Recorder(error=AssertionError("no subprocess authorized"))
+        with pytest.raises(live.LiveCheckError) as info:
+            live.run_cli(plan, runner=forbidden, environ=synthetic_environment())
+        assert info.value.category == "invalid_plan"
+        assert forbidden.calls == []
 
 
 def test_read_operation_helper_uses_only_hardcoded_parameters() -> None:
@@ -965,6 +995,10 @@ def test_new_entrypoint_failure(monkeypatch):
         "TMP": str(tmp_path),
         "PYTEST_ADDOPTS": "",
         "PYTHONUTF8": "1",
+        # The profile above is synthetic, so the user site holding the
+        # installed pytest must be named explicitly or the child cannot
+        # import it.
+        "PYTHONUSERBASE": site.getuserbase(),
     }
     for name in ("SYSTEMDRIVE", "SYSTEMROOT", "WINDIR"):
         value = os.environ.get(name)
