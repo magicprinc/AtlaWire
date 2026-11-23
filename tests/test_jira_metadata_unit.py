@@ -692,8 +692,13 @@ def test_transition_fields_reject_an_unusable_id_before_any_session(
             token=TOKEN,
             transition_id=cast("str | None", transition_id),
         )
-    if isinstance(transition_id, str):
-        assert transition_id not in str(raised.value)
+    message = str(raised.value)
+    if transition_id == "":
+        # An empty ID must be asserted exactly; testing that "" is absent from
+        # the message could never pass.
+        assert message == "Expected a non-empty Jira transition ID."
+    elif isinstance(transition_id, str):
+        assert transition_id not in message
 
 
 @pytest.mark.parametrize(
@@ -761,6 +766,43 @@ def test_a_malformed_late_transition_rejects_the_whole_document(
 
     with pytest.raises(AtlaWireError, match="transition objects"):
         read_transition_fields(monkeypatch, document)
+
+
+def test_a_valid_late_row_with_a_string_id_and_extra_members_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue_type: dict[str, object] = {
+        "id": "2",
+        "subtask": False,
+        "name": "Task",
+        "pluginIssueType": {"nested": [None]},
+        "fields": {"summary": {"required": True}},
+    }
+    transition: dict[str, object] = {
+        "id": "41",
+        "name": "Done",
+        "to": None,
+        "fields": {},
+        "pluginTransition": [None],
+    }
+    create_document: dict[str, object] = {
+        "projects": [{"issuetypes": [{"id": "1"}, issue_type]}]
+    }
+    transition_document: dict[str, object] = {
+        "transitions": [{"id": "31"}, transition]
+    }
+
+    created, create_seen, _ = read_create_meta(monkeypatch, create_document)
+    offered, transition_seen, _ = read_transition_fields(
+        monkeypatch, transition_document
+    )
+
+    assert created == create_document
+    assert offered == transition_document
+    assert create_seen == [
+        (CREATE_META_PATH, {"expand": "projects.issuetypes.fields"})
+    ]
+    assert transition_seen == [(TRANSITIONS_PATH, {"expand": "transitions.fields"})]
 
 
 def test_a_malformed_late_transition_field_rejects_the_whole_document(

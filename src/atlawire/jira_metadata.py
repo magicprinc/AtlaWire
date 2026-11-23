@@ -85,7 +85,8 @@ def get_create_meta(
     path. The fixed ``expand`` value is what makes Jira include each issue
     type's field metadata. The legacy 8.22 ``projects`` array and each present
     ``issuetypes`` array and ``fields`` map are validated as documented objects
-    before anything is returned. Absent optional members stay absent.
+    before anything is returned; every issue type must also carry the
+    documented non-empty string ``id``. Absent optional members stay absent.
     """
     _check_project(project)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
@@ -119,7 +120,8 @@ def get_transition_fields(
     ``transition_id`` is sent as the documented opaque ``transitionId`` value
     and is never placed in the path. Requests performs the query encoding.
     Each transition and each present ``fields`` map must have the documented
-    object shape, so a malformed late entry rejects the whole document instead
+    object shape, and every transition must carry the documented non-empty
+    string ``id``, so a malformed late entry rejects the whole document instead
     of publishing part of it. Reading this endpoint never executes the
     transition.
     """
@@ -200,18 +202,31 @@ def _check_create_project(value: object) -> None:
 
 
 def _check_create_issue_type(value: object) -> None:
-    """Validate one create-metadata issue type and its optional fields."""
+    """Validate one create-metadata issue type, its ID, and optional fields."""
     if not isinstance(value, dict):
         raise AtlaWireError("Expected Jira create metadata issue type objects.")
-    if "fields" not in value:
-        return
-    _check_field_map(value["fields"], "create metadata issue type")
+    if "fields" in value:
+        _check_field_map(value["fields"], "create metadata issue type")
+    if not _has_documented_id(value):
+        raise AtlaWireError("Expected Jira create metadata issue type objects.")
 
 
 def _check_transition(value: object) -> None:
-    """Validate one transition and its optional screen fields."""
+    """Validate one transition, its ID, and its optional screen fields."""
     if not isinstance(value, dict):
         raise AtlaWireError("Expected Jira transition objects.")
-    if "fields" not in value:
-        return
-    _check_field_map(value["fields"], "transition")
+    if "fields" in value:
+        _check_field_map(value["fields"], "transition")
+    if not _has_documented_id(value):
+        raise AtlaWireError("Expected Jira transition objects.")
+
+
+def _has_documented_id(value: _JsonObject) -> bool:
+    """Return whether an object carries the documented non-empty string ``id``.
+
+    Jira 8.22 documents every create-metadata issue type and every transition
+    as an object with a string ``id``. Other members are not inspected, so
+    ``subtask`` and plugin values stay untouched.
+    """
+    issue_id = value.get("id")
+    return isinstance(issue_id, str) and bool(issue_id)
