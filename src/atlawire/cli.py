@@ -107,11 +107,11 @@ from atlawire.confluence import (
     get_page_version,
     get_page_web_url,
     get_space,
-    list_children,
+    list_children_with_metadata,
     list_space_content,
     list_spaces,
     page_id,
-    search_cql,
+    search_cql_with_metadata,
 )
 from atlawire.confluence_conversion import convert_content_body
 from atlawire.confluence_markdown import render_page_markdown
@@ -3010,6 +3010,24 @@ def scan_extension_command(
     help="Exact pull request order (server default when omitted).",
 )
 @click.option(
+    "--role",
+    type=click.Choice(["AUTHOR", "REVIEWER", "PARTICIPANT"]),
+    default=None,
+    help=(
+        "Exact role of a participant. 5.10 needs a username with a role, so "
+        "without --participant the authenticated user's username is resolved "
+        "from the server's X-AUSERNAME header."
+    ),
+)
+@click.option(
+    "--participant",
+    default=None,
+    help=(
+        "Bitbucket username whose role is filtered; defaults to the "
+        "authenticated user and avoids the extra identity request."
+    ),
+)
+@click.option(
     "--limit",
     type=click.IntRange(1, 1000),
     default=25,
@@ -3031,6 +3049,8 @@ def prs(
     repo: str,
     state: str,
     order: str | None,
+    role: str | None,
+    participant: str | None,
     limit: int,
     base_url: str | None,
     token_from_env: bool,
@@ -3038,7 +3058,13 @@ def prs(
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
-    """List a repository's pull requests in server order."""
+    """List a repository's pull requests in server order.
+
+    ``--role`` filters by a participant role. Bitbucket 5.10 documents the
+    filter only as ``username.N`` plus an optional ``role.N`` and silently
+    ignores a bare ``role.N``, so ``--participant`` supplies the username and
+    ``--role`` alone resolves the authenticated user from ``X-AUSERNAME``.
+    """
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
@@ -3049,6 +3075,8 @@ def prs(
             token=token,
             state=state,
             order=order,
+            role=role,
+            participant=participant,
             limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
@@ -4767,7 +4795,13 @@ def jira_author_comments(
 @click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
 @click.option(
-    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+    "--json",
+    "as_json",
+    is_flag=True,
+    help=(
+        "Print a JSON array, or the rows/truncated/total/next object when the "
+        "search is truncated."
+    ),
 )
 @click.option(
     "--limit",
@@ -4801,7 +4835,9 @@ def cql(
     With --expand one raw search page is printed instead of the projected rows:
     CQL, expand, ``start=0``, and limit are sent, and --limit must be at least 1
     because the page is not paged locally. Without it the paginated row
-    projection is unchanged.
+    projection is unchanged, except that a truncated search prints
+    ``{"rows", "truncated", "total", "next"}`` instead of a bare array, so the
+    agent sees the cap.
     """
     if not query.strip():
         raise click.UsageError("Provide a non-empty CQL query.")
@@ -4824,7 +4860,7 @@ def cql(
         click.echo(json.dumps(document))
         return
     try:
-        rows = search_cql(
+        result = search_cql_with_metadata(
             base_url,
             query,
             token=token,
@@ -4833,6 +4869,19 @@ def cql(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
+    if result["truncated"]:
+        click.echo(json.dumps(result))
+        if not as_json:
+            total = ""
+            if result["total"] is not None:
+                total = f" of {result['total']}"
+            click.echo(
+                f"# showing {len(result['rows'])}{total} row(s); "
+                "the search is truncated.",
+                err=True,
+            )
+        return
+    rows = result["rows"]
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -4982,7 +5031,13 @@ def space_content(
 @click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
 @click.option(
-    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+    "--json",
+    "as_json",
+    is_flag=True,
+    help=(
+        "Print a JSON array, or the rows/truncated/total object when the "
+        "listing is truncated."
+    ),
 )
 @click.option(
     "--limit",
@@ -5002,12 +5057,16 @@ def children(
     limit: int,
     allow_http_loopback: bool,
 ) -> None:
-    """List direct child pages of a Confluence page by ID or page link."""
+    """List direct child pages of a Confluence page by ID or page link.
+
+    A truncated listing prints ``{"rows", "truncated", "total"}`` instead of
+    a bare array, so a short list cannot pass for all children.
+    """
     base_url, token = _product_base_url_and_token(
         "confluence", base_url, token_from_env, allow_http_loopback
     )
     try:
-        rows = list_children(
+        result = list_children_with_metadata(
             base_url,
             page_id_or_url,
             token=token,
@@ -5016,6 +5075,19 @@ def children(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
+    if result["truncated"]:
+        click.echo(json.dumps(result))
+        if not as_json:
+            total = ""
+            if result["total"] is not None:
+                total = f" of {result['total']}"
+            click.echo(
+                f"# showing {len(result['rows'])}{total} child page(s); "
+                "the listing is truncated.",
+                err=True,
+            )
+        return
+    rows = result["rows"]
     if as_json:
         click.echo(json.dumps(rows))
         return

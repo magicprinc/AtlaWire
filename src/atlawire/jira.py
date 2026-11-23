@@ -731,10 +731,15 @@ def search_issues(
     query: str,
     *,
     token: str,
+    fields: str | list[str] = _SEARCH_FIELDS,
     limit: int = 50,
     allow_http_loopback: bool = False,
 ) -> list[IssueRow]:
     """Return up to ``limit`` short issue rows in Jira search order.
+
+    ``fields`` is either a string sent verbatim or a list joined with commas in
+    the given order; an empty selection is rejected before any request, like
+    :func:`search_raw` and :func:`search_all_issues`.
 
     Jira 8.22 may omit ``total`` from a search page, so an empty page is the
     only exhaustion proof when it is absent. A known ``total`` is never
@@ -750,6 +755,7 @@ def search_issues(
         base_url,
         query,
         token=token,
+        fields=fields,
         limit=limit,
         allow_http_loopback=allow_http_loopback,
     )["rows"]
@@ -760,13 +766,16 @@ def search_issues_with_metadata(
     query: str,
     *,
     token: str,
+    fields: str | list[str] = _SEARCH_FIELDS,
     limit: int = 50,
     allow_http_loopback: bool = False,
 ) -> IssueSearchMetadata:
     """Вернуть строки поиска вместе с признаком неполноты и заявленным ``total``.
 
     Форма ответа — ``{"rows": [...], "truncated": bool, "total": int | None}``;
-    :func:`search_issues` остаётся прежним списком и делегирует сюда. Если
+    :func:`search_issues` остаётся прежним списком и делегирует сюда.
+    ``fields`` проверяется тем же валидатором, что у :func:`search_raw` и
+    :func:`search_all_issues`, и уходит в каждый запрос.
     известный ``total`` больше числа строк, выдача урезана лимитом; если
     сервер не прислал ``total`` и лимит достигнут, полноту доказать нельзя,
     поэтому ``truncated`` тоже истинно — ложного «всё прочитано» нет.
@@ -775,6 +784,7 @@ def search_issues_with_metadata(
     """
     if not query.strip():
         raise AtlaWireError("Expected a non-empty JQL query.")
+    selected = _search_fields_value(fields)
     if (
         not isinstance(limit, int)
         or isinstance(limit, bool)
@@ -786,7 +796,7 @@ def search_issues_with_metadata(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/search"
     with bearer_session(token) as session:
-        rows, truncated, total = _read_search(session, url, query, limit)
+        rows, truncated, total = _read_search(session, url, query, selected, limit)
     return IssueSearchMetadata(rows=rows, truncated=truncated, total=total)
 
 
@@ -1563,10 +1573,11 @@ def _user_text(value: object, label: str) -> str:
 
 
 def _read_search(
-    session: requests.Session, url: str, query: str, limit: int
+    session: requests.Session, url: str, query: str, fields: str, limit: int
 ) -> tuple[list[IssueRow], bool, int | None]:
     """Прочитать не более ``limit`` строк и вернуть ``(rows, truncated, total)``.
 
+    ``fields`` уже прошёл общий валидатор и уходит в каждый запрос как есть.
     ``truncated`` считается из уже полученных ответов: известный ``total``
     больше числа строк означает обрезку лимитом; если сервер не прислал
     ``total``, а лимит достигнут, полноту доказать нельзя, поэтому результат
@@ -1585,7 +1596,7 @@ def _read_search(
             url,
             params={
                 "jql": query,
-                "fields": _SEARCH_FIELDS,
+                "fields": fields,
                 "startAt": start,
                 "maxResults": requested,
             },
@@ -1675,9 +1686,9 @@ def _search_page(
 def _search_fields_value(fields: str | list[str]) -> str:
     """Вернуть значение ``fields`` для query, отвергая пустой выбор.
 
-    Одна проверка на :func:`search_raw` и :func:`search_all_issues`: строка
-    уходит как есть, список — через запятую в заданном порядке, пустая строка
-    или список падают до запроса.
+    Одна проверка на :func:`search_raw`, :func:`search_issues` и
+    :func:`search_all_issues`: строка уходит как есть, список — через запятую
+    в заданном порядке, пустая строка или список падают до запроса.
     """
     if isinstance(fields, str):
         if not fields.strip():

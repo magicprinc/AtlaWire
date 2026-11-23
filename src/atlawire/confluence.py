@@ -130,6 +130,19 @@ class ContentRows(TypedDict):
     truncated: bool
 
 
+class ContentSearchMetadata(TypedDict):
+    """A bounded CQL search plus the server's own completeness signal.
+
+    ``total`` — ``totalSize`` последней страницы, ``None`` если сервер его не
+    прислал; ``next`` — незапрошенная ссылка продолжения с последней страницы.
+    """
+
+    rows: list[ContentRow]
+    truncated: bool
+    total: int | None
+    next: str | None
+
+
 class ChildRow(TypedDict):
     """A short direct-child row shared by the children text and JSON output."""
 
@@ -200,23 +213,29 @@ def get_page(
     page_id_or_url: str | int,
     *,
     token: str,
+    expand: str = _PAGE_EXPAND,
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
     """Return the Confluence page JSON from the configured instance.
 
-    The server payload is returned unchanged; only its identity, type, title,
-    and ``body.storage.value`` are validated. The configured base URL is always
-    the request destination, even when a page link is supplied.
+    The server payload is returned unchanged; only its identity, type, and title
+    are validated, plus ``body.storage.value`` when ``expand`` asks for it. The
+    configured base URL is always the request destination, even when a page
+    link is supplied. ``expand`` is sent verbatim and defaults to the fixed
+    body/version/space/ancestors list, so omitted callers behave as before.
     """
     requested_id = page_id(page_id_or_url)
+    requested_expand = _page_expand(expand)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     with bearer_session(token) as session:
         page = get_json_object(
             session,
             f"{base}/rest/api/content/{requested_id}",
-            params={"expand": _PAGE_EXPAND},
+            params={"expand": requested_expand},
         )
-    return _validated_page(page, requested_id)
+    return _validated_page(
+        page, requested_id, require_body=_has_body_expansion(requested_expand)
+    )
 
 
 def get_page_web_url(
@@ -299,7 +318,29 @@ def _validated_webui_path(value: str) -> str | None:
     return None
 
 
-def _validated_page(page: dict[str, object], requested_id: str) -> dict[str, object]:
+def _page_expand(value: str) -> str:
+    """Reject an empty page expansion before any request is made."""
+    if not isinstance(value, str) or not value.strip():
+        raise AtlaWireError("Expected a non-empty Confluence page expand list.")
+    return value
+
+
+def _has_body_expansion(expand: str) -> bool:
+    """Return whether ``expand`` asks for the page's storage body.
+
+    Confluence expansions are comma-separated; ``body`` and ``body.storage``
+    both request the storage representation, so only those selections require
+    a ``body.storage.value`` in the response. Any other expansion may legally
+    omit the body, so it is returned unchanged without that check.
+    """
+    return any(
+        part.strip() in {"body", "body.storage"} for part in expand.split(",")
+    )
+
+
+def _validated_page(
+    page: dict[str, object], requested_id: str, *, require_body: bool = True
+) -> dict[str, object]:
     returned_id = page.get("id")
     if isinstance(returned_id, bool):
         raise AtlaWireError(_INVALID_PAGE)
@@ -310,6 +351,8 @@ def _validated_page(page: dict[str, object], requested_id: str) -> dict[str, obj
         raise AtlaWireError(_INVALID_PAGE)
     if page.get("type") != "page" or not isinstance(page.get("title"), str):
         raise AtlaWireError(_INVALID_PAGE)
+    if not require_body:
+        return page
     body = page.get("body")
     if not isinstance(body, dict):
         raise AtlaWireError(_INVALID_PAGE)
@@ -415,13 +458,47 @@ def search_cql(
     reached or an empty page proves exhaustion, and any error discards rows
     already read instead of returning a partial result. A zero limit returns
     no rows and creates no session, matching the legacy behavior.
+
+    [search_cql_with_metadata][atlawire.confluence.search_cql_with_metadata]
+    reports the same rows with the server's completeness signal.
+    """
+    return search_cql_with_metadata(
+        base_url,
+        query,
+        token=token,
+        limit=limit,
+        allow_http_loopback=allow_http_loopback,
+    )["rows"]
+
+
+def search_cql_with_metadata(
+    base_url: str,
+    query: str,
+    *,
+    token: str,
+    limit: int = CQL_LIMIT_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> ContentSearchMetadata:
+    """Return up to ``limit`` short content rows plus the server's own signal.
+
+    The request sequence matches
+    [search_cql][atlawire.confluence.search_cql], but the result is
+    ``{"rows", "truncated", "total", "next"}``: ``truncated`` is true when
+    the server still had rows (its ``totalSize`` exceeds the rows read, or the
+    last page carries a continuation), ``total`` is that ``totalSize`` or
+    ``None``, and ``next`` is the last page's continuation link, which is
+    never followed. A zero limit returns an empty listing without a session.
+
+    This is a separate function because ``search_cql`` returns a plain
+    ``list`` that existing callers index, iterate, and serialize; widening
+    that shape would break them, so completeness-aware callers opt in here.
     """
     if not query.strip():
         raise AtlaWireError("Expected a non-empty CQL query.")
     _validate_limit(limit, CQL_LIMIT_MIN, CQL_LIMIT_MAX)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
-        return []
+        return ContentSearchMetadata(rows=[], truncated=False, total=None, next=None)
     with bearer_session(token) as session:
         collected = _read_rows(
             session,
@@ -433,7 +510,12 @@ def search_cql(
             project=_content_row,
             identity=_content_identity,
         )
-    return collected.rows
+    return ContentSearchMetadata(
+        rows=collected.rows,
+        truncated=collected.truncated,
+        total=collected.total,
+        next=collected.next,
+    )
 
 
 def list_spaces(
@@ -865,11 +947,15 @@ def _validate_limit(limit: int, minimum: int, maximum: int) -> None:
 
 
 class _RowsPage[RowT](NamedTuple):
-    """Rows collected by the pager plus the last page's own completeness signal."""
+    """Строки страницы плюс последний сигнал полноты от сервера.
+
+    ``next`` — незапрошенная ссылка продолжения с последней страницы.
+    """
 
     rows: list[RowT]
     truncated: bool
     total: int | None
+    next: str | None
 
 
 def _read_rows[RowT](
@@ -912,7 +998,9 @@ def _read_rows[RowT](
                     f"Confluence {label} returned an empty page before all "
                     f"matches; {empty_hint}"
                 )
-            return _RowsPage(rows=rows, truncated=False, total=known_total)
+            return _RowsPage(
+                rows=rows, truncated=False, total=known_total, next=None
+            )
         _check_repeated_rows(results, identity, seen_ids, seen_fallback_pages, label)
         # A server cap may shorten a page; the next offset uses the actual rows.
         rows.extend(project(result) for result in results)
@@ -921,9 +1009,10 @@ def _read_rows[RowT](
                 rows=rows,
                 truncated=_page_has_more(page, known_total, len(rows)),
                 total=known_total,
+                next=_page_next(page),
             )
     # The validated limits are positive, so this fallback only serves limit=0.
-    return _RowsPage(rows=rows, truncated=False, total=known_total)
+    return _RowsPage(rows=rows, truncated=False, total=known_total, next=None)
 
 
 def _check_repeated_rows(
@@ -1080,6 +1169,19 @@ def _page_has_more(page: dict[str, object], total: int | None, count: int) -> bo
     if total is not None:
         return total > count
     return _page_has_next(page)
+
+
+def _page_next(page: dict[str, object]) -> str | None:
+    """Вернуть строковую ссылку продолжения последней страницы, если она есть.
+
+    Ссылка не запрашивается и не проверяется по offset, чтобы страница,
+    остановленная точно по лимиту, оставалась такой же терпимой, как раньше:
+    значение только попадает в metadata-ответ и никогда не используется для
+    следующего запроса. Не-строковое значение в metadata не отдаётся.
+    """
+    links = page.get("_links")
+    link = links.get("next") if isinstance(links, dict) else None
+    return link if isinstance(link, str) else None
 
 
 def _valid_utf8(value: str) -> bool:

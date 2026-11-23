@@ -50,6 +50,10 @@ _TAG_LIMIT_DEFAULT = 25
 _PULL_REQUEST_STATES = frozenset({"OPEN", "MERGED", "DECLINED", "ALL"})
 _PULL_REQUEST_ORDERS = frozenset({"NEWEST", "OLDEST"})
 _PULL_REQUEST_DIRECTIONS = frozenset({"INCOMING", "OUTGOING"})
+_PULL_REQUEST_ROLES = frozenset({"AUTHOR", "REVIEWER", "PARTICIPANT"})
+# Bitbucket Server 5.10 публикует роль в фильтре участников через
+# обязательный username.N; отдельного role.N без username.N нет.
+_DASHBOARD_PULL_REQUESTS_PATH = "/rest/api/1.0/dashboard/pull-requests"
 _TAG_ORDERS = frozenset({"ALPHABETICAL", "MODIFICATION"})
 _SOURCE_PATH_CHANGE_TYPES = frozenset({"MOVE", "COPY", "RENAME"})
 # Four times the shared 8 MiB JSON response budget in atlawire.http. This is a
@@ -1168,6 +1172,8 @@ def list_pull_requests(
     order: str | None = None,
     author: str | None = None,
     direction: str | None = None,
+    role: str | None = None,
+    participant: str | None = None,
     limit: int = _PULL_REQUEST_LIMIT_DEFAULT,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
@@ -1181,8 +1187,19 @@ def list_pull_requests(
     sent only when given, so otherwise the server default applies. ``author``
     must be a nonempty Bitbucket participant username: 5.10 documents no
     ``author`` parameter, but its participant filter selects by username, so
-    exactly ``username.1=<author>`` and ``role.1=AUTHOR`` are sent. Both
-    ``author`` and ``direction`` are genuine server-side filters;
+    exactly ``username.1=<author>`` and ``role.1=AUTHOR`` are sent.
+
+    ``role`` selects pull requests where one participant holds that exact role
+    (``AUTHOR``, ``REVIEWER``, or ``PARTICIPANT``). The 5.10 reference makes
+    ``role.N`` optional only next to a mandatory ``username.N``, and the live
+    5.10.0 server silently ignores a bare ``role.1``, so this function never
+    sends one: an explicit ``participant`` fills ``username.1`` and a given
+    ``role`` fills ``role.1``. With ``role`` alone the authenticated user's
+    username is read from the server's ``X-AUSERNAME`` header in one bounded
+    dashboard request, which the REST reference does not document. ``author``
+    cannot be combined with ``role`` or ``participant``.
+
+    Both ``author`` and ``direction`` are genuine server-side filters;
     ``participantStatus`` exists only on ``/dashboard/pull-requests``, is not
     documented for this endpoint, and is never sent here. The fixed
     ``/pull-requests`` route is paged from ``start=0`` with no more than the
@@ -1201,9 +1218,18 @@ def list_pull_requests(
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
         raise AtlaWireError("The pull request limit must be between 1 and 1000.")
     params = _pull_request_params(state, order, author, direction)
+    participant_name, participant_role = _participant_filter(
+        author, participant, role
+    )
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_repository_url(base, repo)}/pull-requests"
     with bearer_session(token) as session:
+        if participant_role is not None and participant_name is None:
+            participant_name = _authenticated_username(session, base)
+        if participant_name is not None:
+            params["username.1"] = participant_name
+        if participant_role is not None:
+            params["role.1"] = participant_role
         return _read_pages(
             session,
             url,
@@ -1251,7 +1277,7 @@ def list_my_pull_requests(
         raise AtlaWireError("The pull request limit must be between 1 and 1000.")
     params = _dashboard_params(state, role, participant_status)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    url = f"{base}/rest/api/1.0/dashboard/pull-requests"
+    url = f"{base}{_DASHBOARD_PULL_REQUESTS_PATH}"
     with bearer_session(token) as session:
         return _read_pages(
             session,
@@ -2667,6 +2693,76 @@ def _pull_request_params(
             )
         params["direction"] = direction
     return params
+
+
+def _participant_filter(
+    author: str | None, participant: str | None, role: str | None
+) -> tuple[str | None, str | None]:
+    """Проверить документированный фильтр участников до любого запроса.
+
+    Справочник 5.10 описывает фильтр как обязательный ``username.N`` плюс
+    необязательный ``role.N``; отдельный ``role.1`` фильтром не является и
+    живой сервер 5.10.0 его молча игнорирует. Поэтому наружу не уходит
+    ``role.1`` без ``username.1``. Пустой ``participant`` означает, что имя
+    аутентифицированного пользователя ещё нужно разрешить через заголовок
+    ``X-AUSERNAME``. ``author`` сохраняет исторический смысл (``username.1``
+    с ``role.1=AUTHOR``) и не смешивается с новой парой.
+    """
+    if role is not None and (
+        not isinstance(role, str) or role not in _PULL_REQUEST_ROLES
+    ):
+        raise AtlaWireError(
+            "The pull request role must be AUTHOR, REVIEWER, or PARTICIPANT."
+        )
+    if author is not None and (participant is not None or role is not None):
+        raise AtlaWireError(
+            "Use author or the role/participant filter, not both."
+        )
+    if participant is not None:
+        return _author_name(participant), role
+    return None, role
+
+
+def _authenticated_username(session: requests.Session, base: str) -> str:
+    """Узнать имя аутентифицированного пользователя одним bounded-чтением.
+
+    Справочник 5.10 не публикует маршрут текущего пользователя, но живой
+    сервер возвращает его в заголовке ``X-AUSERNAME`` любого успешного
+    авторизованного ответа. Запрашивается одна страница dashboard с
+    ``limit=1``; тело не читается, проверяется только заголовок. Отсутствие,
+    пустое значение или control-символы дают явную ошибку с подсказкой
+    передать ``participant``; имя никогда не печатается и уходит только в
+    query как ``username.1``.
+    """
+    try:
+        with session.get(
+            f"{base}{_DASHBOARD_PULL_REQUESTS_PATH}",
+            params={"state": "OPEN", "limit": 1},
+            timeout=(5, 30),
+            allow_redirects=False,
+            stream=True,
+        ) as response:
+            _check_status(response.status_code, method="GET")
+            value = response.headers.get("X-AUSERNAME")
+    except requests.Timeout:
+        raise AtlaWireError(
+            "Request timed out.", category="transport", method="GET"
+        ) from None
+    except requests.RequestException:
+        raise AtlaWireError(
+            _TRANSPORT_MESSAGE, category="transport", method="GET"
+        ) from None
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or _REVISION_UNSAFE.search(value)
+    ):
+        raise AtlaWireError(
+            "Bitbucket did not report the authenticated username; "
+            "pass participant explicitly."
+        )
+    return _require_encodable(value, "username")
 
 
 def _dashboard_params(
