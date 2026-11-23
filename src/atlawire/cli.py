@@ -3573,6 +3573,26 @@ def related_repos(
     ),
 )
 @click.option(
+    "--fields",
+    default=None,
+    help="Jira field list sent verbatim as fields; without it Jira returns all fields.",
+)
+@click.option(
+    "--properties",
+    default=None,
+    help="Issue property keys sent verbatim as properties.",
+)
+@click.option(
+    "--update-history",
+    is_flag=True,
+    help="Ask Jira to include the changelog of the updated fields.",
+)
+@click.option(
+    "--fail-fast",
+    is_flag=True,
+    help="Stop at the first field error instead of returning partial data.",
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def issue(
@@ -3582,33 +3602,34 @@ def issue(
     markdown: bool,
     wiki: bool,
     expand: str | None,
+    fields: str | None,
+    properties: str | None,
+    update_history: bool,
+    fail_fast: bool,
     allow_http_loopback: bool,
 ) -> None:
     """Get a Jira issue as JSON or Markdown by key or browse URL.
 
     ``--expand`` replaces the default ``renderedFields`` expansion and is sent
     verbatim as the expand query parameter; without it the issue is read with
-    rendered fields as before.
+    rendered fields as before. ``--fields``, ``--properties``, ``--update-history``
+    and ``--fail-fast`` map to the remaining documented get-issue query parameters.
     """
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
     try:
-        if expand is None:
-            result = get_issue(
-                base_url,
-                key_or_url,
-                token=token,
-                allow_http_loopback=allow_http_loopback,
-            )
-        else:
-            result = get_issue(
-                base_url,
-                key_or_url,
-                token=token,
-                expand=expand,
-                allow_http_loopback=allow_http_loopback,
-            )
+        result = get_issue(
+            base_url,
+            key_or_url,
+            token=token,
+            expand="renderedFields" if expand is None else expand,
+            fields=fields,
+            properties=properties,
+            update_history=update_history,
+            fail_fast=fail_fast,
+            allow_http_loopback=allow_http_loopback,
+        )
         rendered = (
             render_issue_markdown(result, use_wiki=wiki) if markdown or wiki else None
         )

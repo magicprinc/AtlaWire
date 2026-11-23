@@ -203,16 +203,34 @@ def get_issue(
     *,
     token: str,
     expand: str = "renderedFields",
+    fields: str | None = None,
+    properties: str | None = None,
+    update_history: bool = False,
+    fail_fast: bool = False,
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
-    """Return the Jira issue JSON expanded by ``expand``; rendered fields by default."""
+    """Return the Jira issue JSON expanded by ``expand``; rendered fields by default.
+
+    ``fields`` and ``properties`` are sent verbatim when given. ``update_history``
+    and ``fail_fast`` are sent as ``true`` only when requested, so a default call
+    keeps the server's own defaults instead of pinning them.
+    """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    params = {"expand": expand}
+    if fields is not None:
+        params["fields"] = fields
+    if properties is not None:
+        params["properties"] = properties
+    if update_history:
+        params["updateHistory"] = "true"
+    if fail_fast:
+        params["failFast"] = "true"
     with bearer_session(token) as session:
         issue = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}",
-            params={"expand": expand},
+            params=params,
         )
     # The returned key can legitimately differ from the requested one after a
     # move, so only its own syntax is checked; equality is not pinned.

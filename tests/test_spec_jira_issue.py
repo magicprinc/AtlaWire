@@ -95,3 +95,28 @@ def test_get_issue_errors_are_sanitized_and_not_retried(server, status, capsys, 
     assert TOKEN not in text
     assert len(httpd.calls) == 1
     assert httpd.calls[0][2] == "Bearer " + TOKEN
+
+
+def test_get_issue_sends_every_documented_query_option(server):
+    httpd, base = server
+    assert (
+        jira.get_issue(
+            base,
+            "SPEC-42",
+            token=TOKEN,
+            expand="names",
+            fields="summary,status",
+            properties="alpha,beta",
+            update_history=True,
+            fail_fast=True,
+            allow_http_loopback=True,
+        )
+        == ISSUE
+    )
+    assert parse_qs(urlsplit(httpd.calls[0][1]).query) == {
+        "expand": ["names"],
+        "fields": ["summary,status"],
+        "properties": ["alpha,beta"],
+        "updateHistory": ["true"],
+        "failFast": ["true"],
+    }

@@ -39,7 +39,9 @@ Every command makes one bounded read; none of them writes. Output and failure sh
   `jira-author-comments`, `pr-diff-complete`.
 - **`--fields`, `--expand`.** `jql --fields/--expand` prints one raw
   `/rest/api/2/search` envelope with those values sent verbatim instead of the short
-  projection. `issue --expand` replaces the default `renderedFields` expansion;
+  projection. `issue --expand` replaces the default `renderedFields` expansion, while
+  `--fields`, `--properties`, `--update-history` and `--fail-fast` pass the remaining
+  documented get-issue query parameters through verbatim;
   `cql --expand` prints one raw search page; `page --expand` prints one raw page and
   cannot be combined with `--markdown`/`--storage`. `convert-body --expand` is
   optional.

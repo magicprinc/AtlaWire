@@ -432,9 +432,10 @@ JQL-поиск для коротких строк фиксирует
 проверяет `startAt`/`maxResults`/`total` и отвергает дрейф метаданных; Jira 8.22 может не
 прислать `total` — тогда пустая страница единственное доказательство конца.
 
-**`get_issue(base_url, key_or_url, *, token, expand="renderedFields", allow_http_loopback=False) -> dict[str, object]`** — `jira.py:200`
-- REST: `GET /rest/api/2/issue/{key}`; query `expand` (по умолчанию `renderedFields`,
-  передаётся verbatim).
+**`get_issue(base_url, key_or_url, *, token, expand="renderedFields", fields=None, properties=None, update_history=False, fail_fast=False, allow_http_loopback=False) -> dict[str, object]`** — `jira.py:200`
+- REST: `GET /rest/api/2/issue/{key}`; все пять документированных query-параметров: `expand`
+  (по умолчанию `renderedFields`), `fields` и `properties` передаются verbatim, `updateHistory`
+  и `failFast` отправляются только по запросу.
 - → сырой JSON задачи (`fields` + `renderedFields`, неизвестные поля сохраняются; Markdown нет).
 - Ошибки/лимиты: ключ не `[A-Z][A-Z0-9_]*-[0-9]+`/URL; ответ без `key`/`fields`; после move
   допустим другой ключ — проверяется синтаксис; один GET.

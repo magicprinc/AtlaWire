@@ -205,6 +205,37 @@ def test_issue_expand_is_forwarded_and_the_default_kept(server) -> None:
     assert _only_call(server)[2] == {"expand": ["renderedFields"]}
 
 
+def test_issue_forwards_fields_and_properties_and_history_flags(server) -> None:
+    """Every documented get-issue query option reaches the request exactly."""
+    document = {"key": "DEMO-42", "fields": {"summary": "s"}}
+    server.routes = {JIRA_ISSUE: document}
+
+    result = _invoke(
+        server,
+        (
+            "issue",
+            "DEMO-42",
+            "--fields",
+            "summary,status",
+            "--properties",
+            "alpha",
+            "--update-history",
+            "--fail-fast",
+        ),
+        "jira",
+    )
+
+    assert result.exit_code == 0, result.stderr
+    assert json.loads(result.stdout) == document
+    assert _only_call(server)[2] == {
+        "expand": ["renderedFields"],
+        "fields": ["summary,status"],
+        "properties": ["alpha"],
+        "updateHistory": ["true"],
+        "failFast": ["true"],
+    }
+
+
 def test_cql_expand_prints_the_raw_search_page(server) -> None:
     """--expand sends one raw search page instead of the projected rows."""
     document = {"results": [], "start": 0, "limit": 2, "size": 0, "totalSize": 0}
