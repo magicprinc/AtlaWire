@@ -8,8 +8,11 @@ destination (``http(s)``, a relative path or ``mailto:``) in an ordinary link.
 An ``ac:image`` becomes a Markdown image. Macro parameters are shown next to
 the macro name, so a parameter is never dropped; a parameter whose value is a
 nested ``ri:attachment`` shows the attachment filename instead of an empty
-value. A macro without a dedicated rule shows a readable marker. Storage that
-is too large or too deeply nested falls back to a literal fenced block.
+value. An ``info``/``note``/``warning``/``tip``/``panel`` macro keeps its whole
+body in a blockquote labelled with the panel type, and a ``status`` macro
+becomes visible inline-code text. A macro without a dedicated rule shows a
+readable marker. Storage that is too large or too deeply nested falls back to a
+literal fenced block.
 """
 
 import re
@@ -39,6 +42,10 @@ _RECURSION_FALLBACK = (
 _CODE_FALLBACK = "_Code conversion fallback: no plain-text code payload was available._"
 _UNNAMED_MACRO = "unknown"
 _UNNAMED_IMAGE = "image"
+# Panel macros keep their whole body, so the type is visible as a label.
+_PANEL_MACROS = frozenset({"info", "note", "warning", "tip", "panel"})
+# A panel title that stays on the label line may not look like a Markdown block.
+_BLOCK_LINE = re.compile(r"(?:[-*+] |[0-9]{1,9}[.)] |#{1,6} |```|\||> )")
 # ``language`` is already visible as the fence info string of a code macro.
 _CODE_PARAMETERS = frozenset({"language"})
 # Percent-encoding is applied only to characters that would end a Markdown
@@ -91,6 +98,10 @@ class _ConfluenceMarkdownConverter(SafeMarkdownConverter):
                     fence = fenced_block(code, _code_info(parameters))
                     return "\n\n" + (marker + "\n\n" if marker else "") + fence + "\n\n"
             return _code_fallback(text)
+        if normalized in _PANEL_MACROS:
+            return _panel_macro(name, parameters, text)
+        if normalized == "status":
+            return _status_macro(name, parameters, text)
         return _unsupported_macro(name, parameters, text)
 
     def convert_ac_parameter(self, el: Tag, text: str, parent_tags: set[str]) -> str:
@@ -236,8 +247,7 @@ def _parameter_details(parameters: list[_Parameter]) -> str:
 
 def _macro_record(name: object, details: str, *, supported: bool) -> str:
     """Build a visible macro record; ``details`` keeps every parameter readable."""
-    shown = _label(name) if isinstance(name, str) else ""
-    label = shown or _UNNAMED_MACRO
+    label = _shown_macro_name(name)
     title = f"{label} | {details}" if details else label
     prefix = "[Macro: " if supported else "[Unsupported macro: "
     return prefix + title + "]"
@@ -292,6 +302,87 @@ def _unsupported_macro(name: object, parameters: list[_Parameter], text: str) ->
         return "\n\n" + marker + "\n\n" + body + "\n\n"
     return "\n\n" + marker + "\n\n"
 
+
+def _shown_macro_name(name: object) -> str:
+    """Return the escaped macro name, or the unnamed placeholder."""
+    shown = _label(name) if isinstance(name, str) else ""
+    return shown or _UNNAMED_MACRO
+
+
+def _labelled_parameters(
+    parameters: list[_Parameter], wanted: str
+) -> tuple[str, list[_Parameter]]:
+    """Split off the one parameter a macro shows as its visible label.
+
+    Only the first matching parameter becomes the label; every other parameter
+    stays in the record, so a panel or status macro never drops data it cannot
+    show in the label itself.
+    """
+    label = ""
+    rest: list[_Parameter] = []
+    for parameter in parameters:
+        if not label and one_line(parameter.name).lower() == wanted:
+            label = one_line(parameter.value)
+            continue
+        rest.append(parameter)
+    return label, rest
+
+
+def _quote_line(line: str) -> str:
+    """Prefix one line of a panel body with a blockquote marker."""
+    return "> " + line if line.strip() else ">"
+
+
+def _panel_macro(name: object, parameters: list[_Parameter], text: str) -> str:
+    """Keep a panel body in a blockquote labelled with the panel type.
+
+    A title parameter replaces the type name as the label, and every other
+    parameter stays visible in a macro record before the quote.
+    """
+    title, extras = _labelled_parameters(parameters, "title")
+    type_name = one_line(name).capitalize() if isinstance(name, str) else ""
+    shown = _label(title) if title else _label(type_name) or _UNNAMED_MACRO
+    details = _parameter_details(extras)
+    marker = _macro_record(name, details, supported=True) + "\n\n" if details else ""
+    head = f"> **{shown}:**"
+    body = text.strip()
+    if not body:
+        return "\n\n" + marker + head + "\n\n"
+    lines = body.splitlines()
+    if _BLOCK_LINE.match(lines[0]):
+        quoted = head + "\n" + _quote_line(lines[0])
+    else:
+        quoted = head + " " + lines[0]
+    for line in lines[1:]:
+        quoted += "\n" + _quote_line(line)
+    return "\n\n" + marker + quoted + "\n\n"
+
+
+def _inline_code(value: str) -> str:
+    """Format literal text as one inline span, keeping embedded backticks."""
+    content = one_line(value)
+    longest = max((len(run) for run in re.findall(r"`+", content)), default=0)
+    fence = "`" * (longest + 1)
+    pad = " " if content[:1] in "` " or content[-1:] in "` " else ""
+    return f"{fence}{pad}{content}{pad}{fence}"
+
+
+def _status_macro(name: object, parameters: list[_Parameter], text: str) -> str:
+    """Render a status macro as visible inline text next to its type.
+
+    The title is the visible status value, so it stays inside the inline span
+    without Markdown escaping; a parameter that is not the title is shown in a
+    macro record, because the span has no room to present it readably.
+    """
+    title, extras = _labelled_parameters(parameters, "title")
+    span = _inline_code(f"[STATUS] {title}" if title else "[STATUS]")
+    details = _parameter_details(extras)
+    pieces = [_macro_record(name, details, supported=True)] if details else []
+    pieces.append(span)
+    body = text.strip()
+    if body:
+        pieces.append(body)
+    return " ".join(pieces)
 
 def _literal_fallback(heading: str, marker: str, source: str) -> str:
     return heading + "\n\n" + marker + "\n\n" + fenced_block(source, "xml") + "\n"

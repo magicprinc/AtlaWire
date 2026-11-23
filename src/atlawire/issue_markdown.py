@@ -52,9 +52,12 @@ _IMAGE_REFERENCE_PREFIX = _IMAGE_REFERENCE + " "
 # Jira wiki rules kept intentionally narrow. Each pattern owns one syntax and
 # there is no recursive parse: unsupported nesting stays literal text.
 _WIKI_HEADING = re.compile(r"^ {0,3}h([1-6])\.\s*(.*)$")
-_WIKI_CODE = re.compile(r"\{code(?::(?P<params>[^}\n]{0,256}))?\}")
+# ``{code}``/``{noformat}`` open a block macro only when they are not the
+# inner part of an inline ``{{code}}`` span: the lookbehind keeps the block
+# scan from consuming the braces that belong to inline code.
+_WIKI_CODE = re.compile(r"(?<!\{)\{code(?::(?P<params>[^}\n]{0,256}))?\}")
 _WIKI_CODE_CLOSE = re.compile(r"\{code\}")
-_WIKI_NOFORMAT = re.compile(r"\{noformat\}")
+_WIKI_NOFORMAT = re.compile(r"(?<!\{)\{noformat\}")
 _WIKI_NOFORMAT_CLOSE = re.compile(r"\{noformat\}")
 _WIKI_LANGUAGE = re.compile(r"[A-Za-z0-9_+.#-]{1,32}")
 _WIKI_SAFE_LINK = re.compile(
