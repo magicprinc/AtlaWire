@@ -392,27 +392,6 @@ class _CountingRaw:
         self.closed = True
 
 
-class _GzipDecodingRaw(_CountingRaw):
-    """A raw body whose stream yields gzip-decoded content."""
-
-    def __init__(self, body: bytes) -> None:
-        super().__init__(body)
-        self._decoded = gzip.decompress(body)
-
-    def stream(
-        self, chunk_size: int | None, decode_content: bool = True
-    ) -> Iterator[bytes]:
-        if not decode_content:
-            raise AssertionError("the adapter must request decoded content")
-        if not self._decoded:
-            return
-        size = len(self._decoded) if chunk_size is None else chunk_size
-        for offset in range(0, len(self._decoded), size):
-            chunk = self._decoded[offset : offset + size]
-            self.consumed += len(chunk)
-            yield chunk
-
-
 class _FailingRaw(_CountingRaw):
     """A raw body that yields one prefix and then raises a stream error."""
 
@@ -439,11 +418,13 @@ class _SyntheticAdapter(BaseAdapter):
         status: int,
         body: bytes,
         location: str | None = None,
+        headers: dict[str, str] | None = None,
         raw_factory: Callable[[bytes], _CountingRaw] | None = None,
     ) -> None:
         self._status = status
         self._body = body
         self._location = location
+        self._headers = headers or {}
         self._raw_factory = raw_factory or _CountingRaw
         self.calls = 0
         self.raw: _CountingRaw | None = None
@@ -463,6 +444,8 @@ class _SyntheticAdapter(BaseAdapter):
         response.status_code = self._status
         response.url = request.url or ""
         response.request = request
+        for name, value in self._headers.items():
+            response.headers[name] = value
         if self._location is not None:
             response.headers["Location"] = self._location
         self.raw = self._raw_factory(self._body)
@@ -708,7 +691,9 @@ def test_compressed_body_exactly_at_the_decoded_cap_is_returned(
     compressed = gzip.compress(payload)
     assert len(compressed) < len(payload)
     adapter = _SyntheticAdapter(
-        status=200, body=compressed, raw_factory=_GzipDecodingRaw
+        status=200,
+        body=compressed,
+        headers={"Content-Encoding": "gzip"},
     )
     session = _install(monkeypatch, adapter)
 
@@ -718,8 +703,58 @@ def test_compressed_body_exactly_at_the_decoded_cap_is_returned(
 
     assert result == payload
     assert adapter.raw is not None
-    assert adapter.raw.consumed == len(payload)
-    _assert_released(adapter.raw)
+    assert adapter.raw.consumed == len(compressed)
+    # The encoded stream is read directly, so requests still considers the
+    # body unconsumed and closes it before releasing the connection.
+    _assert_closed_and_released(adapter.raw)
+    assert session.closed
+
+
+def test_a_complete_gzip_member_returns_the_exact_decoded_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = bytes(range(256)) * 2
+    compressed = gzip.compress(payload)
+    assert compressed.startswith(b"\x1f\x8b")
+    adapter = _SyntheticAdapter(
+        status=200,
+        body=compressed,
+        headers={"Content-Encoding": "gzip"},
+    )
+    session = _install(monkeypatch, adapter)
+
+    result = get_repository_attachment(BASE, REPO, ATTACHMENT_ID, token=TOKEN)
+
+    assert result == payload
+    assert adapter.raw is not None
+    assert adapter.raw.consumed == len(compressed)
+    _assert_closed_and_released(adapter.raw)
+    assert session.closed
+
+
+def test_a_truncated_gzip_member_is_rejected_without_returning_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # urllib3's gzip decoder flushes without validating the eight-byte trailer,
+    # so only an explicit decoder can refuse this member.
+    payload = b"gzip-member-control-" * 8
+    complete = gzip.compress(payload, mtime=0)
+    truncated = complete[:-8]
+    assert len(truncated) < len(complete)
+    adapter = _SyntheticAdapter(
+        status=200,
+        body=truncated,
+        headers={"Content-Encoding": "gzip"},
+    )
+    session = _install(monkeypatch, adapter)
+
+    with pytest.raises(AtlaWireError) as caught:
+        get_repository_attachment(BASE, REPO, ATTACHMENT_ID, token=TOKEN)
+
+    assert str(caught.value) == ("Request failed; check connectivity and TLS settings.")
+    assert payload[:32].decode("ascii") not in str(caught.value)
+    assert adapter.raw is not None
+    _assert_closed_and_released(adapter.raw)
     assert session.closed
 
 
@@ -731,7 +766,9 @@ def test_compressed_body_one_byte_over_the_decoded_cap_raises_and_closes(
     compressed = gzip.compress(payload)
     assert len(compressed) < limit
     adapter = _SyntheticAdapter(
-        status=200, body=compressed, raw_factory=_GzipDecodingRaw
+        status=200,
+        body=compressed,
+        headers={"Content-Encoding": "gzip"},
     )
     session = _install(monkeypatch, adapter)
 
@@ -741,7 +778,7 @@ def test_compressed_body_one_byte_over_the_decoded_cap_raises_and_closes(
         )
 
     assert adapter.raw is not None
-    assert adapter.raw.consumed == len(payload)
+    assert adapter.raw.consumed == len(compressed)
     _assert_closed_and_released(adapter.raw)
     assert session.closed
 

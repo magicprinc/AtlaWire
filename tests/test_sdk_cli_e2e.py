@@ -1,6 +1,13 @@
-"""Installed-CLI loopback tests for library-backed api-request."""
+"""Installed-CLI loopback tests for library-backed api-request and read.
+
+``api-request`` reads its URL/token pair from the product environment;
+``read`` uses the saved-file loader for the canonical agent-facing path. Every
+response, credential and server is synthetic.
+"""
 
 import json
+import subprocess
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
@@ -12,6 +19,7 @@ from tests._loopback import (
     send_json,
     serving,
 )
+from tests.test_read_slice_cli_e2e import saved_credentials
 
 TOKEN = "synthetic-api-request-token-2f7"
 CONTEXTS = {"jira": "/jira", "confluence": "/confluence", "bitbucket": "/bitbucket"}
@@ -177,4 +185,164 @@ def test_api_request_error_contains_status_and_original_body() -> None:
     assert envelope["error"]["status"] == 401
     assert envelope["error"]["classification"] == "authentication"
     assert envelope["error"]["body_json"] == {"message": SENTINEL}
+    assert len(seen) == 1
+
+
+def run_canonical_read(
+    tmp_path: Path,
+    on_get: Callable[[BaseHTTPRequestHandler], None],
+    *arguments: str,
+) -> tuple[subprocess.CompletedProcess[str], list[Request]]:
+    """Run ``read`` through the saved-file loader against one loopback server."""
+    seen: list[Request] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            seen.append(request_record(self))
+            on_get(self)
+
+    with serving(Handler) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        result = run_installed(
+            ["read", *arguments, "--allow-http-loopback"],
+            saved_credentials(tmp_path, origin),
+        )
+    return result, seen
+
+
+def _interrupted_body(handler: BaseHTTPRequestHandler, prefix: bytes) -> None:
+    """Declare more bytes than are sent, then close the connection."""
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(prefix) + 64))
+    handler.end_headers()
+    handler.wfile.write(prefix)
+    handler.wfile.flush()
+    handler.close_connection = True
+
+
+def test_canonical_json_read_reports_an_interrupted_body_as_one_error(
+    tmp_path: Path,
+) -> None:
+    prefix = b'{"partial":'
+
+    def on_get(handler: BaseHTTPRequestHandler) -> None:
+        _interrupted_body(handler, prefix)
+
+    result, seen = run_canonical_read(
+        tmp_path,
+        on_get,
+        "jira.project.get",
+        "--params",
+        '{"projectIdOrKey":"DEMO"}',
+    )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert result.stdout.count("\n") == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["status"] == 200
+    assert envelope["error"]["code"] == "transport_error"
+    assert envelope["error"]["body"] is None
+    assert prefix.decode("ascii") not in result.stdout
+    assert [record[1] for record in seen] == ["/jira/rest/api/2/project/DEMO"]
+
+
+def test_canonical_json_read_rejects_a_non_finite_number_in_one_error(
+    tmp_path: Path,
+) -> None:
+    def on_get(handler: BaseHTTPRequestHandler) -> None:
+        send_bytes(handler, 200, b'{"value": 1e999}', content_type="application/json")
+
+    result, seen = run_canonical_read(
+        tmp_path,
+        on_get,
+        "jira.project.get",
+        "--params",
+        '{"projectIdOrKey":"DEMO"}',
+    )
+
+    assert result.returncode == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["status"] == 200
+    assert envelope["error"]["code"] == "invalid_response"
+    assert "Infinity" not in result.stdout
+    assert len(seen) == 1
+
+
+def test_canonical_binary_read_rejects_partial_content_without_publishing(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "avatar.png"
+
+    def on_get(handler: BaseHTTPRequestHandler) -> None:
+        send_bytes(
+            handler,
+            206,
+            b"partial",
+            content_type="application/octet-stream",
+            extra_headers={"Content-Range": "bytes 0-6/64"},
+        )
+
+    result, seen = run_canonical_read(
+        tmp_path,
+        on_get,
+        "jira.avatar.system",
+        "--params",
+        '{"type":"user"}',
+        "--out",
+        str(destination),
+    )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["status"] == 206
+    assert envelope["error"]["code"] == "invalid_response"
+    assert envelope["error"]["classification"] == "partial_content"
+    assert "data" not in envelope
+    assert not destination.exists()
+    assert list(tmp_path.glob("*.part")) == []
+    assert [record[1] for record in seen] == ["/jira/rest/api/2/avatar/user/system"]
+
+
+def test_canonical_binary_read_reports_an_interrupted_body_as_one_error(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "avatar.png"
+    prefix = b"PRIVATE-BINARY-PREFIX"
+
+    def on_get(handler: BaseHTTPRequestHandler) -> None:
+        _interrupted_body(handler, prefix)
+
+    result, seen = run_canonical_read(
+        tmp_path,
+        on_get,
+        "jira.avatar.system",
+        "--params",
+        '{"type":"user"}',
+        "--out",
+        str(destination),
+    )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert result.stdout.count("\n") == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["status"] == 200
+    assert envelope["error"]["code"] == "transport_error"
+    assert "data" not in envelope
+    assert not destination.exists()
+    assert list(tmp_path.glob("*.part")) == []
+    assert prefix.decode("ascii") not in result.stdout
+    assert prefix.decode("ascii") not in result.stderr
     assert len(seen) == 1

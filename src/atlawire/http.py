@@ -4,11 +4,13 @@ import base64
 import json
 import math
 import re
-from collections.abc import Generator, Iterable, Mapping, Sequence
+import zlib
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from typing import Never, cast
 from urllib.parse import unquote, urlsplit
 
 import requests
+import urllib3.exceptions
 
 _TEXT_LIMIT = 1024 * 1024
 # Allow more room for structured documents than raw source while bounding
@@ -17,9 +19,12 @@ _JSON_LIMIT = 8 * 1024 * 1024
 _CHUNK_SIZE = 64 * 1024
 _TEXT_LIMIT_MESSAGE = "The text response exceeds the 1 MiB limit."
 _JSON_LIMIT_MESSAGE = "The JSON response exceeds the 8 MiB limit."
+_TRANSPORT_MESSAGE = "Request failed; check connectivity and TLS settings."
 _PARTIAL_RESPONSE_MESSAGE = "HTTP 206: partial content is not supported."
 _SECRET_ECHO_MESSAGE = "The response contained the session bearer token."
 _NO_CONTENT = object()
+_GZIP_WBITS = 16 + zlib.MAX_WBITS
+_GZIP_CODINGS = frozenset({"gzip", "x-gzip"})
 _BIDI_CONTROLS = frozenset(
     "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 )
@@ -308,9 +313,7 @@ def _get_json(
     except requests.Timeout:
         raise AtlaWireError("Request timed out.") from None
     except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings."
-        ) from None
+        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
     decoded = _decode_json(payload, token=_bearer_token(session))
     return decoded
 
@@ -377,9 +380,7 @@ def post_json_object(
     except requests.Timeout:
         raise AtlaWireError("Request timed out.") from None
     except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings."
-        ) from None
+        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
     decoded = _decode_json(data, token=_bearer_token(session))
     if not isinstance(decoded, dict):
         raise AtlaWireError("Expected a JSON object.")
@@ -458,9 +459,7 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
     except requests.Timeout:
         raise AtlaWireError("Request timed out.") from None
     except requests.RequestException:
-        raise AtlaWireError(
-            "Request failed; check connectivity and TLS settings."
-        ) from None
+        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
     text = _decode_utf8_text(payload)
     _reject_token_echo(session, text)
     return text
@@ -488,6 +487,87 @@ def _read_limited(response: requests.Response, *, limit: int, message: str) -> b
             raise AtlaWireError(message)
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+def read_encoded_limited(
+    response: requests.Response, *, limit: int, message: str
+) -> bytes:
+    """Read one body under a decoded-size cap, verifying a gzip member.
+
+    urllib3 decodes ``Content-Encoding`` before each chunk is counted, so the
+    cap applies to decoded bytes either way. Its gzip decoder does not validate
+    the eight-byte member trailer (CRC32 and length): it flushes the zlib object
+    and returns, so a truncated member would produce a plausible prefix. When
+    the response declares exactly one gzip coding, the encoded chunks are read
+    raw and decoded here with ``zlib.decompressobj(31)``, which reports
+    completion only after the complete trailer was consumed. Every other coding
+    (identity, deflate, unknown, or stacked) keeps the shared streamed reader
+    unchanged.
+
+    A truncated or undecodable member raises the generic transport diagnostic:
+    the decoder's own message can name the host or a certificate, so it is never
+    re-raised. Memory stays bounded to ``limit`` plus one raw chunk, because
+    each decode call caps its own output.
+    """
+    if _single_content_coding(response) not in _GZIP_CODINGS:
+        return _read_limited(response, limit=limit, message=message)
+    return _read_gzip_limited(response, limit=limit, message=message)
+
+
+def _single_content_coding(response: requests.Response) -> str | None:
+    """Return the one declared content coding, or ``None`` for any other case."""
+    header = response.headers.get("Content-Encoding") or ""
+    codings = [part.strip().lower() for part in header.split(",") if part.strip()]
+    return codings[0] if len(codings) == 1 else None
+
+
+def _read_gzip_limited(
+    response: requests.Response, *, limit: int, message: str
+) -> bytes:
+    """Decode one gzip body, rejecting an incomplete member and oversize output."""
+    decoder = zlib.decompressobj(_GZIP_WBITS)
+    parts: list[bytes] = []
+    total = 0
+    for chunk in _iter_encoded(response):
+        data = chunk
+        while data:
+            if decoder.eof:
+                # A further member follows; urllib3 accepts concatenated members.
+                decoder = zlib.decompressobj(_GZIP_WBITS)
+            try:
+                decoded = decoder.decompress(data, limit - total + 1)
+            except zlib.error:
+                raise AtlaWireError(_TRANSPORT_MESSAGE) from None
+            total += len(decoded)
+            if total > limit:
+                raise AtlaWireError(message)
+            parts.append(decoded)
+            data = decoder.unused_data if decoder.eof else decoder.unconsumed_tail
+    if not decoder.eof:
+        raise AtlaWireError(_TRANSPORT_MESSAGE)
+    return b"".join(parts)
+
+
+def _iter_encoded(response: requests.Response) -> Iterator[bytes]:
+    """Yield the undecoded chunks of one streamed response body.
+
+    Requests passes ``decode_content=True`` unconditionally, so the raw stream
+    is used directly. Because that bypasses its exception translation, every
+    read failure is reported as the same generic transport error here; the
+    cause may name the host or a certificate.
+    """
+    raw = response.raw
+    stream = getattr(raw, "stream", None)
+    try:
+        if stream is not None:
+            yield from stream(_CHUNK_SIZE, decode_content=False)
+        else:
+            while chunk := raw.read(_CHUNK_SIZE, decode_content=False):
+                yield chunk
+    except AtlaWireError:
+        raise
+    except requests.RequestException, urllib3.exceptions.HTTPError, OSError:
+        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
 
 
 def _decode_utf8_text(payload: bytes) -> str:

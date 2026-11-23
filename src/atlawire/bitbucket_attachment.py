@@ -20,9 +20,9 @@ import requests
 from atlawire.http import (
     AtlaWireError,
     _check_status,
-    _read_limited,
     bearer_session,
     normalize_base_url,
+    read_encoded_limited,
     reject_credential_echo,
 )
 
@@ -70,7 +70,9 @@ def get_repository_attachment(
     content, counted after content decoding. Its 8 MiB default matches the
     shared JSON response budget; it is a transport bound, not a statement about
     expected attachment sizes. A body larger than the bound raises; it is never
-    truncated, and no partial content is returned.
+    truncated, and no partial content is returned. A gzip body is decoded with
+    a validating decoder, so an incomplete member (missing or corrupt trailer)
+    raises the shared generic transport error instead of returning its prefix.
 
     The returned value is the exact response body for a successful read; bytes
     that are not part of the response are never added. Before returning, the
@@ -104,7 +106,7 @@ def get_repository_attachment(
                 stream=True,
             ) as response:
                 _check_status(response.status_code)
-                payload = _read_limited(
+                payload = read_encoded_limited(
                     response,
                     limit=limit,
                     message=f"The attachment exceeds the {limit}-byte limit.",

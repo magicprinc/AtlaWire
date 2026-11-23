@@ -9,6 +9,7 @@ import time
 from http.server import BaseHTTPRequestHandler
 
 import pytest
+import requests
 
 from atlawire import sdk
 from atlawire.http import AtlaWireError
@@ -347,6 +348,239 @@ def test_semantic_post_is_not_retried_on_503(
 
     assert len(seen) == 1
     assert caught.value.status == 503
+
+
+def test_retry_after_with_a_non_ascii_digit_falls_back_to_the_normal_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # U+00B2 satisfies str.isdigit() but float() rejects it; a parsed header
+    # must never turn one retryable status into an unhandled ValueError.
+    seen: list[object] = []
+    sleeps: list[float] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            seen.append(request_record(self))
+            send_bytes(
+                self,
+                503,
+                b'{"message":"busy"}',
+                content_type="application/json",
+                extra_headers={"Retry-After": "\u00b2"},
+            )
+
+    monkeypatch.setattr(time, "sleep", sleeps.append)
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        with pytest.raises(SdkRequestError) as caught:
+            get_json(
+                "jira",
+                base,
+                "/rest/api/2/myself",
+                token=TOKEN,
+                allow_http_loopback=True,
+            )
+
+    assert len(seen) == 3
+    assert sleeps == [1.0, 2.0]
+    assert caught.value.status == 503
+    assert caught.value.code == "http_503"
+
+
+def test_retry_after_ascii_seconds_still_schedules_an_immediate_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[object] = []
+    sleeps: list[float] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            seen.append(request_record(self))
+            if len(seen) == 1:
+                send_bytes(
+                    self,
+                    503,
+                    b'{"message":"busy"}',
+                    content_type="application/json",
+                    extra_headers={"Retry-After": "0"},
+                )
+                return
+            send_json(self, 200, {"name": "ada"})
+
+    monkeypatch.setattr(time, "sleep", sleeps.append)
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        result = get_json(
+            "jira",
+            base,
+            "/rest/api/2/myself",
+            token=TOKEN,
+            allow_http_loopback=True,
+        )
+
+    assert result == {"name": "ada"}
+    assert len(seen) == 2
+    assert sleeps == []
+
+
+def test_an_ssl_certificate_failure_is_one_attempt_with_no_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A certificate rejection is not a dropped connection: repeating it cannot
+    # succeed, so the retry policy must not amplify the failure.
+    calls: list[str] = []
+    sleeps: list[float] = []
+
+    def refuse(*args: object, **kwargs: object) -> requests.Response:
+        del args, kwargs
+        calls.append("send")
+        raise requests.exceptions.SSLError("certificate verify failed")
+
+    monkeypatch.setattr(sdk, "_send", refuse)
+    monkeypatch.setattr(time, "sleep", sleeps.append)
+    with pytest.raises(SdkRequestError) as caught:
+        get_json(
+            "jira",
+            "https://example.invalid",
+            "/rest/api/2/myself",
+            token=TOKEN,
+        )
+
+    assert calls == ["send"]
+    assert sleeps == []
+    assert caught.value.status is None
+    assert caught.value.code == "transport_error"
+    assert caught.value.classification == "transport"
+    assert "certificate" not in caught.value.message.lower()
+
+
+def test_an_interrupted_body_keeps_the_real_status_in_one_error() -> None:
+    prefix = b'{"partial":'
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(prefix) + 64))
+            self.end_headers()
+            self.wfile.write(prefix)
+            self.wfile.flush()
+            self.close_connection = True
+
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        with pytest.raises(SdkRequestError) as caught:
+            get_json(
+                "jira",
+                base,
+                "/rest/api/2/myself",
+                token=TOKEN,
+                allow_http_loopback=True,
+            )
+
+    assert caught.value.status == 200
+    assert caught.value.code == "transport_error"
+    assert caught.value.classification == "transport"
+    assert caught.value.body is None
+    assert prefix.decode("ascii") not in caught.value.message
+
+
+def test_a_json_number_outside_the_float_range_is_rejected() -> None:
+    # json.loads maps 1e999 to inf without consulting parse_constant, so the
+    # float hook is the only place a finite-only contract can hold.
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            send_bytes(self, 200, b'{"value": 1e999}', content_type="application/json")
+
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        with pytest.raises(SdkRequestError) as caught:
+            get_json(
+                "jira",
+                base,
+                "/rest/api/2/myself",
+                token=TOKEN,
+                allow_http_loopback=True,
+            )
+
+    assert caught.value.status == 200
+    assert caught.value.code == "invalid_response"
+    envelope = json.dumps(caught.value.to_dict(product="jira", token=TOKEN))
+    assert "Infinity" not in envelope
+    assert "-Infinity" not in envelope
+
+
+def test_a_finite_json_exponent_is_still_accepted() -> None:
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            send_bytes(self, 200, b'{"value": 1e3}', content_type="application/json")
+
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        result = get_json(
+            "jira",
+            base,
+            "/rest/api/2/myself",
+            token=TOKEN,
+            allow_http_loopback=True,
+        )
+
+    assert result == {"value": 1000.0}
+
+
+@pytest.mark.parametrize("literal", ["Infinity", "-Infinity"])
+def test_literal_infinity_is_still_rejected(literal: str) -> None:
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            send_bytes(
+                self,
+                200,
+                f'{{"value": {literal}}}'.encode(),
+                content_type="application/json",
+            )
+
+    with serving(Handler) as server:
+        base = f"http://127.0.0.1:{server.server_port}{CONTEXT}"
+        with pytest.raises(SdkRequestError) as caught:
+            get_json(
+                "jira",
+                base,
+                "/rest/api/2/myself",
+                token=TOKEN,
+                allow_http_loopback=True,
+            )
+
+    assert caught.value.code == "invalid_response"
 
 
 @pytest.mark.parametrize("value", [["a", "b"], {"nested": 1}, True, None])

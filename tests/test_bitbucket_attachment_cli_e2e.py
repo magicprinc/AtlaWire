@@ -19,6 +19,7 @@ import base64
 import gzip
 import json
 import subprocess
+import zlib
 from collections.abc import Callable, Sequence
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -800,6 +801,40 @@ def test_attachment_get_accepts_a_complete_gzip_member_with_recorded_wire(
     assert wire.bodies == [complete]
     assert wire.encodings == ["gzip"]
     assert wire.lengths == [str(len(complete))]
+
+
+def test_attachment_get_still_decodes_a_deflate_body_exactly(
+    tmp_path: Path,
+) -> None:
+    payload = b"deflate-member-control-" * 8
+    compressed = zlib.compress(payload)
+    assert_safe_serialization(payload)
+    seen: list[Request] = []
+    accepts: list[str | None] = []
+    extra: list[str] = []
+
+    def on_get(handler: BaseHTTPRequestHandler) -> None:
+        send_bytes(
+            handler,
+            200,
+            compressed,
+            content_type="application/octet-stream",
+            content_encoding="deflate",
+        )
+
+    handler = make_get_handler(on_get, seen, accepts, extra)
+    result = run_attachment_against(
+        tmp_path / "missing-credentials.json",
+        handler,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert_no_credential_echo(result)
+    assert decode_base64_json(result.stdout) == payload
+    assert seen == [attachment_request()]
+    assert accepts == ["*/*"]
+    assert extra == []
 
 
 def test_attachment_get_rejects_a_truncated_gzip_member(

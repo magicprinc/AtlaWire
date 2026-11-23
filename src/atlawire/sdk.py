@@ -10,6 +10,7 @@ diagnostic excerpt.
 import hashlib
 import json
 import logging
+import math
 import re
 import time
 from collections.abc import Mapping
@@ -27,7 +28,7 @@ from atlawire.file_publication import (
     discard_temporary_file,
     publish_new_file,
 )
-from atlawire.http import AtlaWireError, normalize_base_url
+from atlawire.http import _TRANSPORT_MESSAGE, AtlaWireError, normalize_base_url
 
 __all__ = [
     "SdkRequestError",
@@ -157,8 +158,22 @@ def _non_finite(value: str) -> object:
     raise ValueError(f"Non-finite JSON value: {value}.")
 
 
+def _finite_float(value: str) -> float:
+    """Reject a JSON number that leaves the finite double range.
+
+    ``json.loads`` maps an overflowing literal such as ``1e999`` to ``inf``
+    without consulting ``parse_constant``, which only sees the bare ``NaN`` and
+    ``Infinity`` spellings. The float hook is therefore the only place the
+    finite-only contract can hold for exponent notation.
+    """
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite JSON value: {value}.")
+    return number
+
+
 def _strict_json(text: str) -> object:
-    return json.loads(text, parse_constant=_non_finite)
+    return json.loads(text, parse_constant=_non_finite, parse_float=_finite_float)
 
 
 def _classify(status: int | None) -> tuple[str, str]:
@@ -339,9 +354,12 @@ def request_json_with_status(
 
     Exactly one route is requested per attempt. Redirects are refused rather
     than followed, the body is read in bounded chunks, and retries are owned
-    here: at most three total attempts and five seconds of scheduled waits.
+    here: at most three total attempts and five seconds of scheduled waits for
+    dropped connections and the two retryable statuses. A TLS certificate
+    failure is deterministic and is reported once, without retrying.
     HTTP errors keep their status; a failure without a response has
-    ``status=None``.
+    ``status=None``, while a body that is interrupted after the status line
+    keeps the real status and is reported as a transport error.
     """
     normalized = method.upper()
     if normalized not in {"GET", "POST"}:
@@ -387,6 +405,9 @@ def download_to_file(
     temporary file and published atomically only after a complete, bounded
     read; a destination created during publication is refused, never replaced.
     On any failure the temporary file is removed and nothing is published.
+    HTTP 206 is rejected as incomplete partial content, and a body interrupted
+    after the status line is reported as one transport error that keeps the
+    real status; neither path leaves a file or a staging ``.part`` behind.
     """
     target = Path(destination)
     if target.exists():
@@ -426,26 +447,52 @@ def download_to_file(
                     classification=classification,
                     message=f"HTTP {status}: request failed.",
                 )
+            if status == 206:
+                # A partial body is never the complete representation the
+                # receipt promises, even when the server chose to send 206
+                # without a Range request.
+                raise SdkRequestError(
+                    status=status,
+                    code="invalid_response",
+                    classification="partial_content",
+                    message="HTTP 206: partial content is not a supported read.",
+                    body=None,
+                    content_type=response.headers.get("Content-Type"),
+                    path=path,
+                )
             digest = hashlib.sha256()
             written = 0
-            with temporary.open("wb") as stream:
-                for chunk in response.iter_content(chunk_size=_CHUNK):
-                    written += len(chunk)
-                    if written > max_bytes:
-                        raise SdkRequestError(
-                            status=status,
-                            code="invalid_response",
-                            classification="response_too_large",
-                            message=(
-                                f"The response exceeds the {max_bytes}-byte limit."
-                            ),
-                            body=None,
-                            content_type=response.headers.get("Content-Type"),
-                            path=path,
-                            body_truncated=True,
-                        )
-                    digest.update(chunk)
-                    stream.write(chunk)
+            try:
+                with temporary.open("wb") as stream:
+                    for chunk in response.iter_content(chunk_size=_CHUNK):
+                        written += len(chunk)
+                        if written > max_bytes:
+                            raise SdkRequestError(
+                                status=status,
+                                code="invalid_response",
+                                classification="response_too_large",
+                                message=(
+                                    f"The response exceeds the {max_bytes}-byte limit."
+                                ),
+                                body=None,
+                                content_type=response.headers.get("Content-Type"),
+                                path=path,
+                                body_truncated=True,
+                            )
+                        digest.update(chunk)
+                        stream.write(chunk)
+            except requests.RequestException:
+                # An interrupted or undecodable body must not surface as a
+                # traceback or leave a partial file behind.
+                raise SdkRequestError(
+                    status=status,
+                    code="transport_error",
+                    classification="transport",
+                    message=_TRANSPORT_MESSAGE,
+                    body=None,
+                    content_type=response.headers.get("Content-Type"),
+                    path=path,
+                ) from None
         finally:
             response.close()
         publish_new_file(temporary, target)
@@ -501,6 +548,18 @@ def _attempt_loop(
                 time.sleep(delay)
             waited += delay
             continue
+        except requests.exceptions.SSLError:
+            # A certificate rejection is deterministic: another attempt cannot
+            # turn it into a success, so it is reported once with no status.
+            raise SdkRequestError(
+                status=None,
+                code="transport_error",
+                classification="transport",
+                message=_TRANSPORT_MESSAGE,
+                body=None,
+                content_type=None,
+                path=path,
+            ) from None
         except requests.ConnectionError:
             delay = _pause(attempt, waited, None) if retryable else None
             if delay is None:
@@ -508,7 +567,7 @@ def _attempt_loop(
                     status=None,
                     code="transport_error",
                     classification="transport",
-                    message="Request failed; check connectivity and TLS settings.",
+                    message=_TRANSPORT_MESSAGE,
                     body=None,
                     content_type=None,
                     path=path,
@@ -522,7 +581,7 @@ def _attempt_loop(
                 status=None,
                 code="transport_error",
                 classification="transport",
-                message="Request failed; check connectivity and TLS settings.",
+                message=_TRANSPORT_MESSAGE,
                 body=None,
                 content_type=None,
                 path=path,
@@ -654,6 +713,19 @@ def _consume(
             path=path,
             body_truncated=True,
         ) from None
+    except requests.RequestException:
+        # The status line arrived but the body did not: the request is neither a
+        # success nor an HTTP-status failure, so keep the real status and report
+        # one sanitized transport error.
+        raise SdkRequestError(
+            status=status,
+            code="transport_error",
+            classification="transport",
+            message=_TRANSPORT_MESSAGE,
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+        ) from None
     if not payload:
         if status == 204:
             # Documented no-content: the caller decides whether this route
@@ -735,7 +807,7 @@ def _retry_after(response: requests.Response) -> float | None:
     if not header:
         return None
     value = header.strip()
-    if value.isdigit():
+    if value.isascii() and value.isdigit():
         return float(value)
     try:
         parsed = parsedate_to_datetime(value)
