@@ -46,8 +46,7 @@ CONTEXT = "/scm/bitbucket"
 REPO = "DEMO/widgets"
 ATTACHMENT_ID = "12345"
 ATTACHMENT_PATH = (
-    f"{CONTEXT}/rest/api/1.0/projects/DEMO/repos/widgets"
-    f"/attachments/{ATTACHMENT_ID}"
+    f"{CONTEXT}/rest/api/1.0/projects/DEMO/repos/widgets/attachments/{ATTACHMENT_ID}"
 )
 SECRET_MESSAGE = "Error: The response contained the session bearer token.\n"
 
@@ -653,9 +652,7 @@ def test_attachment_get_fails_generically_on_a_content_length_shortfall(
         handler.close_connection = True
 
     handler = make_get_handler(on_get, seen, accepts, extra)
-    result = run_attachment_against(
-        tmp_path / "missing-credentials.json", handler
-    )
+    result = run_attachment_against(tmp_path / "missing-credentials.json", handler)
 
     assert result.returncode == 1
     assert result.stdout == ""
@@ -687,9 +684,7 @@ def test_attachment_get_fails_generically_on_incomplete_chunked_framing(
     handler = make_get_handler(
         on_get, seen, accepts, extra, protocol_version="HTTP/1.1"
     )
-    result = run_attachment_against(
-        tmp_path / "missing-credentials.json", handler
-    )
+    result = run_attachment_against(tmp_path / "missing-credentials.json", handler)
 
     assert result.returncode == 1
     assert result.stdout == ""
@@ -844,3 +839,75 @@ def test_attachment_get_rejects_a_truncated_gzip_member(
     assert wire.lengths == [str(len(truncated))]
     assert wire.bodies[0] == complete[: len(truncated)]
     assert complete.startswith(wire.bodies[0])
+
+
+def _run_attachment_out(
+    credentials: Path,
+    destination: Path,
+    responses: Sequence[Response],
+) -> tuple[subprocess.CompletedProcess[str], list[Request]]:
+    """Run attachment-get with --out instead of the base64 contract."""
+    seen: list[Request] = []
+
+    def on_get(handler: BaseHTTPRequestHandler) -> None:
+        status, body, headers = responses[0]
+        send_bytes(handler, status, body, **headers)
+
+    with serving(make_get_handler(on_get, seen, [], [])) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        result = run_installed(
+            [
+                "attachment-get",
+                REPO,
+                ATTACHMENT_ID,
+                "--out",
+                str(destination),
+                "--base-url",
+                f"{origin}{CONTEXT}/",
+                "--token-from-env",
+                "--allow-http-loopback",
+            ],
+            environment(origin, credentials),
+        )
+    return result, seen
+
+
+def test_attachment_out_writes_exact_bytes_and_a_receipt(tmp_path: Path) -> None:
+    payload = bytes(range(256)) + b"tail"
+    destination = tmp_path / "attachment.bin"
+
+    result, seen = _run_attachment_out(
+        tmp_path / "missing-credentials.json",
+        destination,
+        [(200, payload, {"content_type": "application/octet-stream"})],
+    )
+
+    assert result.returncode == 0, result.stdout
+    assert destination.read_bytes() == payload
+    receipt = json.loads(result.stdout)
+    assert receipt["path"] == str(destination)
+    assert receipt["bytes"] == len(payload)
+    assert receipt["sha256"] == __import__("hashlib").sha256(payload).hexdigest()
+    assert seen == [attachment_request()]
+    assert destination.with_name(destination.name + ".part").exists() is False
+
+
+def test_attachment_out_refuses_an_existing_file(tmp_path: Path) -> None:
+    destination = tmp_path / "attachment.bin"
+    destination.write_bytes(b"keep")
+
+    result, seen = _run_attachment_out(
+        tmp_path / "missing-credentials.json",
+        destination,
+        [(200, b"new", {"content_type": "application/octet-stream"})],
+    )
+
+    assert result.returncode == 1
+    assert destination.read_bytes() == b"keep"
+
+    result, _ = _run_attachment_out(
+        tmp_path / "missing-credentials.json",
+        tmp_path / "unused.bin",
+        [(200, b"new", {"content_type": "application/octet-stream"})],
+    )
+    assert result.returncode == 0

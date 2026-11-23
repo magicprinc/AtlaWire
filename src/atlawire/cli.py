@@ -156,7 +156,6 @@ from atlawire.operations import (
     read_binary,
     read_operation,
 )
-from atlawire.sdk import SdkRequestError, get_json, request_json
 from atlawire.pr_review import collect_pr_review, parse_pr_link, render_markdown
 from atlawire.repo_grep import (
     GREP_LIMIT_DEFAULT,
@@ -167,6 +166,7 @@ from atlawire.repo_grep import (
     grep_repository,
 )
 from atlawire.repo_scan import scan_repository_extensions
+from atlawire.sdk import SdkRequestError, get_json, request_json
 
 _TSV_CONTROLS = re.compile(
     r"[\\\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e"
@@ -1679,6 +1679,33 @@ def file_command(
     _write_exact_text(text)
 
 
+def _write_bytes(destination: str, payload: bytes) -> dict[str, object]:
+    """Write bytes atomically and return a receipt; never overwrite."""
+    import hashlib
+    from pathlib import Path as _Path
+
+    target = _Path(destination)
+    if target.exists():
+        raise AtlaWireError("The destination already exists.")
+    temporary = target.with_name(f"{target.name}.{os.getpid()}.part")
+    try:
+        with temporary.open("wb") as stream:
+            stream.write(payload)
+        os.replace(temporary, target)
+    except OSError:
+        raise AtlaWireError("Could not write the destination file.") from None
+    finally:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+    return {
+        "path": str(target),
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
 @cli.command("attachment-get")
 @click.argument("repo")
 @click.argument("attachment_id")
@@ -1686,8 +1713,13 @@ def file_command(
     "--base64",
     "as_base64",
     is_flag=True,
-    required=True,
-    help="Required: print standard base64 in one JSON object.",
+    help="Print standard base64 in one JSON object.",
+)
+@click.option(
+    "--out",
+    "destination",
+    default=None,
+    help="Write the attachment to this file instead; it must not exist.",
 )
 @click.option(
     "--max-bytes",
@@ -1705,6 +1737,7 @@ def attachment_get_command(
     repo: str,
     attachment_id: str,
     as_base64: bool,
+    destination: str | None,
     max_bytes: int,
     base_url: str | None,
     token_from_env: bool,
@@ -1722,8 +1755,8 @@ def attachment_get_command(
     Bitbucket Server 5.10 reference, and plugin/server version support is
     unverified.
     """
-    if not as_base64:
-        raise click.UsageError("--base64 is required.")
+    if as_base64 == (destination is not None):
+        raise click.UsageError("Pass exactly one of --base64 or --out.")
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
@@ -1736,8 +1769,12 @@ def attachment_get_command(
             max_bytes=max_bytes,
             allow_http_loopback=allow_http_loopback,
         )
-        document = json.dumps({"base64": base64.b64encode(payload).decode("ascii")})
-        reject_credential_echo(document, tokens=(token,))
+        if destination is None:
+            document = json.dumps({"base64": base64.b64encode(payload).decode("ascii")})
+            reject_credential_echo(document, tokens=(token,))
+        else:
+            receipt = _write_bytes(destination, payload)
+            document = json.dumps(receipt)
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
     click.echo(document)
