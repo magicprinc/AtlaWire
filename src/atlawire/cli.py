@@ -234,15 +234,13 @@ def _error_envelope(
     }
 
 
-def _emit_catalog(context: click.Context, _param: click.Parameter, value: bool) -> None:
+def _emit_catalog(context: click.Context) -> None:
     """Print the command catalog as one JSON document and exit.
 
     The catalog is derived from Click metadata plus the operation registry.
     No product URL or token is resolved, so neither the saved BBK file nor the
     environment is read and no network request is made.
     """
-    if not value or context.resilient_parsing:
-        return
     group = cast(click.Group, context.command)
     catalog = build_command_catalog(group)
     catalog["operations"] = canonical_operations()
@@ -250,12 +248,8 @@ def _emit_catalog(context: click.Context, _param: click.Parameter, value: bool) 
     context.exit()
 
 
-def _emit_description(
-    context: click.Context, _param: click.Parameter, value: str | None
-) -> None:
+def _emit_description(context: click.Context, value: str) -> None:
     """Print one operation description, or a JSON error for an unknown ID."""
-    if not value or context.resilient_parsing:
-        return
     try:
         described = describe_operation(value)
     except AtlaWireError:
@@ -273,14 +267,36 @@ def _emit_description(
     context.exit()
 
 
+def _reject_conflicting_discovery(
+    context: click.Context, catalog: bool, describe_id: str | None
+) -> None:
+    """Reject combined discovery actions as one JSON validation error.
+
+    ``--catalog`` and ``--describe`` are parsed before any subcommand context
+    exists, so a conflict exits before credentials, files, or network access.
+    """
+    if not catalog and describe_id is None:
+        return
+    if (catalog and describe_id is not None) or context.invoked_subcommand:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    None,
+                    code="validation_error",
+                    message=(
+                        "Use --catalog or --describe alone, without a subcommand."
+                    ),
+                )
+            )
+        )
+        raise click.exceptions.Exit(2)
+
+
 @click.group(invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="atlawire")
 @click.option(
     "--catalog",
     is_flag=True,
-    is_eager=True,
-    expose_value=False,
-    callback=_emit_catalog,
     help="Print every command, parameter and canonical operation as JSON.",
 )
 @click.option(
@@ -288,13 +304,10 @@ def _emit_description(
     "describe_id",
     metavar="OPERATION_ID",
     default=None,
-    is_eager=True,
-    expose_value=False,
-    callback=_emit_description,
     help="Print one operation's full JSON description, then exit.",
 )
 @click.pass_context
-def cli(context: click.Context) -> None:
+def cli(context: click.Context, catalog: bool, describe_id: str | None) -> None:
     """Work with self-hosted Jira, Confluence, and Bitbucket.
 
     Commands use the saved BBK credential file by default. Pass
@@ -304,6 +317,12 @@ def cli(context: click.Context) -> None:
     `atlawire --describe <operation-id>`. Run the read with
     `atlawire read <operation-id> --params '<json-object>'`.
     """
+    if not context.resilient_parsing:
+        _reject_conflicting_discovery(context, catalog, describe_id)
+        if describe_id is not None:
+            _emit_description(context, describe_id)
+        if catalog:
+            _emit_catalog(context)
     if context.invoked_subcommand is None:
         click.echo(context.get_help())
 
@@ -371,16 +390,19 @@ def _product_base_url_and_token(
     """Resolve one product's matched URL and token for a command invocation.
 
     Explicit ``--token-from-env`` keeps the environment-only contract and never
-    opens the saved BBK file. Otherwise the saved pair is required, and an
-    explicit or environment URL is accepted only when it equals the saved one.
+    opens the saved BBK file: the product's own URL variable supplies the
+    destination when no explicit URL was passed. Otherwise the saved pair is
+    required, and an explicit or environment URL is accepted only when it
+    equals the saved one.
     """
     url_name, token_name = _PRODUCT_ENVIRONMENT[product]
     if token_from_env:
-        if not base_url:
+        resolved_url = base_url or os.environ.get(url_name)
+        if not resolved_url:
             raise click.UsageError(
                 f"Missing --base-url or {url_name} when using --token-from-env."
             )
-        return base_url, os.environ.get(token_name, "")
+        return resolved_url, os.environ.get(token_name, "")
     try:
         saved = resolve_saved_credentials(
             product,
@@ -395,21 +417,27 @@ def _product_base_url_and_token(
 def _federated_targets(
     token_from_env: bool,
     allow_http_loopback: bool,
-) -> tuple[ProductTarget, ProductTarget, ProductTarget]:
-    """Resolve three independent matched pairs before any federated request.
+) -> tuple[ProductTarget | None, ProductTarget | None, ProductTarget | None]:
+    """Resolve each matched pair independently before any federated request.
 
-    Environment mode supplies each product's own URL variable explicitly, so a
-    token is never combined with another product's destination. Saved-file mode
-    reads each product's entry separately.
+    A missing or invalid pair becomes ``None`` for that product only, so the
+    other products are still searched and the unusable one is reported in
+    ``errors``. Environment mode reads each product's own URL variable, so a
+    token is never combined with another product's destination.
     """
 
-    def resolve(product: str) -> ProductTarget:
-        url_name, _ = _PRODUCT_ENVIRONMENT[product]
-        supplied = os.environ.get(url_name) if token_from_env else None
-        base_url, token = _product_base_url_and_token(
-            product, supplied, token_from_env, allow_http_loopback
-        )
-        return ProductTarget(base_url, token)
+    def resolve(product: str) -> ProductTarget | None:
+        try:
+            base_url, token = _product_base_url_and_token(
+                product, None, token_from_env, allow_http_loopback
+            )
+            validated_url = normalize_base_url(
+                base_url, allow_http_loopback=allow_http_loopback
+            )
+            bearer_session(token).close()
+        except click.ClickException, AtlaWireError:
+            return None
+        return ProductTarget(validated_url, token)
 
     return resolve("confluence"), resolve("jira"), resolve("bitbucket")
 
@@ -734,12 +762,8 @@ def read_operation_command(
     arguments = _operation_json_object(raw_params)
     query = _operation_json_object(raw_query) if raw_query is not None else None
     product = _operation_product(operation_id)
-    url_name, _ = _PRODUCT_ENVIRONMENT[product]
-    supplied = base_url
-    if token_from_env and supplied is None:
-        supplied = os.environ.get(url_name)
     resolved_url, token = _product_base_url_and_token(
-        product, supplied, token_from_env, allow_http_loopback
+        product, base_url, token_from_env, allow_http_loopback
     )
     try:
         result = read_operation(
@@ -903,6 +927,18 @@ def read_command(
             )
         )
         raise click.exceptions.Exit(2) from None
+    response_kind = cast(dict[str, object], described["response"])["kind"]
+    if response_kind != "binary" and destination is not None:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message="This operation returns JSON; --out is only for binary reads.",
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
     try:
         resolved_url, token = _product_base_url_and_token(
             product, base_url, token_from_env, allow_http_loopback
@@ -919,7 +955,6 @@ def read_command(
         )
         raise click.exceptions.Exit(2) from None
 
-    response_kind = cast(dict[str, object], described["response"])["kind"]
     if response_kind == "binary":
         if not destination:
             click.echo(
@@ -1028,12 +1063,8 @@ def api_get_command(
 ) -> None:
     """Read one standard non-admin JSON GET through atlassian-python-api."""
     params = _operation_json_object(raw_params) if raw_params is not None else None
-    url_name, _ = _PRODUCT_ENVIRONMENT[product]
-    supplied = base_url
-    if token_from_env and supplied is None:
-        supplied = os.environ.get(url_name)
     resolved_url, token = _product_base_url_and_token(
-        product, supplied, token_from_env, allow_http_loopback
+        product, base_url, token_from_env, allow_http_loopback
     )
     try:
         result = get_json(
@@ -1100,12 +1131,8 @@ def api_request_command(
     """Run one read-only GET or POST through atlassian-python-api."""
     params = _operation_json_object(raw_params) if raw_params is not None else None
     body = _operation_json_object(raw_body) if raw_body is not None else None
-    url_name, _ = _PRODUCT_ENVIRONMENT[product]
-    supplied = base_url
-    if token_from_env and supplied is None:
-        supplied = os.environ.get(url_name)
     resolved_url, token = _product_base_url_and_token(
-        product, supplied, token_from_env, allow_http_loopback
+        product, base_url, token_from_env, allow_http_loopback
     )
     try:
         result = request_json(

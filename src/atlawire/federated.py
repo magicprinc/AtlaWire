@@ -8,10 +8,11 @@ so no destination or credential is ever shared between products.
 
 Differences from BBK's ``find``:
 
-* **Fail closed.** A failure in any product raises
-  [AtlaWireError][atlawire.http.AtlaWireError] and publishes nothing. BBK
-  returned the surviving channels plus an ``errors`` list; such a partial answer
-  can look complete to an agent, so it is not reproduced here.
+* **Partial answers are labelled.** An unavailable or failing product
+  contributes no rows and exactly one message in ``errors``, and ``complete`` is
+  false; the total-failure error is raised only when no product/term read
+  completed at all. BBK returned the surviving channels plus an ``errors`` list;
+  the difference here is that every partial answer says so via ``complete``.
 * **No raw term interpolation.** Each term becomes one double-quoted literal.
   Double quotes, backslashes, controls, bidi controls, and lone surrogates are
   rejected before any request instead of escaped, because Jira Server documents
@@ -54,6 +55,11 @@ LIMIT_MIN = 1
 LIMIT_MAX = 999
 LIMIT_DEFAULT = 20
 JIRA_ORDER = "created DESC"
+_PRODUCT_SLOTS = (
+    ("confluence", "Confluence"),
+    ("jira", "Jira"),
+    ("bitbucket", "Bitbucket"),
+)
 
 LIMITATIONS = (
     (
@@ -132,9 +138,9 @@ class FileRow(TypedDict):
 def federated_search(
     terms: Sequence[str],
     *,
-    confluence: ProductTarget,
-    jira: ProductTarget,
-    bitbucket: ProductTarget,
+    confluence: ProductTarget | None,
+    jira: ProductTarget | None,
+    bitbucket: ProductTarget | None,
     limit: int = LIMIT_DEFAULT,
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
@@ -144,9 +150,10 @@ def federated_search(
     ``["ported numbers", "ported", "МВНО"]``. At least one non-blank term is
     required; an exact repeated term is searched once. ``confluence``, ``jira``,
     and ``bitbucket`` are independent explicit pairs: each adapter receives only
-    its own base URL and token, and every pair is validated before the first
-    request, so a later failure cannot follow requests sent to a wrong
-    destination.
+    its own base URL and token. Every supplied pair is validated strictly before
+    the first request, so a token is never sent to a destination it was not
+    configured with. ``None`` means that product is not configured; it is
+    reported in ``errors`` and the other products are still searched.
 
     ``limit`` is the row cap passed to each product for each term (1 to 999).
     Deduplication happens after those caps, so the rows returned never prove
@@ -159,7 +166,7 @@ def federated_search(
     may apply its own query qualifiers, which can only narrow that product.
     Bitbucket paging reads every server-capped page until the per-term limit or
     the terminal page, so a short page cannot silently end that term's search; a
-    later-page transport or cursor failure stops the whole call.
+    later-page transport or cursor failure stops that product's term only.
 
     Returns one JSON-serializable object:
 
@@ -171,26 +178,29 @@ def federated_search(
       terms}`` rows; ``matchEvidence`` keeps the strongest value seen for that
       file across terms (``highlight`` > ``context-only`` > ``none``);
     * ``counts`` — unique merged rows per product;
+    * ``errors`` — one message per product that was unavailable or failed for
+      at least one term;
+    * ``complete`` — true only when no product is unavailable and no error was
+      recorded;
     * ``limits`` — the per-term cap actually used;
     * ``limitations`` — the always-present coverage warnings.
 
     Raises [AtlaWireError][atlawire.http.AtlaWireError] for invalid input, an
-    invalid or incomplete pair, any product failure, or a result lacking a
-    stable identity. Nothing is returned in those cases.
+    invalid supplied pair, or when no product/term read completed at all. A
+    failed product/term keeps no rows, while earlier successful terms and the
+    other products stay.
     """
     searched = _search_terms(terms)
     _check_limit(limit)
-    targets = (
-        _target("Confluence", confluence, allow_http_loopback),
-        _target("Jira", jira, allow_http_loopback),
-        _target("Bitbucket", bitbucket, allow_http_loopback),
+    targets, errors = _validated_targets(
+        (confluence, jira, bitbucket), allow_http_loopback
     )
     # Build every query before the first request, so no term can fail late.
     queries = tuple((term, _cql_query(term), _jql_query(term)) for term in searched)
-    pages, issues, files, errors = _collect(
-        queries, targets, limit, allow_http_loopback
+    pages, issues, files, completed = _collect(
+        queries, targets, errors, limit, allow_http_loopback
     )
-    if len(errors) == 3:
+    if completed == 0:
         raise AtlaWireError(
             "Federated search failed for every product; nothing was returned."
         )
@@ -211,40 +221,80 @@ def federated_search(
     }
 
 
+def _validated_targets(
+    values: tuple[ProductTarget | None, ProductTarget | None, ProductTarget | None],
+    allow_http_loopback: bool,
+) -> tuple[dict[str, ProductTarget], dict[str, str]]:
+    """Validate each supplied pair independently and record missing slots.
+
+    A missing product becomes one error and no target, so the other products
+    are still searched. Every supplied pair is validated strictly before the
+    first request, which keeps a token away from an unconfigured destination.
+    """
+    targets: dict[str, ProductTarget] = {}
+    errors: dict[str, str] = {}
+    for (slot, product), value in zip(_PRODUCT_SLOTS, values, strict=True):
+        if value is None:
+            errors[slot] = (
+                f"The {product} base URL and token are not configured or invalid."
+            )
+            continue
+        targets[slot] = _target(product, value, allow_http_loopback)
+    return targets, errors
+
+
 def _collect(
     queries: Sequence[tuple[str, str, str]],
-    targets: tuple[ProductTarget, ProductTarget, ProductTarget],
+    targets: dict[str, ProductTarget],
+    errors: dict[str, str],
     limit: int,
     allow_http_loopback: bool,
 ) -> tuple[
     dict[str, PageRow],
     dict[str, IssueRow],
     dict[tuple[str, str, str], FileRow],
-    dict[str, str],
+    int,
 ]:
-    """Merge one term at a time; keep surviving products on failure."""
+    """Merge one term at a time; keep surviving products on failure.
+
+    The returned count is the number of product/term reads that completed, so
+    partial failures are not mistaken for a total failure when rows happen to
+    be empty.
+    """
     pages: dict[str, PageRow] = {}
     issues: dict[str, IssueRow] = {}
     files: dict[tuple[str, str, str], FileRow] = {}
-    errors: dict[str, str] = {}
-    confluence, jira, bitbucket = targets
+    completed = 0
+    confluence = targets.get("confluence")
+    jira = targets.get("jira")
+    bitbucket = targets.get("bitbucket")
     for term, cql, jql in queries:
-        try:
-            for page in _confluence_rows(confluence, cql, limit, allow_http_loopback):
-                _merge_page(pages, page, term)
-        except AtlaWireError as exc:
-            errors.setdefault("confluence", str(exc))
-        try:
-            for issue in _jira_rows(jira, jql, limit, allow_http_loopback):
-                _merge_issue(issues, issue, term)
-        except AtlaWireError as exc:
-            errors.setdefault("jira", str(exc))
-        try:
-            for code in _bitbucket_rows(bitbucket, term, limit, allow_http_loopback):
-                _merge_file(files, code, term)
-        except AtlaWireError as exc:
-            errors.setdefault("bitbucket", str(exc))
-    return pages, issues, files, errors
+        if confluence is not None:
+            try:
+                for page in _confluence_rows(
+                    confluence, cql, limit, allow_http_loopback
+                ):
+                    _merge_page(pages, page, term)
+                completed += 1
+            except AtlaWireError as exc:
+                errors.setdefault("confluence", str(exc))
+        if jira is not None:
+            try:
+                for issue in _jira_rows(jira, jql, limit, allow_http_loopback):
+                    _merge_issue(issues, issue, term)
+                completed += 1
+            except AtlaWireError as exc:
+                errors.setdefault("jira", str(exc))
+        if bitbucket is not None:
+            try:
+                for code in _bitbucket_rows(
+                    bitbucket, term, limit, allow_http_loopback
+                ):
+                    _merge_file(files, code, term)
+                completed += 1
+            except AtlaWireError as exc:
+                errors.setdefault("bitbucket", str(exc))
+    return pages, issues, files, completed
 
 
 def _confluence_rows(
