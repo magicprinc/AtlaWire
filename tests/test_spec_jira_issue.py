@@ -79,7 +79,15 @@ def test_get_issue_wire_get_path_and_query(server):
     assert parsed.path == "/rest/api/2/issue/SPEC-42"
     query = parse_qs(parsed.query)
     assert query.pop("expand") == ["renderedFields"]
-    assert query in ({}, {"updateHistory": ["true"]})
+    assert query in ({}, {"updateHistory": ["false"]})
+
+
+def test_get_issue_read_does_not_update_history(server):
+    httpd, base = server
+    jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
+    assert len(httpd.calls) == 1
+    query = parse_qs(urlsplit(httpd.calls[0][1]).query, keep_blank_values=True)
+    assert query.get("updateHistory") in (None, ["false"])
 
 
 def test_get_issue_preserves_unknown_response_fields(server):

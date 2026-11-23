@@ -131,6 +131,13 @@ def _json_object(value: object) -> dict[str, object]:
     return value
 
 
+def _json_array(value: object) -> list[object]:
+    """Return one library payload only when it is a JSON array."""
+    if not isinstance(value, list):
+        raise AtlaWireError("Expected a JSON array.", category="upstream")
+    return value
+
+
 def get_issue(
     base_url: str,
     key_or_url: str,
@@ -151,7 +158,11 @@ def get_issue(
     )
     try:
         try:
-            issue = _json_object(client.get_issue(key, expand=expand, fields=None))
+            issue = _json_object(
+                client.get_issue(
+                    key, expand=expand, fields=None, update_history=False
+                )
+            )
         except (requests.RequestException, ApiError) as error:
             raise _sdk_error(error) from None
     finally:
@@ -181,11 +192,16 @@ def get_issue_worklogs(
     ``/rest/api/2/issue/{key}/worklog`` endpoint.
     """
     key = _issue_key(key_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        document = get_json_object(
-            session, f"{base}/rest/api/2/issue/{key}/worklog", params={}
-        )
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            document = _json_object(client.issue_get_worklog(key))
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     worklogs = document.get("worklogs")
     if not isinstance(worklogs, list):
         raise AtlaWireError("Expected a Jira worklogs array.")
@@ -210,13 +226,20 @@ def get_issue_changelog(
     therefore stays visible instead of being reported as complete.
     """
     key = _issue_key(key_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        issue = get_json_object(
-            session,
-            f"{base}/rest/api/2/issue/{key}",
-            params={"expand": "changelog"},
-        )
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            issue = _json_object(
+                client.get_issue(
+                    key, fields=None, expand="changelog", update_history=False
+                )
+            )
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     changelog = issue.get("changelog")
     if not isinstance(changelog, dict):
         raise AtlaWireError("Expected a Jira changelog document.")
@@ -543,9 +566,16 @@ def list_statuses(
     ``/rest/api/2/status``. The complete response is validated before anything
     is returned, so a malformed late entry cannot yield a partial list.
     """
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        values = get_json_array(session, f"{base}/rest/api/2/status", params={})
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            values = _json_array(client.get_all_statuses())
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     names: list[str] = []
     for value in values:
         if not isinstance(value, dict):
@@ -571,13 +601,17 @@ def list_priorities(
     ``/rest/api/2/priority``. Each row is a complete server object, including
     unknown and nested fields, and is returned unchanged.
     """
-    return _read_reference_list(
-        base_url,
-        token=token,
-        path="/rest/api/2/priority",
-        label="priority",
-        allow_http_loopback=allow_http_loopback,
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
     )
+    try:
+        try:
+            values = _json_array(client.get_all_priorities())
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
+    return [_reference_object(value, "priority") for value in values]
 
 
 def list_resolutions(
@@ -591,13 +625,17 @@ def list_resolutions(
     The fixed read is ``/rest/api/2/resolution``. Each row is returned
     unchanged, so unknown and nested fields survive.
     """
-    return _read_reference_list(
-        base_url,
-        token=token,
-        path="/rest/api/2/resolution",
-        label="resolution",
-        allow_http_loopback=allow_http_loopback,
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
     )
+    try:
+        try:
+            values = _json_array(client.get_all_resolutions())
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
+    return [_reference_object(value, "resolution") for value in values]
 
 
 def list_issue_types(
@@ -611,13 +649,17 @@ def list_issue_types(
     The fixed read is ``/rest/api/2/issuetype``. Rows are not filtered by
     subtask status and are returned unchanged.
     """
-    return _read_reference_list(
-        base_url,
-        token=token,
-        path="/rest/api/2/issuetype",
-        label="issue type",
-        allow_http_loopback=allow_http_loopback,
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
     )
+    try:
+        try:
+            values = _json_array(client.get_issue_types())
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
+    return [_reference_object(value, "issue type") for value in values]
 
 
 def list_status_categories(
@@ -653,9 +695,16 @@ def list_jira_projects(
     pagination metadata, so the client cannot prove that no further visible
     project exists; a short array is not a completeness claim.
     """
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        values = get_json_array(session, f"{base}/rest/api/2/project", params={})
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            values = _json_array(client.get_all_projects())
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     return [_reference_object(value, "project") for value in values]
 
 
@@ -695,22 +744,25 @@ def search_users(
     The Jira 8.22 ``/rest/user/search`` endpoint takes a non-empty
     ``username`` substring and returns a bare array, not a paged envelope.
     Only the requested page is read; an empty or full page never proves that
-    no further matching users exist. Inactive users are excluded by the
-    server default. Raw user objects are returned unchanged. A page longer
+    no further matching users exist. Inactive users are excluded. Raw user
+    objects are returned unchanged. A page longer
     than ``max_results`` is rejected instead of being returned.
     """
     _check_user_search(username, start_at, max_results)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        values = get_json_array(
-            session,
-            f"{base}/rest/api/2/user/search",
-            params={
-                "username": username,
-                "startAt": start_at,
-                "maxResults": max_results,
-            },
-        )
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            values = _json_array(
+                client.user_find_by_user_string(
+                    username, start=start_at, limit=max_results
+                )
+            )
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     if len(values) > max_results:
         raise AtlaWireError("Jira returned more users than maxResults.")
     return [_reference_object(value, "user") for value in values]
@@ -754,11 +806,16 @@ def list_transitions(
     permission or target-status meaning is inferred beyond the returned fields.
     """
     key = _issue_key(key_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        envelope = get_json_object(
-            session, f"{base}/rest/api/2/issue/{key}/transitions", params={}
-        )
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            envelope = _json_object(client.get_issue_transitions_full(key))
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     values = envelope.get("transitions")
     if not isinstance(values, list):
         raise AtlaWireError("Expected a Jira transitions array.")
@@ -821,11 +878,16 @@ def list_issue_remote_links(
     destinations, so they are not fetched.
     """
     key = _issue_key(key_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        values = get_json_array(
-            session, f"{base}/rest/api/2/issue/{key}/remotelink", params={}
-        )
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            values = _json_array(client.get_issue_remote_links(key))
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     return [_project_remote_link(value) for value in values]
 
 
@@ -849,9 +911,16 @@ def get_current_user(
     result carries no links, account IDs, or permission claims, and it never
     implies that the caller is anonymous or authorized.
     """
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
-        user = get_json_object(session, f"{base}/rest/api/2/myself", params={})
+    client = client_for(
+        "jira", base_url, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        try:
+            user = _json_object(client.myself())
+        except (requests.RequestException, ApiError) as error:
+            raise _sdk_error(error) from None
+    finally:
+        client.close()
     return _project_current_user(user)
 
 

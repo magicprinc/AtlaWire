@@ -19,6 +19,7 @@ _JSON_LIMIT = 8 * 1024 * 1024
 _CHUNK_SIZE = 64 * 1024
 _TEXT_LIMIT_MESSAGE = "The text response exceeds the 1 MiB limit."
 _JSON_LIMIT_MESSAGE = "The JSON response exceeds the 8 MiB limit."
+_BINARY_LIMIT_MESSAGE = "The binary or text response exceeds the configured size limit."
 _TRANSPORT_MESSAGE = "Request failed; check connectivity and TLS settings."
 _PARTIAL_RESPONSE_MESSAGE = "HTTP 206: partial content is not supported."
 _SECRET_ECHO_MESSAGE = "The response contained the session bearer token."
@@ -126,20 +127,240 @@ def normalize_base_url(value: str, *, allow_http_loopback: bool) -> str:
     return value.rstrip("/")
 
 
+_BEARER_TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]+")
+
+
+def _validated_token(token: str) -> str:
+    """Return ``token`` after the one shared credential-shape check.
+
+    The same rule guards the direct session and the session handed to the
+    library, so an invalid credential fails closed before either is created.
+    """
+    if not _BEARER_TOKEN.fullmatch(token):
+        raise AtlaWireError("Missing or invalid bearer token.", category="credentials")
+    return token
+
+
 def bearer_session(token: str) -> requests.Session:
     """Create a session that the caller must close.
 
     The session sends the bearer token, ignores ambient netrc/proxy settings,
     and never follows or pre-reads a redirect response.
     """
-    if not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
-        raise AtlaWireError("Missing or invalid bearer token.", category="credentials")
+    token = _validated_token(token)
     session = _NoRedirectSession()
     # Do not let ambient netrc settings replace the explicit Authorization header.
     session.trust_env = False
     session.headers.update(
         {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     )
+    return session
+
+
+_UNSET = object()
+
+
+def _reject_redirect_or_partial(status: int, *, method: str | None) -> None:
+    """Refuse a 3xx or 206 before its body is read or decoded.
+
+    ``requests.Response.raise_for_status`` treats both as successful, so the
+    library would hand a redirect page or a partial representation to a caller
+    as if it were a complete document. Status, message and metadata match the
+    shared policy used by the direct transport.
+    """
+    if 300 <= status < 400:
+        raise AtlaWireError(
+            f"HTTP {status}: redirect refused; check the base URL.",
+            category="http",
+            http_status=status,
+            method=method,
+        )
+    if status == 206:
+        raise AtlaWireError(
+            _PARTIAL_RESPONSE_MESSAGE,
+            category="http",
+            http_status=status,
+            method=method,
+        )
+
+
+def _media_type(response: requests.Response) -> str:
+    """Return the lowercased media type without parameters."""
+    return (response.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+
+
+def _is_json_media_type(media_type: str) -> bool:
+    return media_type == "application/json" or media_type.endswith("+json")
+
+
+def _is_text_media_type(media_type: str) -> bool:
+    return media_type.startswith("text/")
+
+
+def _declared_body_length(response: requests.Response) -> int | None:
+    """Return ``Content-Length`` only when it measures the decoded body.
+
+    A content coding (gzip and friends) makes the header the compressed size, so
+    it is ignored and the streamed counter enforces the same cap instead.
+    """
+    coding = (response.headers.get("Content-Encoding") or "").strip().lower()
+    if coding and coding != "identity":
+        return None
+    value = response.headers.get("Content-Length")
+    if value is None:
+        return None
+    try:
+        length = int(value.strip())
+    except ValueError:
+        return None
+    return length if length >= 0 else None
+
+
+class _GuardedResponse:
+    """Read-only proxy around ``requests.Response`` with the shared read policy.
+
+    The library owns the HTTP exchange, so its own ``raise_for_status`` accepts
+    3xx/206 and would buffer an unbounded body. This proxy keeps that transport
+    but overrides every body accessor: ``.content``, ``.text`` and ``.json()``
+    reject a redirect or partial status, cap the decoded body (8 MiB for JSON,
+    ``body_limit`` otherwise, pre-checked against ``Content-Length``), and decode
+    JSON strictly from the original bytes with non-finite numbers refused. Every
+    other attribute is delegated unchanged, and the library may still set
+    ``.encoding``.
+    """
+
+    def __init__(
+        self,
+        response: requests.Response,
+        *,
+        body_limit: int,
+        method: str,
+    ) -> None:
+        object.__setattr__(self, "_response", response)
+        object.__setattr__(self, "_body_limit", body_limit)
+        object.__setattr__(self, "_method", method)
+        object.__setattr__(self, "_body", _UNSET)
+        object.__setattr__(self, "_text", _UNSET)
+        object.__setattr__(self, "_json", _UNSET)
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(object.__getattribute__(self, "_response"), name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        # The library assigns ``response.encoding`` before it reads the body.
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(object.__getattribute__(self, "_response"), name, value)
+
+    def _limit(self) -> tuple[int, str]:
+        if _is_json_media_type(_media_type(self._response)):
+            return _JSON_LIMIT, _JSON_LIMIT_MESSAGE
+        return self._body_limit, _BINARY_LIMIT_MESSAGE
+
+    def _load_body(self) -> bytes:
+        response = object.__getattribute__(self, "_response")
+        _reject_redirect_or_partial(response.status_code, method=self._method)
+        limit, message = self._limit()
+        declared = _declared_body_length(response)
+        if declared is not None and declared > limit:
+            raise AtlaWireError(message, category="upstream")
+        return _read_limited(response, limit=limit, message=message)
+
+    @property
+    def content(self) -> bytes:
+        body = object.__getattribute__(self, "_body")
+        if body is _UNSET:
+            body = self._load_body()
+            object.__setattr__(self, "_body", body)
+        return body
+
+    @property
+    def text(self) -> str:
+        text = object.__getattribute__(self, "_text")
+        if text is _UNSET:
+            text = self._decode_text()
+            object.__setattr__(self, "_text", text)
+        return text
+
+    def _decode_text(self) -> str:
+        payload = self.content
+        media_type = _media_type(self._response)
+        if _is_json_media_type(media_type):
+            try:
+                text = payload.decode("utf-8")
+            except UnicodeDecodeError:
+                raise AtlaWireError("Expected UTF-8 JSON.", category="upstream") from None
+            # A non-empty JSON body is parsed here, so a malformed or
+            # non-finite document fails even for a library method that would
+            # otherwise swallow a JSON error and fall back to the raw text.
+            if text.strip():
+                object.__setattr__(self, "_json", _parse_json_text(text))
+            return text
+        errors = "strict" if _is_text_media_type(media_type) else "replace"
+        try:
+            text = payload.decode(self._response.encoding or "utf-8", errors)
+        except (UnicodeDecodeError, LookupError):
+            raise AtlaWireError("Expected UTF-8 text.", category="upstream") from None
+        return text
+
+    def json(self) -> object:
+        """Return the value decoded under the shared strict JSON rules."""
+        if _is_json_media_type(_media_type(self._response)):
+            _ = self.text  # выставляет кэш ``_json`` либо бросает ошибку
+            value = object.__getattribute__(self, "_json")
+            if value is not _UNSET:
+                return value
+        payload = self.content
+        if len(payload) > _JSON_LIMIT:
+            raise AtlaWireError(_JSON_LIMIT_MESSAGE, category="upstream")
+        value = _decode_json(payload)
+        object.__setattr__(self, "_json", value)
+        return value
+
+    def raise_for_status(self) -> None:
+        """Raise ``HTTPError`` carrying this guarded proxy on a failed status."""
+        try:
+            self._response.raise_for_status()
+        except requests.HTTPError as error:
+            raise requests.HTTPError(str(error), response=self) from None
+
+
+class _GuardedLibrarySession(_NoRedirectSession):
+    """Session for the library: every response is streamed and guarded."""
+
+    def __init__(self, *, body_limit: int) -> None:
+        super().__init__()
+        self._body_limit = body_limit
+
+    def request(self, method: str, url: str, **kwargs: object) -> requests.Response:
+        """Send one request with ``stream=True`` and wrap the response.
+
+        Streaming keeps the body cap ahead of ``requests`` buffering the whole
+        payload. The returned proxy is duck-typed; callers that annotate
+        ``requests.Response`` keep the attributes they use.
+        """
+        kwargs["stream"] = True
+        response = super().request(method, url, **kwargs)
+        return _GuardedResponse(
+            response,
+            body_limit=self._body_limit,
+            method=method,
+        )
+
+
+def library_session(token: str, *, body_limit: int) -> requests.Session:
+    """Create the guarded session handed to ``atlassian-python-api``.
+
+    The token is validated by the same rule as the direct session, ambient
+    netrc/proxy state is ignored, redirects are never resolved, and every
+    response is returned as a [_GuardedResponse][atlawire.http._GuardedResponse].
+    ``body_limit`` caps a non-JSON body; JSON keeps the fixed 8 MiB cap. The
+    caller owns the session.
+    """
+    _validated_token(token)
+    session = _GuardedLibrarySession(body_limit=body_limit)
+    session.trust_env = False
     return session
 
 
@@ -162,13 +383,7 @@ def _check_status(
     A 206 carries only part of a representation, so it is never a successful
     complete read for this client. Every caller consumes a complete document.
     """
-    if 300 <= status < 400:
-        raise AtlaWireError(
-            f"HTTP {status}: redirect refused; check the base URL.",
-            category="http",
-            http_status=status,
-            method=method,
-        )
+    _reject_redirect_or_partial(status, method=method)
     if status == 401:
         raise AtlaWireError(
             "HTTP 401: authentication rejected.",
@@ -179,13 +394,6 @@ def _check_status(
     if status == 403:
         raise AtlaWireError(
             "HTTP 403: access denied.",
-            category="http",
-            http_status=status,
-            method=method,
-        )
-    if status == 206:
-        raise AtlaWireError(
-            _PARTIAL_RESPONSE_MESSAGE,
             category="http",
             http_status=status,
             method=method,
@@ -429,6 +637,18 @@ def _decode_json(payload: bytes, *, token: str | None = None) -> object:
         text = payload.decode("utf-8")
     except UnicodeDecodeError:
         raise AtlaWireError("Expected UTF-8 JSON.", category="upstream") from None
+    return _parse_json_text(text, token=token)
+
+
+def _parse_json_text(text: str, *, token: str | None = None) -> object:
+    """Parse JSON that was decoded from one bounded UTF-8 body.
+
+    The rules are shared by the direct transport and the guarded library
+    response: one leading BOM is ignored, non-finite constants and out-of-range
+    numbers are refused, and the supplied token must not appear in the wire text
+    or in the decoded value. Parsing runs before the credential check, so a
+    malformed document keeps its own diagnostic.
+    """
     text = text.removeprefix("\ufeff")
     try:
         decoded = json.loads(

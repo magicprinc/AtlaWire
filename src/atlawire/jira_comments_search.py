@@ -38,6 +38,7 @@ from datetime import datetime
 from typing import TypedDict, TypeGuard
 
 import requests
+from atlassian.errors import ApiError
 
 from atlawire import jira as _jira
 from atlawire.http import (
@@ -54,6 +55,7 @@ from atlawire.regex_helper import (
     validate_regex,
 )
 from atlawire.repo_grep import REGEX_TIMEOUT_DEFAULT
+from atlawire.sdk import ReadOnlyClient, client_for
 
 _API = "rest/api/2"
 _SEARCH_FIELDS = "summary,comment,updated"
@@ -194,16 +196,26 @@ def find_author_comments(
             allow_http_loopback=allow_http_loopback,
         )
     query = _build_jql(days, project)
-    with bearer_session(token) as session:
-        return _collect(
-            session,
-            base,
-            query,
-            author,
-            limit=limit,
-            grep=pattern,
-            max_issues=max_issues,
-        )
+    client = client_for(
+        "jira", base, token, allow_http_loopback=allow_http_loopback
+    )
+    try:
+        # The complete issue scan goes through the library Jira.jql; the
+        # comment-thread read keeps its own paged GET because the library
+        # exposes no startAt/maxResults equivalent for issue comments.
+        with bearer_session(token) as session:
+            return _collect(
+                client,
+                session,
+                base,
+                query,
+                author,
+                limit=limit,
+                grep=pattern,
+                max_issues=max_issues,
+            )
+    finally:
+        client.close()
 
 
 def _validate_parameters(
@@ -476,6 +488,7 @@ class _CollectorSlot:
 
 
 def _collect(
+    client: ReadOnlyClient,
     session: requests.Session,
     base: str,
     query: str,
@@ -486,7 +499,6 @@ def _collect(
     max_issues: int,
 ) -> list[AuthorCommentRow]:
     """Scan every candidate issue and retain only the newest ``limit`` rows."""
-    url = f"{base}/{_API}/search"
     slot = _CollectorSlot(limit=limit)
     seen_comment_ids: set[str] = set()
     seen_keys: set[str] = set()
@@ -500,16 +512,17 @@ def _collect(
                 "The Jira issue budget was exhausted before the search completed."
             )
         requested = min(_SEARCH_PAGE_SIZE, remaining)
-        page = get_json_object(
-            session,
-            url,
-            params={
-                "jql": query,
-                "startAt": start,
-                "maxResults": requested,
-                "fields": _SEARCH_FIELDS,
-            },
-        )
+        try:
+            page = client.jql(
+                query,
+                fields=_SEARCH_FIELDS,
+                start=start,
+                limit=requested,
+            )
+        except (requests.RequestException, ApiError) as error:
+            raise _jira._sdk_error(error) from None
+        if not isinstance(page, dict):
+            raise AtlaWireError("Expected a Jira search page object.")
         issues, reported_total = _search_page(page, start, requested, total)
         if reported_total > max_issues:
             raise AtlaWireError(
