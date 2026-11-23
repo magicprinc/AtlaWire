@@ -24,6 +24,8 @@ SEARCH_LIMIT_MAX = 1000
 COMMENT_PAGES_MIN = 1
 COMMENT_PAGES_MAX = 1000
 COMMENT_PAGES_DEFAULT = 100
+COMMENT_LIMIT_MIN = 1
+COMMENT_LIMIT_MAX = 1000
 _COMMENT_PAGE_SIZE = 50
 _SEARCH_ALL_PAGE_SIZE = 100
 _WORKLOG_PAGE_SIZE = 50
@@ -87,6 +89,20 @@ class CommentRow(TypedDict):
     created: str | None
     updated: str | None
     body: str | None
+
+
+class CommentThreadMetadata(TypedDict):
+    """Комментарии задачи вместе с признаком неполноты и заявленным ``total``.
+
+    ``truncated`` истинно, когда ``limit`` остановил чтение раньше известного
+    ``total``, поэтому урезанная выдача не выглядит полной. ``total`` —
+    последнее значение, которое прислал сервер; тред без страниц считается
+    пустым и полным.
+    """
+
+    rows: list[CommentRow]
+    truncated: bool
+    total: int
 
 
 class CurrentUser(TypedDict):
@@ -448,24 +464,75 @@ def list_issue_comments(
     key_or_url: str,
     *,
     token: str,
+    limit: int | None = None,
     max_pages: int = COMMENT_PAGES_DEFAULT,
     allow_http_loopback: bool = False,
 ) -> list[CommentRow]:
-    """Return every comment of one issue in server order.
+    """Return at most ``limit`` comments of one issue in server order.
 
     Only the key is taken from ``key_or_url``; every request goes to the
     configured ``base_url``. A page is accepted only when its ``startAt``,
     required ``total``, and nonempty ``maxResults`` agree with the rows read so
-    far, so a server cap is followed without skipping comments. Duplicate IDs
-    and any metadata drift reject the whole thread; a page cap or HTTP failure
-    after valid rows also publishes nothing.
+    far, so a server cap is followed without skipping comments. ``limit`` caps
+    the thread and is sent as the per-page ``maxResults``, never above the
+    50-row page size, so a small limit really narrows the server response;
+    ``None`` reads and validates every page. Duplicate IDs and any metadata
+    drift reject the whole thread; a page cap or HTTP failure after valid rows
+    also publishes nothing. The list itself cannot show that ``limit`` stopped
+    the read; use :func:`list_issue_comments_with_metadata` when a cut result
+    must be visible to the caller.
+    """
+    return list_issue_comments_with_metadata(
+        base_url,
+        key_or_url,
+        token=token,
+        limit=limit,
+        max_pages=max_pages,
+        allow_http_loopback=allow_http_loopback,
+    )["rows"]
+
+
+def list_issue_comments_with_metadata(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    limit: int | None = None,
+    max_pages: int = COMMENT_PAGES_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> CommentThreadMetadata:
+    """Вернуть комментарии вместе с признаком неполноты и заявленным ``total``.
+
+    Форма ответа — ``{"rows": [...], "truncated": bool, "total": int}``;
+    :func:`list_issue_comments` остаётся прежним списком и делегирует сюда.
+    ``limit`` уходит в серверный ``maxResults`` каждой страницы (не больше
+    ``_COMMENT_PAGE_SIZE``), поэтому малый лимит уменьшает и сам ответ, а не
+    только число возвращаемых строк. ``truncated`` истинно, когда ``limit``
+    остановил чтение раньше известного ``total``, поэтому ложного «всё
+    прочитано» нет. ``total`` — значение, которое сервер прислал на последней
+    принятой странице; дополнительного запроса ради признака неполноты не
+    делается.
     """
     key = _issue_key(key_or_url)
+    _check_comment_limit(limit)
     _check_comment_pages(max_pages)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/issue/{key}/comment"
     with bearer_session(token) as session:
-        return _read_comments(session, url, max_pages)
+        rows, truncated, total = _read_comments(session, url, max_pages, limit)
+    return CommentThreadMetadata(rows=rows, truncated=truncated, total=total)
+
+
+def _check_comment_limit(limit: int | None) -> None:
+    if limit is not None and (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not COMMENT_LIMIT_MIN <= limit <= COMMENT_LIMIT_MAX
+    ):
+        raise AtlaWireError(
+            "The comment limit must be between "
+            f"{COMMENT_LIMIT_MIN} and {COMMENT_LIMIT_MAX}."
+        )
 
 
 def _check_comment_pages(max_pages: int) -> None:
@@ -481,22 +548,37 @@ def _check_comment_pages(max_pages: int) -> None:
 
 
 def _read_comments(
-    session: requests.Session, url: str, max_pages: int
-) -> list[CommentRow]:
+    session: requests.Session,
+    url: str,
+    max_pages: int,
+    limit: int | None,
+) -> tuple[list[CommentRow], bool, int]:
+    """Прочитать не более ``limit`` комментариев: ``(rows, truncated, total)``.
+
+    ``truncated`` истинно только тогда, когда ``limit`` остановил обход до
+    известного ``total``. Размер страницы запроса не превышает ``limit`` и
+    ``_COMMENT_PAGE_SIZE``, поэтому лимит уменьшает и ответ сервера, а не только
+    результат. Исчерпанный бюджет страниц по-прежнему ошибка, а не частичный
+    результат.
+    """
     rows: list[CommentRow] = []
     seen_ids: set[str] = set()
     start = 0
     total: int | None = None
     for _ in range(max_pages):
+        remaining = None if limit is None else limit - len(rows)
+        requested = _COMMENT_PAGE_SIZE
+        if remaining is not None:
+            requested = min(requested, remaining)
         page = get_json_object(
             session,
             url,
-            params={"startAt": start, "maxResults": _COMMENT_PAGE_SIZE},
+            params={"startAt": start, "maxResults": requested},
         )
-        comments, reported_total = _comment_page(page, start, total)
+        comments, reported_total = _comment_page(page, start, total, requested)
         total = reported_total
         if not comments:
-            return rows
+            return rows, False, total
         for value in comments:
             row = _project_comment(value)
             if row["id"] in seen_ids:
@@ -504,16 +586,22 @@ def _read_comments(
             seen_ids.add(row["id"])
             rows.append(row)
         start += len(comments)
+        if limit is not None and len(rows) >= limit:
+            return rows, total > len(rows), total
         if start == total:
-            return rows
+            return rows, False, total
     raise AtlaWireError(
         "Jira comments exceeded the page limit; raise --max-pages or retry."
     )
 
 
 def _comment_page(
-    page: dict[str, object], start: int, expected_total: int | None
+    page: dict[str, object],
+    start: int,
+    expected_total: int | None,
+    requested: int,
 ) -> tuple[list[object], int]:
+    """Validate one page and return its comments and total."""
     reported_start = page.get("startAt")
     if (
         not isinstance(reported_start, int)
@@ -544,7 +632,7 @@ def _comment_page(
         raise AtlaWireError("Invalid Jira comments maxResults.")
     if len(comments) > advertised:
         raise AtlaWireError("Jira returned more comments than maxResults.")
-    if len(comments) > _COMMENT_PAGE_SIZE:
+    if len(comments) > requested:
         raise AtlaWireError("Jira returned more comments than requested.")
     if total < start + len(comments):
         raise AtlaWireError("Inconsistent Jira comments pagination metadata.")
