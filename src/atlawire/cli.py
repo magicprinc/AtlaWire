@@ -9,6 +9,7 @@ import sys
 from io import TextIOWrapper
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 import click
 
@@ -25,20 +26,27 @@ from atlawire.bitbucket import (
     find_repositories,
     get_branch,
     get_commit,
+    get_commit_comment,
     get_commit_diff,
     get_commit_diff_text,
+    get_default_branch,
     get_file_blame,
     get_last_modified,
+    get_project,
     get_pull_request,
     get_pull_request_diff,
     get_pull_request_diff_text,
     get_pull_request_diff_with_fallback,
     get_pull_request_file,
     get_pull_request_merge_status,
+    get_related_repositories,
+    get_repository,
+    get_repository_changes,
     get_repository_file,
     get_tag,
     list_branches,
     list_commit_changes,
+    list_commit_comments,
     list_commits,
     list_directory,
     list_my_pull_requests,
@@ -49,6 +57,8 @@ from atlawire.bitbucket import (
     list_pull_requests,
     list_repositories,
     list_repository_files,
+    list_repository_forks,
+    list_repository_participants,
     list_tags,
 )
 from atlawire.bitbucket_attachment import (
@@ -71,6 +81,8 @@ from atlawire.bitbucket_search import (
 )
 from atlawire.catalog import build_command_catalog
 from atlawire.confluence import (
+    _SPACE_CONTENT_PATH,
+    _SPACE_PATH,
     ATTACHMENT_LIMIT_DEFAULT,
     CHILD_LIMIT_DEFAULT,
     CHILD_LIMIT_MAX,
@@ -85,6 +97,7 @@ from atlawire.confluence import (
     SPACE_LIMIT_DEFAULT,
     SPACE_LIMIT_MAX,
     SPACE_LIMIT_MIN,
+    _validated_space_key,
     get_page,
     get_page_attachments,
     get_page_comments,
@@ -92,7 +105,9 @@ from atlawire.confluence import (
     get_page_labels,
     get_page_version,
     get_page_web_url,
+    get_space,
     list_children,
+    list_space_content,
     list_spaces,
     search_cql,
 )
@@ -117,6 +132,8 @@ from atlawire.file_publication import (
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
+    get_json_array,
+    get_json_object,
     normalize_base_url,
     reject_credential_echo,
 )
@@ -131,12 +148,23 @@ from atlawire.jira import (
     USER_RESULTS_DEFAULT,
     USER_RESULTS_MAX,
     USER_RESULTS_MIN,
+    _issue_key,
+    _jira_id,
+    _property_key,
     get_current_user,
     get_issue,
     get_issue_changelog,
+    get_issue_comment,
+    get_issue_link,
+    get_issue_properties,
+    get_issue_property,
+    get_issue_votes,
+    get_issue_watchers,
+    get_issue_worklog,
     get_issue_worklogs,
     list_issue_comments,
     list_issue_remote_links,
+    list_issue_subtasks,
     list_issue_types,
     list_jira_projects,
     list_my_issues,
@@ -3083,6 +3111,403 @@ def my_prs(
     _print_my_pull_requests(rows, as_json=as_json)
 
 
+def _reject_conflicting_output_flags(*, as_json: bool, raw: bool) -> None:
+    """Reject --json with --raw before credentials, files, or network access."""
+    if as_json and raw:
+        raise click.UsageError("Use --json or --raw, not both.")
+
+
+def _read_raw_json(
+    base_url: str,
+    path: str,
+    *,
+    token: str,
+    allow_http_loopback: bool,
+    as_array: bool = False,
+) -> object:
+    """Read one raw JSON response through the library's shared read transport.
+
+    ``as_array`` applies the same object/array shape check as the projected
+    function, so ``--raw`` cannot report a shape the projection would reject.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    reader = get_json_array if as_array else get_json_object
+    with bearer_session(token) as session:
+        return reader(session, f"{base}{path}", params={})
+
+
+@cli.command()
+@click.argument("project_key")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def project(
+    project_key: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one Bitbucket project: key, name, description, public, and type."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = get_project(
+            base_url,
+            project_key,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command()
+@click.argument("project_key")
+@click.argument("slug")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def repository(
+    project_key: str,
+    slug: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one Bitbucket repository: slug, name, state, public, defaultBranch."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = get_repository(
+            base_url,
+            project_key,
+            slug,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("default-branch")
+@click.argument("project_key")
+@click.argument("slug")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def default_branch(
+    project_key: str,
+    slug: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print a repository's default branch: id, displayId, latestCommit, isDefault.
+
+    An empty repository answers with no branch, so both modes print null.
+    """
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = get_default_branch(
+            base_url,
+            project_key,
+            slug,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("repo-changes")
+@click.argument("project_key")
+@click.argument("slug")
+@click.argument("until")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def repo_changes(
+    project_key: str,
+    slug: str,
+    until: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print files changed by UNTIL: path, type, and node."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = get_repository_changes(
+            base_url,
+            project_key,
+            slug,
+            until,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("commit-comments")
+@click.argument("project_key")
+@click.argument("slug")
+@click.argument("commit_id")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def commit_comments(
+    project_key: str,
+    slug: str,
+    commit_id: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one commit's comments: id, author, text, and createdDate."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = list_commit_comments(
+            base_url,
+            project_key,
+            slug,
+            commit_id,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("commit-comment")
+@click.argument("project_key")
+@click.argument("slug")
+@click.argument("commit_id")
+@click.argument("comment_id")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def commit_comment(
+    project_key: str,
+    slug: str,
+    commit_id: str,
+    comment_id: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one commit comment: id, author, text, and createdDate."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = get_commit_comment(
+            base_url,
+            project_key,
+            slug,
+            commit_id,
+            comment_id,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("repo-participants")
+@click.argument("project_key")
+@click.argument("slug")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def repo_participants(
+    project_key: str,
+    slug: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print repository pull request participants: name, displayName, role."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = list_repository_participants(
+            base_url,
+            project_key,
+            slug,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("repo-forks")
+@click.argument("project_key")
+@click.argument("slug")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def repo_forks(
+    project_key: str,
+    slug: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print a repository's direct forks: slug, project, and state."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = list_repository_forks(
+            base_url,
+            project_key,
+            slug,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("related-repos")
+@click.argument("project_key")
+@click.argument("slug")
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def related_repos(
+    project_key: str,
+    slug: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print repositories related to this one: slug, project, and state."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = get_related_repositories(
+            base_url,
+            project_key,
+            slug,
+            token=token,
+            raw=raw,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
 @cli.command()
 @click.argument("key_or_url")
 @click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
@@ -3260,6 +3685,379 @@ def issue_changelog(
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
     click.echo(json.dumps(result))
+
+
+@cli.command("issue-votes")
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_votes(
+    key_or_url: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue's votes: voters, hasVoted, and watchCount."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/votes",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_votes(
+                base_url,
+                key_or_url,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-watchers")
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_watchers(
+    key_or_url: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue's watchers: watchers, watchCount, and isWatching."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/watchers",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_watchers(
+                base_url,
+                key_or_url,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-subtasks")
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_subtasks(
+    key_or_url: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue's subtasks: key, summary, type, and status."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/subtask",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+                as_array=True,
+            )
+        else:
+            document = list_issue_subtasks(
+                base_url,
+                key_or_url,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-comment")
+@click.argument("key_or_url")
+@click.argument("comment_id")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_comment(
+    key_or_url: str,
+    comment_id: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue comment: id, author, body, created, and updated."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            checked = _jira_id(comment_id, "comment")
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/comment/{checked}",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_comment(
+                base_url,
+                key_or_url,
+                comment_id,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-worklog")
+@click.argument("key_or_url")
+@click.argument("worklog_id")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_worklog(
+    key_or_url: str,
+    worklog_id: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one worklog: id, author, started, seconds, and comment."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            checked = _jira_id(worklog_id, "worklog")
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/worklog/{checked}",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_worklog(
+                base_url,
+                key_or_url,
+                worklog_id,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-properties")
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_properties(
+    key_or_url: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue's property names as a keys array."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/properties",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_properties(
+                base_url,
+                key_or_url,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-property")
+@click.argument("key_or_url")
+@click.argument("property_key")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_property(
+    key_or_url: str,
+    property_key: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue property: its key and the server's raw value."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _issue_key(key_or_url)
+            segment = quote(_property_key(property_key), safe="")
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issue/{key}/properties/{segment}",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_property(
+                base_url,
+                key_or_url,
+                property_key,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-link")
+@click.argument("link_id")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_link(
+    link_id: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one issue link: id, type, inwardIssue, and outwardIssue."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            checked = _jira_id(link_id, "issue link")
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/2/issueLink/{checked}",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_issue_link(
+                base_url,
+                link_id,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
 
 
 @cli.command()
@@ -3940,6 +4738,96 @@ def spaces(
     for row in rows:
         values = (row["key"], row["name"], row["type"])
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command()
+@click.argument("space_key")
+@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def space(
+    space_key: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print one Confluence space: key, name, type, status, and url."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "confluence", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _validated_space_key(space_key)
+            document = _read_raw_json(
+                base_url,
+                f"{_SPACE_PATH}/{key}",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = get_space(
+                base_url,
+                space_key,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("space-content")
+@click.argument("space_key")
+@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@click.option(
+    "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
+)
+@click.option("--raw", is_flag=True, help="Print the raw server response instead.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def space_content(
+    space_key: str,
+    base_url: str | None,
+    token_from_env: bool,
+    as_json: bool,
+    raw: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print a space's content up to the default row cap: rows and truncated."""
+    _reject_conflicting_output_flags(as_json=as_json, raw=raw)
+    base_url, token = _product_base_url_and_token(
+        "confluence", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        if raw:
+            key = _validated_space_key(space_key)
+            document = _read_raw_json(
+                base_url,
+                _SPACE_CONTENT_PATH.format(key=key),
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            document = list_space_content(
+                base_url,
+                space_key,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(document))
 
 
 @cli.command()
