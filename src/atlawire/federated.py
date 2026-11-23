@@ -187,7 +187,13 @@ def federated_search(
     )
     # Build every query before the first request, so no term can fail late.
     queries = tuple((term, _cql_query(term), _jql_query(term)) for term in searched)
-    pages, issues, files = _collect(queries, targets, limit, allow_http_loopback)
+    pages, issues, files, errors = _collect(
+        queries, targets, limit, allow_http_loopback
+    )
+    if len(errors) == 3:
+        raise AtlaWireError(
+            "Federated search failed for every product; nothing was returned."
+        )
     return {
         "terms": list(searched),
         "confluence": list(pages.values()),
@@ -198,6 +204,8 @@ def federated_search(
             "jira": len(issues),
             "bitbucket": len(files),
         },
+        "errors": errors,
+        "complete": not errors,
         "limits": {"per_term_per_product": limit},
         "limitations": list(LIMITATIONS),
     }
@@ -209,21 +217,34 @@ def _collect(
     limit: int,
     allow_http_loopback: bool,
 ) -> tuple[
-    dict[str, PageRow], dict[str, IssueRow], dict[tuple[str, str, str], FileRow]
+    dict[str, PageRow],
+    dict[str, IssueRow],
+    dict[tuple[str, str, str], FileRow],
+    dict[str, str],
 ]:
-    """Merge one term at a time in BBK's Confluence, Jira, Bitbucket order."""
+    """Merge one term at a time; keep surviving products on failure."""
     pages: dict[str, PageRow] = {}
     issues: dict[str, IssueRow] = {}
     files: dict[tuple[str, str, str], FileRow] = {}
+    errors: dict[str, str] = {}
     confluence, jira, bitbucket = targets
     for term, cql, jql in queries:
-        for page in _confluence_rows(confluence, cql, limit, allow_http_loopback):
-            _merge_page(pages, page, term)
-        for issue in _jira_rows(jira, jql, limit, allow_http_loopback):
-            _merge_issue(issues, issue, term)
-        for code in _bitbucket_rows(bitbucket, term, limit, allow_http_loopback):
-            _merge_file(files, code, term)
-    return pages, issues, files
+        try:
+            for page in _confluence_rows(confluence, cql, limit, allow_http_loopback):
+                _merge_page(pages, page, term)
+        except AtlaWireError as exc:
+            errors.setdefault("confluence", str(exc))
+        try:
+            for issue in _jira_rows(jira, jql, limit, allow_http_loopback):
+                _merge_issue(issues, issue, term)
+        except AtlaWireError as exc:
+            errors.setdefault("jira", str(exc))
+        try:
+            for code in _bitbucket_rows(bitbucket, term, limit, allow_http_loopback):
+                _merge_file(files, code, term)
+        except AtlaWireError as exc:
+            errors.setdefault("bitbucket", str(exc))
+    return pages, issues, files, errors
 
 
 def _confluence_rows(
@@ -274,10 +295,7 @@ def _bitbucket_rows(
 
 def _failure(product: str, exc: AtlaWireError) -> AtlaWireError:
     """Describe a stopped federated call without echoing its request details."""
-    return AtlaWireError(
-        f"Federated search stopped: the {product} search failed and no partial "
-        f"result was published. {exc}"
-    )
+    return AtlaWireError(f"{product} search failed. {exc}")
 
 
 def _merge_page(pages: dict[str, PageRow], row: ContentRow, term: str) -> None:

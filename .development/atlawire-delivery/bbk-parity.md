@@ -37,7 +37,7 @@ AtlaWire equivalent.
 | `page` | `page`, `page-history`, `page-comments`, `page-labels`, `page-attachments`, `page-version`, `page-url` | covered | |
 | `spaces`, `children` | `spaces`, `children` | covered | |
 | `cql` | `cql` | covered | |
-| `find` (federated) | `find` | partial | Fails closed today; partial-result contract is planned |
+| `find` (federated) | `find` | covered | Partial results: surviving products, per-product `errors`, `complete:false`; exit 1 only when all three fail |
 | `whoami` | `whoami` | covered | Per-product identity and partial failures |
 | `selftest` | `selftest` | covered | Same probe as `whoami`, registered under the BBK name |
 | repository attachment download | `attachment-get` | partial | Returns base64 JSON, not a file; `read ... --out` covers archive/raw |
@@ -47,13 +47,12 @@ AtlaWire equivalent.
 
 ## Remaining functional gaps
 
-1. `find` still fails closed: one failed product suppresses all results. The
-   partial-result contract (per-product status, `complete:false`) is designed
-   but needs its own batch with rewritten oracles.
-2. `attachment-get` emits base64 JSON. A file destination exists for the
+1. `attachment-get` emits base64 JSON. A file destination exists for the
    registered binary reads but not for that plugin route.
-3. Live differential evidence covers five workflows; the rest are offline
+2. Live differential evidence covers five workflows; the rest are offline
    only.
+3. Within one product, a paging failure discards that product's rows for the
+   term; it is reported in `errors`, never silently shown as empty.
 
 ## Evidence
 

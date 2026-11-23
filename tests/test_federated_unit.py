@@ -302,7 +302,7 @@ def test_bitbucket_paging_is_requested_for_every_term(
     assert paging == [True, True]
 
 
-def test_bitbucket_cursor_failure_after_a_term_publishes_nothing(
+def test_bitbucket_cursor_failure_keeps_its_earlier_rows_and_reports_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[Call] = []
@@ -335,15 +335,21 @@ def test_bitbucket_cursor_failure_after_a_term_publishes_nothing(
     monkeypatch.setattr(federated, "search_issues", empty_search)
     monkeypatch.setattr(federated, "search_code", bitbucket_search)
 
-    with pytest.raises(AtlaWireError) as caught:
-        search(["first", "second"])
+    result = search(["first", "second"])
 
-    message = str(caught.value)
-    assert "Bitbucket" in message
-    assert "nextStart" in message
-    assert "no partial result" in message
-    assert "src/a.py" not in message
+    assert result["complete"] is False
+    assert "nextStart" in result["errors"]["bitbucket"]
     assert [call[2] for call in calls] == ["first", "second"]
+    assert product_rows(result, "bitbucket") == [
+        {
+            "project": "P",
+            "repository": "r",
+            "file": "src/a.py",
+            "hitCount": 1,
+            "matchEvidence": "highlight",
+            "terms": ["first"],
+        }
+    ]
 
 
 def test_unicode_terms_are_quoted_verbatim_for_each_product(
@@ -417,39 +423,18 @@ def test_missing_or_malformed_terms_are_rejected_before_any_request(
 
 
 @pytest.mark.parametrize("product", ["Confluence", "Jira", "Bitbucket"])
-def test_any_product_failure_publishes_nothing_and_stops_later_calls(
+def test_any_product_failure_keeps_the_surviving_products(
     monkeypatch: pytest.MonkeyPatch, product: str
 ) -> None:
     calls = install_search(monkeypatch, fail=product)
 
-    with pytest.raises(AtlaWireError) as caught:
-        search(["ported numbers", "ported"])
+    result = search(["ported numbers", "ported"])
 
-    first = (
-        "Confluence",
-        CONFLUENCE.base_url,
-        'text ~ "ported numbers"',
-        CONFLUENCE.token,
-        20,
-    )
-    second = (
-        "Jira",
-        JIRA.base_url,
-        'text ~ "ported numbers" ORDER BY created DESC',
-        JIRA.token,
-        20,
-    )
-    third = ("Bitbucket", BITBUCKET.base_url, "ported numbers", BITBUCKET.token, 20)
-    expected = {
-        "Confluence": [first],
-        "Jira": [first, second],
-        "Bitbucket": [first, second, third],
-    }[product]
-    assert calls == expected
-
-    message = str(caught.value)
-    assert product in message
-    assert "no partial result was published" in message
+    assert result["complete"] is False
+    assert product.lower() in result["errors"]
+    # Every product is asked for both terms; one failure does not stop others.
+    assert len(calls) == 6
+    assert {call[0] for call in calls} == {"Confluence", "Jira", "Bitbucket"}
     for detail in (
         CONFLUENCE.token,
         JIRA.token,
@@ -457,7 +442,7 @@ def test_any_product_failure_publishes_nothing_and_stops_later_calls(
         CONFLUENCE.base_url,
         "ported numbers",
     ):
-        assert detail not in message
+        assert detail not in json.dumps(result["errors"])
 
 
 def test_each_product_receives_only_its_own_pair(
@@ -578,7 +563,8 @@ def test_empty_results_keep_zero_counts_and_coverage_warnings(
     assert product_rows(result, "jira") == []
     assert product_rows(result, "bitbucket") == []
     assert counts(result) == {"confluence": 0, "jira": 0, "bitbucket": 0}
-    assert "errors" not in result
+    assert result["errors"] == {}
+    assert result["complete"] is True
     warning = " ".join(limitations(result))
     assert "per-term limit" in warning
     assert "may be omitted" in warning
@@ -601,30 +587,32 @@ def test_exact_repeated_term_is_searched_once(monkeypatch: pytest.MonkeyPatch) -
 
 
 @pytest.mark.parametrize("page_id", [None, True, ""], ids=["none", "boolean", "empty"])
-def test_page_without_stable_id_fails_closed(
+def test_page_without_stable_id_fails_only_its_product(
     monkeypatch: pytest.MonkeyPatch, page_id: object
 ) -> None:
     install_search(monkeypatch, pages={"ported": [page(page_id)]})
 
-    with pytest.raises(AtlaWireError) as caught:
-        search(["ported"])
+    result = search(["ported"])
 
-    assert "stable ID" in str(caught.value)
+    assert result["complete"] is False
+    assert "stable ID" in result["errors"]["confluence"]
+    assert product_rows(result, "confluence") == []
 
 
-def test_issue_without_stable_key_fails_closed(
+def test_issue_without_stable_key_fails_only_its_product(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_search(monkeypatch, issues={"ported": [issue("")]})
 
-    with pytest.raises(AtlaWireError) as caught:
-        search(["ported"])
+    result = search(["ported"])
 
-    assert "stable key" in str(caught.value)
+    assert result["complete"] is False
+    assert "stable key" in result["errors"]["jira"]
+    assert product_rows(result, "jira") == []
 
 
 @pytest.mark.parametrize("path", ["", None], ids=["empty", "missing"])
-def test_file_without_stable_path_fails_closed(
+def test_file_without_stable_path_fails_only_its_product(
     monkeypatch: pytest.MonkeyPatch, path: object
 ) -> None:
     install_search(
@@ -632,7 +620,8 @@ def test_file_without_stable_path_fails_closed(
         files={"ported": [code(path=cast(str, path))]},
     )
 
-    with pytest.raises(AtlaWireError) as caught:
-        search(["ported"])
+    result = search(["ported"])
 
-    assert "without a path" in str(caught.value)
+    assert result["complete"] is False
+    assert "without a path" in result["errors"]["bitbucket"]
+    assert product_rows(result, "bitbucket") == []

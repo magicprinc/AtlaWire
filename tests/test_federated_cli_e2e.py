@@ -386,6 +386,8 @@ def expected_payload() -> dict[str, object]:
             },
         ],
         "counts": {"confluence": 3, "jira": 3, "bitbucket": 3},
+        "errors": {},
+        "complete": True,
         "limits": {"per_term_per_product": 20},
         "limitations": list(LIMITATIONS),
     }
@@ -414,30 +416,31 @@ def test_find_json_merges_two_terms_and_uses_only_read_routes(
 def test_find_bitbucket_cursor_failure_publishes_nothing(
     missing_credentials: Path,
 ) -> None:
-    # Bitbucket paging asks for the next page; its non-advancing cursor fails the
-    # whole call, so the first page's file must not be published.
+    # Bitbucket paging asks for the next page; its non-advancing cursor fails
+    # that product, while its first page and the other products survive.
     result, seen = run_find(missing_credentials, "bitbucket-cursor-gap", "paged")
 
-    assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["complete"] is False
+    assert "nextStart" in payload["errors"]["bitbucket"]
+    # The product adapter aborts its own paging, so that product contributes
+    # nothing; the other products still answer.
+    assert payload["bitbucket"] == []
     assert seen == [
         confluence_call("paged", 0, 20),
         jira_call("paged"),
         bitbucket_page("paged", 0, 20),
         bitbucket_page("paged", 5, 19),
     ]
-    assert "Bitbucket" in result.stderr
-    assert "no partial result" in result.stderr
-    assert "nextStart" in result.stderr
-    assert "src/a.py" not in result.stderr
-    assert "Traceback" not in result.stderr
     for detail in (
         CONFLUENCE_TOKEN,
         JIRA_TOKEN,
         BITBUCKET_TOKEN,
         SECRET_SENTINEL,
     ):
-        assert detail not in result.stderr
+        assert detail not in result.stdout
 
 
 def test_find_unicode_term_reaches_each_product_verbatim(
@@ -484,29 +487,31 @@ def test_find_requires_at_least_one_term(missing_credentials: Path) -> None:
     assert "Missing argument" in result.stderr
 
 
-def test_find_jira_failure_on_second_term_publishes_nothing(
+def test_find_jira_failure_on_second_term_keeps_the_other_products(
     missing_credentials: Path,
 ) -> None:
     result, seen = run_find(
         missing_credentials, "jira-second-term", "ported numbers", "ported"
     )
 
-    assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    assert payload["complete"] is False
+    assert "jira" in payload["errors"]
+    assert payload["jira"], "the first term's issues survive"
+    assert payload["confluence"], "later terms still reach other products"
     assert seen == [
         *expected_requests(["ported numbers"]),
         confluence_call("ported", 0, 20),
         confluence_call("ported", 2, 18),
         jira_call("ported"),
+        bitbucket_call("ported"),
     ]
-    assert "Jira" in result.stderr
-    assert "no partial result" in result.stderr
     for detail in (
         SECRET_SENTINEL,
         CONFLUENCE_TOKEN,
         JIRA_TOKEN,
         BITBUCKET_TOKEN,
-        '"ported',
     ):
-        assert detail not in result.stderr
-    assert "Traceback" not in result.stderr
+        assert detail not in result.stdout
