@@ -82,7 +82,8 @@ def escape_controls(value: str) -> str:
 def inline(value: str) -> str:
     """Escape data so Markdown renderers show it literally."""
     text = _MARKDOWN_SPECIALS.sub(r"\\\1", one_line(value))
-    if text[:1] in "#-+=":
+    # ``startswith`` keeps an empty string unescaped: ``"" in "#-+="`` is true.
+    if text.startswith(("#", "-", "+", "=")):
         text = "\\" + text
     else:
         marker = _ORDERED_MARKER.match(text)

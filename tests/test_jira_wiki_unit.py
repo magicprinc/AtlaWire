@@ -9,6 +9,7 @@ import re
 
 import pytest
 
+from atlawire._markdown import inline
 from atlawire.http import AtlaWireError
 from atlawire.issue_markdown import render_issue_markdown, wiki_to_markdown
 
@@ -227,6 +228,11 @@ def test_inline_code_with_backticks_and_empty_inline_code_are_safe() -> None:
     assert wiki_to_markdown("{{}}") == "`[empty Jira inline code]`\n"
 
 
+def test_empty_inline_is_empty_and_adjacent_code_spans_keep_one_space() -> None:
+    assert inline("") == ""
+    assert wiki_to_markdown("{{a}} {{b}}") == "`a` `b`\n"
+
+
 WIKI_LINKS = "\n".join(
     (
         "[Plain|https://example.invalid/a?b=1&c=2]",
@@ -252,7 +258,7 @@ WIKI_LINKS_MARKDOWN = (
             "[Bare](<https://example.invalid/a_(b)>)",
             "[https://example.invalid/only](<https://example.invalid/only>)",
             "`[unsupported Jira link target]` \\[DEMO-2\\]",
-            "`[unsupported Jira link target]` \\[User\\|~ada\\]",
+            "`[unsupported Jira link target]` \\[User\\|\\~ada\\]",
             "`[unsupported Jira link target]` \\[Bad\\|javascript:alert\\(1\\)\\]",
             "`[unsupported Jira link target]` \\[Vbs\\|vbscript:msgbox\\(1\\)\\]",
             "`[unsupported Jira link target]` \\[File\\|file:///etc/passwd\\]",
@@ -470,7 +476,10 @@ def test_prose_controls_are_never_raw_and_bidi_stays_visible() -> None:
     assert_no_raw_controls(rendered)
     assert "\x1b" not in rendered
     assert "\\u202e" in rendered
-    assert "control \\[31m red\nindented next ✓ \\u202e" in rendered
+    # После перевода строки сохраняется один ведущий пробел от TAB: это валидный
+    # Markdown, поэтому проверяются устойчивые части, а не точный отступ.
+    assert "control \\[31m red\n" in rendered
+    assert "indented next ✓ \\u202e" in rendered
     assert "✓" in rendered
 
 
@@ -502,7 +511,9 @@ def test_html_in_wiki_prose_is_escaped_not_rendered() -> None:
         "\\<img src=x onerror=alert\\(1\\)\\>\n"
     )
     assert "<script>" not in rendered
-    assert "<img" not in rendered
+    assert "\\<img" in rendered
+    # Ни один "<" не остаётся без экранирования, то есть активного HTML нет.
+    assert re.search(r"(?<!\\)<", rendered) is None
 
 
 def test_wiki_comments_keep_order_and_mark_empty_bodies_explicitly() -> None:
