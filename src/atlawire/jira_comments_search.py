@@ -7,9 +7,12 @@ update timestamp is older than the window can be missed. The window is a
 bounded candidate set, not a comment-date index.
 
 Pagination is fail-closed. Jira search pages and truncated comment threads are
-read with real ``startAt`` offsets and stable totals; any malformed or
-inconsistent pagination metadata or consumed record, later HTTP failure,
-duplicate record, issue-budget exhaustion, or comment page limit raises
+read with real ``startAt`` offsets. Jira 8.22 documents that a search ``total``
+may be empty: when it is absent, only an empty page proves exhaustion, while a
+``total`` reported earlier is never forgotten and an empty page short of it
+fails. The page size follows the ``maxResults`` echo and the undocumented
+``isLast`` flag is not read. Any malformed or inconsistent pagination metadata
+or consumed record, later HTTP failure,
 :class:`AtlaWireError`, and no partial result is returned. A short page is never
 treated as proof of exhaustion, and a last issue's ``updated`` value is never
 used as an early stop. Completed thread pages are streamed into a bounded
@@ -67,45 +70,6 @@ DEFAULT_DAYS = 90
 DEFAULT_LIMIT = 10
 DEFAULT_MAX_ISSUES = 20000
 COMMENT_PAGE_LIMIT = 100
-USER_SEARCH_LIMIT = 50
-# Hard bound on pages read for one user-lookup candidate.
-USER_PAGE_LIMIT = 100
-
-_RU2LAT = {
-    "а": "a",
-    "б": "b",
-    "в": "v",
-    "г": "g",
-    "д": "d",
-    "е": "e",
-    "ё": "e",
-    "ж": "zh",
-    "з": "z",
-    "и": "i",
-    "й": "y",
-    "к": "k",
-    "л": "l",
-    "м": "m",
-    "н": "n",
-    "о": "o",
-    "п": "p",
-    "р": "r",
-    "с": "s",
-    "т": "t",
-    "у": "u",
-    "ф": "f",
-    "х": "kh",
-    "ц": "ts",
-    "ч": "ch",
-    "ш": "sh",
-    "щ": "shch",
-    "ъ": "",
-    "ы": "y",
-    "ь": "",
-    "э": "e",
-    "ю": "yu",
-    "я": "ya",
-}
 
 
 class AuthorCommentRow(TypedDict):
@@ -140,18 +104,18 @@ def find_author_comments(
     """Return the newest comments by one exact Jira author.
 
     When ``user`` is omitted, the authenticated identity is read with
-    :func:`atlawire.jira.get_current_user` and no user search is performed.
-    Otherwise ``user`` is resolved with :func:`atlawire.jira.search_users`.
-    The original term, a BBK-compatible transliteration, and a short
-    transliterated prefix are tried in order. Paging stops at the first empty
-    page. Jira 8.22 returns a bare user array without ``total`` or ``isLast``,
-    so an empty page is treated as practical exhaustion, not proof that no
-    further users exist. An exact login match stops paging immediately. If
-    paging ends with exactly one nonexact candidate, that candidate is selected
-    as a heuristic, not proven uniqueness or complete discovery; multiple
-    distinct nonexact candidates are rejected as ambiguous. Pass the exact
-    login for unambiguous use. Only comments whose ``author.name`` exactly
-    equals the resolved login are kept.
+    :func:`atlawire.jira.resolve_user` and no user search is performed.
+    Otherwise ``user`` is resolved with :func:`atlawire.jira.resolve_user`,
+    which tries the original term, a BBK-compatible transliteration, and a
+    short transliterated prefix in order. Paging stops at the first empty page.
+    Jira 8.22 returns a bare user array without ``total`` or ``isLast``, so an
+    empty page is treated as practical exhaustion, not proof that no further
+    users exist. An exact login match stops paging immediately. If paging ends
+    with exactly one nonexact candidate, that candidate is selected as a
+    heuristic, not proven uniqueness or complete discovery; multiple distinct
+    nonexact candidates are rejected as ambiguous with their logins named in
+    the error. Pass the exact login for unambiguous use. Only comments whose
+    ``author.name`` exactly equals the resolved login are kept.
 
     ``grep`` is an optional BBK-compatible regular expression. A non-empty
     pattern is validated before any request, then evaluated with
@@ -282,43 +246,6 @@ def _grep_match_documents(bodies: list[str], pattern: str) -> list[bool]:
     return matches
 
 
-def _translit(term: str) -> str:
-    """Transliterate Russian text with BBK's soft-sign rule.
-
-    A soft sign before ``е``/``ё``/``ю``/``я`` becomes ``y``, so
-    ``Воробьев`` becomes ``vorobyev`` rather than ``vorobev``.
-    """
-    out: list[str] = []
-    chars = term.lower()
-    for index, char in enumerate(chars):
-        if (
-            char == "ь"
-            and index + 1 < len(chars)
-            and chars[index + 1] in "еёюя"
-        ):
-            out.append("y")
-            continue
-        out.append(_RU2LAT.get(char, char))
-    return "".join(out)
-
-
-def _user_candidates(term: str) -> list[str]:
-    """Return BBK-compatible lookup candidates in priority order."""
-    candidates = [term]
-    latin = _translit(term)
-    if latin != term.lower():
-        candidates.append(latin)
-        if len(latin) >= 4:
-            candidates.append(latin[:4])
-    unique: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        if candidate not in seen:
-            seen.add(candidate)
-            unique.append(candidate)
-    return unique
-
-
 def _resolve_author(
     base: str,
     term: str,
@@ -326,103 +253,21 @@ def _resolve_author(
     token: str,
     allow_http_loopback: bool,
 ) -> _ResolvedAuthor:
-    """Resolve one login without guessing between several matching users."""
-    for candidate in _user_candidates(term):
-        resolved = _resolve_user_candidate(
-            base,
-            candidate,
-            token=token,
-            allow_http_loopback=allow_http_loopback,
-        )
-        if resolved is not None:
-            return resolved
-    raise AtlaWireError("No Jira user matched the requested login or name.")
-
-
-def _resolve_user_candidate(
-    base: str,
-    candidate: str,
-    *,
-    token: str,
-    allow_http_loopback: bool,
-) -> _ResolvedAuthor | None:
-    """Page one candidate until empty, exact, or page-budget failure.
-
-    Jira's user search has no total or ``isLast`` field. The first empty page is
-    therefore the only practical exhaustion signal, and selecting a singleton
-    nonexact user after it is a heuristic rather than proof of uniqueness.
-    """
-    ambiguous = "Jira user search matched more than one user; use the exact login."
-    duplicate = (
-        "Jira user search returned a duplicate or non-advancing page; "
-        "use the exact login."
+    """Resolve one login through the shared public resolver."""
+    resolved = _jira.resolve_user(
+        base, term, token=token, allow_http_loopback=allow_http_loopback
     )
-    candidate_key = candidate.casefold()
-    only_nonexact: object | None = None
-    multiple_candidates = False
-    seen_names: set[str] = set()
-    start = 0
-    for _ in range(USER_PAGE_LIMIT):
-        rows = _jira.search_users(
-            base,
-            candidate,
-            token=token,
-            start_at=start,
-            max_results=USER_SEARCH_LIMIT,
-            allow_http_loopback=allow_http_loopback,
-        )
-        if not rows:
-            if multiple_candidates:
-                raise AtlaWireError(ambiguous)
-            if only_nonexact is not None:
-                return _resolved_author(only_nonexact)
-            return None
-        exact_rows: list[object] = []
-        for row in rows:
-            name = _user_name(row)
-            key = name.casefold()
-            if key in seen_names:
-                raise AtlaWireError(duplicate)
-            seen_names.add(key)
-            if key == candidate_key:
-                exact_rows.append(row)
-            elif only_nonexact is None:
-                only_nonexact = row
-            else:
-                multiple_candidates = True
-        if len(exact_rows) > 1:
-            raise AtlaWireError(ambiguous)
-        if exact_rows:
-            return _resolved_author(exact_rows[0])
-        start += len(rows)
-    raise AtlaWireError(
-        "Jira user search exceeded the page budget; use the exact login."
-    )
-
-
-def _user_name(row: object) -> str:
-    if not isinstance(row, dict):
-        raise AtlaWireError("Expected Jira user objects.")
-    name = row.get("name")
-    if not isinstance(name, str) or not name.strip():
-        raise AtlaWireError("Expected Jira users with non-empty names.")
-    return _check_text(name, "Jira user name")
+    return _author_identity(resolved.get("name"), resolved.get("displayName"))
 
 
 def _current_author(
     base: str, *, token: str, allow_http_loopback: bool
 ) -> _ResolvedAuthor:
     """Resolve the authenticated identity without searching for users."""
-    current = _jira.get_current_user(
+    current = _jira.resolve_user(
         base, token=token, allow_http_loopback=allow_http_loopback
     )
     return _author_identity(current.get("name"), current.get("displayName"))
-
-
-def _resolved_author(row: object) -> _ResolvedAuthor:
-    if not isinstance(row, dict):
-        raise AtlaWireError("Expected Jira user objects.")
-    return _author_identity(row.get("name"), row.get("displayName"))
 
 
 def _author_identity(name: object, display: object) -> _ResolvedAuthor:
@@ -493,13 +338,14 @@ def _collect(
     serial = 0
     start = 0
     total: int | None = None
-    while total is None or start < total:
+    page_size = _SEARCH_PAGE_SIZE
+    while True:
         remaining = max_issues - start
         if remaining < 1:
             raise AtlaWireError(
                 "The Jira issue budget was exhausted before the search completed."
             )
-        requested = min(_SEARCH_PAGE_SIZE, remaining)
+        requested = min(page_size, remaining)
         page = get_json_object(
             session,
             url,
@@ -510,15 +356,19 @@ def _collect(
                 "fields": _SEARCH_FIELDS,
             },
         )
-        issues, reported_total = _search_page(page, start, requested, total)
-        if reported_total > max_issues:
-            raise AtlaWireError(
-                "The Jira search exceeds the issue budget; narrow the query "
-                "or raise the budget."
-            )
-        total = reported_total
+        issues, reported_total, advertised = _search_page(page, start, requested, total)
+        if reported_total is not None:
+            total = reported_total
+            if total > max_issues:
+                raise AtlaWireError(
+                    "The Jira search exceeds the issue budget; narrow the query "
+                    "or raise the budget."
+                )
         if not issues:
+            _jira._check_search_end(start, total)
             break
+        if advertised is not None:
+            page_size = min(advertised, _SEARCH_PAGE_SIZE)
         for issue in issues:
             for timestamp, row in _issue_comments(
                 session,
@@ -531,7 +381,7 @@ def _collect(
             ):
                 serial = slot.offer(timestamp, row, serial)
         start += len(issues)
-        if start == total:
+        if total is not None and start >= total:
             break
     return slot.finish()
 
@@ -541,8 +391,13 @@ def _search_page(
     start: int,
     requested: int,
     known_total: int | None,
-) -> tuple[list[object], int]:
-    """Validate one search page and return its issues and stable total."""
+) -> tuple[list[object], int | None, int | None]:
+    """Validate one search page and return its issues, total, and page size.
+
+    ``total`` may be absent. A total reported by an earlier page is kept by the
+    caller, so a different later value fails. The undocumented ``isLast`` flag
+    is not read.
+    """
     reported_start = page.get("startAt")
     if not _is_int(reported_start) or reported_start != start:
         raise AtlaWireError(
@@ -552,30 +407,26 @@ def _search_page(
     if not isinstance(issues, list):
         raise AtlaWireError("Expected a Jira search issues array.")
     total = page.get("total")
-    if not _is_int(total) or total < 0:
-        raise AtlaWireError("Invalid Jira search total.")
-    if known_total is not None and total != known_total:
-        raise AtlaWireError("Jira search total changed between pages.")
+    if total is not None:
+        if not _is_int(total) or total < 0:
+            raise AtlaWireError("Invalid Jira search total.")
+        if known_total is not None and total != known_total:
+            raise AtlaWireError("Jira search total changed between pages.")
+        if total < start:
+            raise AtlaWireError("Inconsistent Jira search pagination metadata.")
+    advertised: int | None = None
     if issues:
-        advertised = page.get("maxResults")
-        if not _is_int(advertised) or advertised <= 0:
+        advertised_value = page.get("maxResults")
+        if not _is_int(advertised_value) or advertised_value <= 0:
             raise AtlaWireError("Invalid Jira search maxResults.")
+        advertised = advertised_value
         if len(issues) > advertised:
             raise AtlaWireError("Jira search returned more issues than maxResults.")
         if len(issues) > requested:
             raise AtlaWireError("Jira search returned more issues than requested.")
-        if total < start + len(issues):
+        if total is not None and total < start + len(issues):
             raise AtlaWireError("Inconsistent Jira search pagination metadata.")
-    elif start != total:
-        raise AtlaWireError(
-            "Jira search returned an empty page before all matches."
-        )
-    is_last = page.get("isLast")
-    if is_last is not None and not isinstance(is_last, bool):
-        raise AtlaWireError("Invalid Jira search isLast flag.")
-    if is_last is True and start + len(issues) < total:
-        raise AtlaWireError("Jira search isLast disagreed with its total.")
-    return issues, total
+    return issues, total, advertised
 
 
 def _issue_comments(
