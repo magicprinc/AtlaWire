@@ -9,6 +9,12 @@ empty result, another page, and a failure. The final artifact covers all
 required operations in the agreed versioned inventory, with additive
 workflows kept separate.
 
+Use [the execution order](delivery-plan.md#execution-order) for the next
+implementation slice and [the full functional matrix](#6-full-functional-matrix)
+to reconcile every exposed workflow. This plan covers the final tool, not just
+the new SDK adapter. Existing tests count if they prove the listed contract
+against a known candidate; do not recreate them to complete the matrix.
+
 ## 1. Lock the candidate and the evidence
 
 1. Record the commit and tracked **and untracked** candidate changes. Install
@@ -19,9 +25,14 @@ workflows kept separate.
    resolved package location and console launcher. Use a synthetic home,
    explicit synthetic BBK credential path, loopback or dummy endpoints and a
    deliberately selected environment for **all** offline commands. Include
-   subprocesses. Do not assume passing mock tests prove egress restrictions.
-   Use no real credential files, inherited product values, proxy/netrc state,
-   or non-loopback test targets offline.
+   subprocesses, manual probes and delegated work. Set and verify that
+   environment **before invoking the real CLI**, even for input expected to be
+   rejected before credentials. Use the underlying callable with an I/O trap
+   for ad hoc validation if the CLI cannot be isolated yet. Do not assume
+   passing mock tests prove egress restrictions. Use no real credential files,
+   inherited product values, proxy/netrc state, or non-loopback test targets
+   offline. A live request during an offline run is an isolation failure;
+   stop, disclose it, and discard that run as release evidence.
 3. Compare the checked-in release inventory with the advertised canonical
    base and test coverage IDs; reject omissions, duplicates and unclassified
    additions. The inventory is derived from versioned references, not emitted
@@ -246,15 +257,18 @@ invitation to run tests against a live destructive path.
    compatibility tests with each batch. These commands are not the release
    suite and do not prove the current new CLI path by themselves.
 2. **Full offline green and coverage reconciliation.** Run
-   `C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests` plus
-   project lint/types and the applicable dependency audit. Give pytest a
-   unique project-local `--basetemp` if used. Report tool failures instead of
-   suppressing them. Reconcile the required inventory against advertised IDs
-   and independently verified test cases. **Pass threshold:** every required
-   ID is implemented, advertised and passes its installed-CLI loopback case.
-   No unresolved in-scope classification, unexpected skip, or unsupported
-   required operation counts as done. Exclusions and additive reads are
-   reported separately.
+   `C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q --basetemp=.planning/<new-run>/pytest tests`
+   (replace `<new-run>` with a unique run directory whose parent exists).
+   Selecting `tests` explicitly separates offline tests from opt-in `checks`.
+   Run Ruff and Pyright scoped to the project; run the applicable dependency
+   audit with its network access approved. Report failures instead of
+   suppressing them. Reconcile the full functional matrix and the required
+   inventory against advertised IDs and independently verified test cases.
+   **Pass threshold:** every required ID is implemented, advertised and passes
+   its installed-CLI loopback case, and every shipped workflow is covered at
+   its real entry point. No unresolved in-scope classification, unexpected
+   skip, or unsupported required operation counts as done. Exclusions and
+   additive reads are reported separately.
 3. **Clean wheel proof.** Run `uv lock --check` without regenerating the lock
    as part of the check. Confirm the lock includes the same SDK pin as the
    project metadata. Build a versioned wheel with approved Python 3.15 tooling.
@@ -292,6 +306,99 @@ invitation to run tests against a live destructive path.
    Return the exact candidate and test receipt to the reviewer. The fresh
    review challenges both the tests and implementation; separately
    authorized independent execution uses an isolated copy of that candidate.
-   Unsupported required scope, missing decisive live evidence, failed
-   checks or unresolved safety findings block release; report a review
-   candidate instead. BBK retirement remains a separate owner decision.
+    Unsupported required scope, missing decisive live evidence, failed
+    checks or unresolved safety findings block release; report a review
+    candidate instead. BBK retirement remains a separate owner decision.
+
+## 6. Full functional matrix
+
+Freeze **three lists**, not one percentage: (1) required standard reads from
+versioned references; (2) public CLI commands, Python entry points and retained
+aliases from the installed artifact; (3) required BBK workflows, including
+meaningful flags and library-only reads. Assign each item a matrix row, one
+evidence owner and a disposition. Adding a CLI alias does not add another
+standard read; an SDK method does not establish a supported route. Do not count
+helpers as user-facing features, but test them through the workflows they serve.
+
+The REST denominator is still open. Before implementing the product batches,
+the integrator commits the versioned reference-based inventory alongside these
+plans and asks the owner to resolve exclusions or unknown classifications.
+Do not derive this file from the runtime manifest or observed CLI tree. For
+each REST row, record `product + exact source/version | method + route |
+required/excluded/unresolved + reason | operation ID | required/optional
+inputs | success statuses, shape and continuation | advertised | adapter |
+offline installed test | live status`. A runtime row is not a passing adapter
+test. Keep independent fixtures small but sufficient to catch wrong resources,
+discarded fields or invalid shape. For each workflow, record
+`entry point/flags | fixture | expected output | failure/boundary | test node |
+artifact/result`. Extend [the provisional BBK table](bbk-parity.md) with
+its own workflow IDs and final-wheel comparison receipts. Do not substitute
+CLI name matches, REST cases, or the five historical smoke comparisons.
+
+Record offline and clean-wheel results as **pass / failed / not exercised /
+not applicable**. For live REST proof distinguish **direct pass on this
+wheel**, **not run directly; named representative path passed and residual
+risk accepted by owner**, and **failed/inconclusive**. Link the direct or
+representative receipt; an old receipt or another product's result does
+not qualify. BBK workflows have their own direct comparison status. Explain
+every exclusion; do not use “not applicable” for untested required scope.
+Reconcile both directions: every required row has the prescribed evidence,
+and every advertised row and retained alias has a documented contract.
+
+This matrix was checked against all 65 current top-level commands and reviewed
+for evidence gaps by DeepSeek Flash (`ses_df9f2ebb6ffeTR1Qao5D65wHqU`).
+That is a plan check, not an executed functional pass or a frozen inventory.
+
+| Area and existing functionality | What the full verification must demonstrate |
+| --- | --- |
+| **Installation and discovery (R1/R6):** console and `python -m atlawire`, version, root/product/command help, `--catalog`, `--describe`, `operations` | Test offline with no credentials and two different working directories. The final wheel includes its required resources; module location and launcher belong to that wheel, not the checkout or a different user-site install. One canonical command per required ID, executable argv from `--describe`, explicit page and failure semantics, no secret defaults, and correct invalid/conflicting-action exits. Use `tests/test_entrypoints.py`, `test_catalog_unit.py` and `test_read_slice_cli_e2e.py` as starting points. |
+| **Canonical and compatibility APIs (R1/R2):** `read`, `read-operation`, `api-get`, `api-request`, documented Python calls/wrappers | Cover one exact wire fixture per registered required ID; one matching CLI/Python case on the wheel; one case per retained compatibility contract. Test the fixed allowlist, no cause-based switch to another transport, validation and expected outputs. Reject raw session/dispatch exposure and a wrong product or excluded route without sending any request. Reuse `test_operations*`, `test_read_slice*`, `test_sdk*`, `test_semantic_post_cli_e2e.py` and `test_manifest_unit.py`; a manifest self-comparison is not external evidence. |
+| **Owner setup and credentials (R3/R4):** saved/provider, env-only, explicit URL matching, `auth login` where the deployment is supported | Test distinct pairs for products even on one host, context path and explicit override, missing/invalid/partial config, and refusal before request. A valid environment-only pair works without `--base-url`. Ordinary reads never prompt. Exercise hidden input, browser fallback, unsupported enrollment, cancellation, failed authenticated probe, protected store update and retained other entries. Verify read-only behavior without issuing a write. |
+| **Jira discovery and search (R2/R5):** `jira-me`, `jira-projects`, `jira-users`, `jira-issue-types`, `jira-priorities`, `jira-resolutions`, `jira-status-categories`, `statuses`, `jql`, `mine`, `jira-author-comments` | Check known identity and reference IDs, permission-dependent fields, JQL/filter/author behavior, ambiguous identities, empty/limited/page continuation and partial errors. Inspect exact flags and filters, not only nonempty output. Reuse `test_jira_reference*`, `test_jira_mine_statuses_e2e.py`, `test_jql_e2e.py` and `test_jira_comments_search*`. |
+| **Jira issue and metadata (R2/R5):** `issue`, `issue-comments`, `issue-changelog`, `issue-worklogs`, `issue-remote-links`, `transitions`, `jira-create-meta`, `jira-edit-meta`, `jira-transition-fields` | Check issue key/URL and projection, history/comment/worklog bounds, opaque transition IDs, late malformed metadata, no write or activity-history action, and JSON/Markdown/wiki behavior. Exercise required attachment download via the binary path; do not mistake attachment metadata for content. Reuse `test_jira_issue_extra*`, `test_jira_metadata*`, `test_jira_markdown*` and `test_jira_wiki*`. |
+| **Confluence (R2/R5):** `spaces`, `cql`, `children`, `page`, `page-attachments`, `page-comments`, `page-labels`, `page-history`, `page-version`, `page-url`, `convert-body` | Prove expansion and paging, current vs exact historical version, links checked against the configured origin without automatic traversal, Storage/HTML conversion and safe rendered Markdown. Verify historical content, stable attachment metadata and documented content reads as distinct workflows. Use `test_confluence*`, `test_children_e2e.py`, `test_cql_e2e.py` and `test_page_storage_cli_e2e.py`. |
+| **Bitbucket repository/reference reads (R2/R5):** `projects`, `repos`, `find-repos`, `file`, `files`, `ls`, `blame`, `branch`, `branches`, `tags`, `tag`, `last-modified`, `commit`, `commits`, `commit-changes`, `commit-diff`, `attachment-get`; documented raw/archive routes | Test exact repo/path/ref, encoded path segments, content bytes, stable IDs, object shapes, arbitrary next-page cursor and cap. Distinguish default branch vs missing branch and terminal vs capped pages. Bad cursor must be reached before the cap to prove rejection; exact-cap is a distinct success. Reuse `test_bitbucket*`, `test_branches_commits_e2e.py`, `test_files_cli_e2e.py`, `test_commit_*`, `test_blame_e2e.py`, and binary tests. |
+| **Bitbucket PR and search workflows (R2/R5):** `pr` (show, files, comments, commits, diff, file), `prs`, `my-prs`, `pr-merge-status`, `pr-diff-complete`, `pr-review`, `search`, `grep-repo`, `scan-extension` | Trace known PR/files/commit identifiers and pinned refs end to end. Test whole-diff truncation, per-file fallback and its own failure, role/status filters, no hidden workspace clone, regex/case/path and listing-only behavior, plugin absence vs no matches, capped work and stable match evidence. Reuse `test_pull_request*`, `test_pr_review*`, `test_repo_grep*`, `test_repo_scan*` and `test_search*`. |
+| **Cross-product workflows (R5):** `find`, `whoami`, `selftest` | Match each product's health/results to its own configured pair. Test missing pair without blocking others, failed and successful terms for every product, an empty-but-successful term, all attempts failed, malformed later page, duplicate merge and total logical-read budget including extra pages. Keep earlier successful terms, not rows from a failed per-term page sequence. `selftest` has the documented `whoami` behavior. Reuse `test_federated*`, `test_whoami_cli_e2e.py` and `test_bbk_live_parity_contract.py`. |
+| **Transport, retries and file publication (R2/R3):** JSON, text, no-content, binary, HTTP error and diagnostic paths | Check distinct `200`/documented `204`/unsolicited `206`, redirect refusal, interrupted framed body and truncated gzip, finite/nonfinite numbers, exact/over size, HTTP/transport error framing, no post-response retry, and no TLS verification retry. Drive the file collision after the existence check, assert original bytes, no receipt, and no owned staging file. Cover received-vs-absent HTTP status. Reuse `test_sdk_transport_e2e.py`, `test_binary_read_cli_e2e.py`, `test_bitbucket_attachment_cli_e2e.py` and the targeted cases in [audit follow-up](audit-follow-up.md). |
+| **Output and diagnostics (R1/R3/R4):** raw JSON, text, Markdown, TSV, base64, file receipt and logs | JSON preserves ordinary data and is strict (independent finite-number check); compare renderer-visible text and inert markup rather than brittle substrings. Test Unicode, controls/bidi, error redaction from tool-owned sources, exact bytes, rotation/contended or failed log writes, and no change to the primary result when diagnostics fail. Reuse `test_bidi_output_e2e.py`, `test_output_sanitization.py`, `test_transformed_output_guard_cli_e2e.py` and the existing credential-disclosure regressions. |
+
+Run one **agent task walk-through** without source access from a clean wheel:
+learn syntax with help/catalog; find a known issue, page and repository by
+search or `find`; retrieve the exact issue, page revision and pinned PR or
+file; ask for a second documented page; explain an empty result and a
+controlled failure; download the known binary and verify its receipt. Fixtures
+can share a scenario across rows but must carry distinct identities and product
+contexts so a wrong-source result fails. This complements per-ID tests; it
+does not replace them. Confirm the owner setup path separately.
+
+### Test depth, execution order and reporting
+
+1. **Per commit:** run just the behavior-specific node(s) and affected suites
+   on the checked implementation. On critical bugs, keep the same regression
+   between the failing and passing runs. Use the frozen contract to adjudicate
+   test-only defects. For an argv NUL Windows cannot launch, test the callable
+   and keep a launchable CLI negative control; do not call an OS launch failure
+   a successful validation test.
+2. **Integrated offline gate:** use the full command in section 5. Enforce
+   app and child isolation while passing required non-secret Windows runtime
+   settings and the intended Python user site. A subprocess check needs the
+   intended launcher, not just a module import. Verify live-runner allowlist
+   accept/reject behavior offline; its mocks prove runner behavior, not server
+   behavior. Record executed tests and skips separately.
+3. **Coverage and test quality:** measure full **branch** coverage of
+   `atlawire`, with subprocess data combined and the source mapped to the
+   tested build. Verify a known child's execution is actually represented
+   (for example, the module entry point). Check specifically file publication,
+   SDK error handling, credential pairing, cross-product partial paths and
+   pagination. Missing coverage identifies an investigation, not an automatic
+   production defect. Use section 4's behavioral sensitivity checks; do not
+   add cosmetic tests or invent a percentage floor.
+4. **Wheel then real servers:** run the installed-agent scenario and required
+   route/workflow matrix on the exact wheel using synthetic settings first.
+   Record one artifact hash for offline and owner-run live evidence. Run
+   representative live checks per product and materially different
+   response/adapter path, including paging, semantic reads, media and the
+   required BBK comparisons. Do not run synthetic faults against a live
+   installation. Produce a small sanitized receipt for each gate; record any
+   missing access/version/fixture as inconclusive and stop release sign-off.
