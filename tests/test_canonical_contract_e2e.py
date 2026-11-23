@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from atlawire import __version__
 from tests._loopback import (
     request_record,
     run_installed,
@@ -425,6 +426,93 @@ def test_conflicting_discovery_flags_are_one_validation_error(
     assert "alone" in envelope["error"]["message"]
     assert "commands" not in envelope and "operations" not in envelope
     assert all(records == [] for records in seen.values())
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--help", "--catalog"],
+        ["--catalog", "--help"],
+        ["--describe", "jira.project.get", "--version"],
+        ["--version", "--describe", "jira.project.get"],
+    ],
+    ids=["help-first", "catalog-first", "describe-first", "version-first"],
+)
+def test_conflicting_help_and_version_actions_are_one_validation_error(
+    tmp_path: Path, argv: list[str]
+) -> None:
+    # Rejects Click's eager help/version exiting zero before the conflict check.
+    seen = request_log()
+    missing = tmp_path / "fixture-missing.json"
+    with product_origins(seen):
+        environment = blank_environment(missing)
+        result = run_installed(argv, environment)
+
+    assert result.returncode == 2
+    envelope = single_json(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["code"] == "validation_error"
+    assert "alone" in envelope["error"]["message"]
+    assert "commands" not in envelope and "operations" not in envelope
+    assert result.stderr == ""
+    assert not missing.exists()
+    assert all(records == [] for records in seen.values())
+
+
+def test_single_root_help_prints_usage_without_requests(tmp_path: Path) -> None:
+    # Positive control: the conflict guard must not break a lone root --help.
+    seen = request_log()
+    with product_origins(seen):
+        environment = blank_environment(tmp_path / "fixture-missing.json")
+        result = run_installed(["--help"], environment)
+
+    assert result.returncode == 0, result.stderr
+    assert "Usage:" in result.stdout
+    assert "--catalog" in result.stdout and "--version" in result.stdout
+    assert "Error:" not in result.stdout
+    assert all(records == [] for records in seen.values())
+
+
+def test_single_root_version_prints_the_exact_line(tmp_path: Path) -> None:
+    # Positive control: a lone root --version keeps Click's exact output.
+    seen = request_log()
+    with product_origins(seen):
+        environment = blank_environment(tmp_path / "fixture-missing.json")
+        result = run_installed(["--version"], environment)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == f"atlawire, version {__version__}\n"
+    assert all(records == [] for records in seen.values())
+
+
+def test_literal_flag_like_value_is_not_a_root_action(tmp_path: Path) -> None:
+    # Rejects scanning raw argv: only parsed root options may count as actions.
+    seen = request_log()
+    payload = {"code": {"values": [code_fixture("--help")], "isLastPage": True}}
+    with product_origins(
+        seen, {"bitbucket": {SEARCH_PATHS["bitbucket"]: json_responder(payload)}}
+    ) as origins:
+        environment = blank_environment(tmp_path / "fixture-missing.json")
+        configure(environment, "bitbucket", origins["bitbucket"])
+        result = run_installed(
+            [
+                "search",
+                "--json",
+                "--token-from-env",
+                "--allow-http-loopback",
+                "--",
+                "--help",
+            ],
+            environment,
+        )
+
+    assert result.returncode == 0, result.stderr
+    assert "validation_error" not in result.stdout
+    assert json.loads(result.stdout)[0]["file"] == "src/--help.py"
+    assert len(seen["bitbucket"]) == 1
+    record = seen["bitbucket"][0]
+    assert record[4] is not None
+    assert record[4]["query"] == "--help"
 
 
 def test_read_of_a_json_operation_with_out_is_a_validation_error(

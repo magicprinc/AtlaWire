@@ -267,24 +267,42 @@ def _emit_description(context: click.Context, value: str) -> None:
     context.exit()
 
 
-def _reject_conflicting_discovery(
-    context: click.Context, catalog: bool, describe_id: str | None
+def _reject_conflicting_root_actions(
+    context: click.Context,
+    *,
+    catalog: bool,
+    describe_id: str | None,
+    show_help: bool,
+    show_version: bool,
 ) -> None:
-    """Reject combined discovery actions as one JSON validation error.
+    """Reject combined root-level actions as one JSON validation error.
 
-    ``--catalog`` and ``--describe`` are parsed before any subcommand context
-    exists, so a conflict exits before credentials, files, or network access.
+    The four root actions are parsed before any subcommand context exists, so a
+    conflict exits before credentials, files, or network access. The discovery
+    actions stay exclusive of a subcommand, as before.
     """
-    if not catalog and describe_id is None:
+    actions = [
+        name
+        for name, active in (
+            ("--catalog", catalog),
+            ("--describe", describe_id is not None),
+            ("--help", show_help),
+            ("--version", show_version),
+        )
+        if active
+    ]
+    if not actions:
         return
-    if (catalog and describe_id is not None) or context.invoked_subcommand:
+    discovery = catalog or describe_id is not None
+    if len(actions) > 1 or (discovery and context.invoked_subcommand):
         click.echo(
             json.dumps(
                 _error_envelope(
                     None,
                     code="validation_error",
                     message=(
-                        "Use --catalog or --describe alone, without a subcommand."
+                        "Use --catalog, --describe, --help, or --version alone, "
+                        "without a subcommand."
                     ),
                 )
             )
@@ -292,8 +310,13 @@ def _reject_conflicting_discovery(
         raise click.exceptions.Exit(2)
 
 
-@click.group(invoke_without_command=True)
-@click.version_option(version=__version__, prog_name="atlawire")
+@click.group(invoke_without_command=True, add_help_option=False)
+@click.option(
+    "--version",
+    "show_version",
+    is_flag=True,
+    help="Show the version and exit.",
+)
 @click.option(
     "--catalog",
     is_flag=True,
@@ -306,8 +329,20 @@ def _reject_conflicting_discovery(
     default=None,
     help="Print one operation's full JSON description, then exit.",
 )
+@click.option(
+    "--help",
+    "show_help",
+    is_flag=True,
+    help="Show this message and exit.",
+)
 @click.pass_context
-def cli(context: click.Context, catalog: bool, describe_id: str | None) -> None:
+def cli(
+    context: click.Context,
+    show_version: bool,
+    catalog: bool,
+    describe_id: str | None,
+    show_help: bool,
+) -> None:
     """Work with self-hosted Jira, Confluence, and Bitbucket.
 
     Commands use the saved BBK credential file by default. Pass
@@ -318,7 +353,21 @@ def cli(context: click.Context, catalog: bool, describe_id: str | None) -> None:
     `atlawire read <operation-id> --params '<json-object>'`.
     """
     if not context.resilient_parsing:
-        _reject_conflicting_discovery(context, catalog, describe_id)
+        _reject_conflicting_root_actions(
+            context,
+            catalog=catalog,
+            describe_id=describe_id,
+            show_help=show_help,
+            show_version=show_version,
+        )
+        # Every root action is handled here instead of by an eager Click
+        # option, so a conflicting pair is seen before any of them runs.
+        if show_help:
+            click.echo(context.get_help())
+            context.exit()
+        if show_version:
+            click.echo(f"atlawire, version {__version__}")
+            context.exit()
         if describe_id is not None:
             _emit_description(context, describe_id)
         if catalog:
