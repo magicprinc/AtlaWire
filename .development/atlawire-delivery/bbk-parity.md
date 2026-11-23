@@ -5,9 +5,13 @@ integrations (Kafka, NATS, Grafana, Gmail, Calendar, chats, local indexes,
 Maven catalog, MSSQL) are out of scope by the owner's decision and are not
 listed as gaps here.
 
-Statuses: **covered** = an AtlaWire command exists with offline tests;
-**partial** = command exists but the noted dimension differs; **gap** = no
-AtlaWire equivalent.
+This is a **provisional mapping**, not a parity verdict. **Covered** means a
+candidate command and offline tests were identified, not that all BBK flags,
+public helpers or live behavior were verified. **Partial** means a known gap
+or failure remains; **gap** means no equivalent has been identified. Use the
+[delivery checklist](delivery-plan.md#execution-order) and [functional test
+matrix](test-plan.md#6-full-functional-matrix) to replace labels with exact
+fixture, artifact and outcome evidence.
 
 | BBK workflow | AtlaWire | Status | Note |
 | --- | --- | --- | --- |
@@ -37,29 +41,35 @@ AtlaWire equivalent.
 | `page` | `page`, `page-history`, `page-comments`, `page-labels`, `page-attachments`, `page-version`, `page-url` | covered | |
 | `spaces`, `children` | `spaces`, `children` | covered | |
 | `cql` | `cql` | covered | |
-| `find` (federated) | `find` | covered | Partial results: surviving products, per-product `errors`, `complete:false`; exit 1 only when all three fail |
+| `find` (federated) | `find` | partial | Returns some partial results; missing pairs, mixed-term all-failed detection and total-read budget are open |
 | `whoami` | `whoami` | covered | Per-product identity and partial failures |
 | `selftest` | `selftest` | covered | Same probe as `whoami`, registered under the BBK name |
-| repository attachment download | `attachment-get` | partial | Returns base64 JSON, not a file; `read ... --out` covers archive/raw |
-| Jira attachment download | `read jira.attachment.content --out` | covered | Streamed, bounded, no overwrite |
+| repository attachment download | `attachment-get` | partial | Supports base64 and `--out`; no-overwrite and complete gzip validation are open |
+| Jira attachment download | `read jira.attachment.content --out` | partial | Streamed and bounded; complete response and no-overwrite need regression proof |
 | `convert-body` | `convert-body`, `read confluence.content.convert` | covered | |
 | page/issue Markdown rendering | `issue --markdown`, `page` | covered | |
 
 ## Remaining functional gaps
 
-1. `attachment-get` emits base64 JSON. A file destination exists for the
-   registered binary reads but not for that plugin route.
-2. Live differential evidence covers five workflows; the rest are offline
-   only.
-3. Within one product, a paging failure discards that product's rows for the
-   term; it is reported in `errors`, never silently shown as empty.
+1. Both file-output paths violate the no-overwrite guarantee at publication
+   time. See [audit follow-up](audit-follow-up.md). The repository attachment
+   route is BBK-observed; live plugin/version support is not established here.
+2. Five historical live comparisons are not verification of the current wheel
+   or of the rest of the matrix.
+3. The `find` boundary intentionally discards a failed product/term's page
+   sequence. Keep other successful terms and products. Current code can still
+   abort because one product is unconfigured or because every product had
+   *some* failed term.
 
 ## Evidence
 
-- Offline: 1073 focused tests across CLI, transport, registry and manifest.
+- Offline: historical focused selections cover parts of the CLI, transport,
+  registry and manifest. No reconciled workflow-by-workflow pass on one
+  artifact yet.
 - Live: five BBK comparisons previously recorded in
   `checks/test_bbk_live_parity.py` (JQL, CQL, code search, author comments,
   repository grep).
-- Operation coverage: 201 required non-admin operations registered
-  (192 JSON GET, 3 semantic POST, 6 binary); 9 administrative/system routes
-  and 1 inconsistently documented route are excluded with reasons.
+- REST registry: 202 registered entries at `16b739a` (199 GET, 3 semantic
+  POST; 7 binary entries), of which three are in `--catalog.operations`.
+  These are local counts, not the required REST scope or a parity percentage.
+  Verify route/metadata dispositions and permission exclusions separately.

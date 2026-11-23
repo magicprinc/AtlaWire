@@ -11,26 +11,52 @@ The original local drafts and session ledger remain under
 `.planning/2026-11-22-read-only-rest-and-bbk-parity/`. Commit changes to these
 development plans as separate review iterations, without unrelated code.
 
-## Start here
+## Start here: implement, do not re-plan
 
-1. Keep the working Jira compatibility fix and rerun its 136-case selection
-   after integration. Fix the catalog round-trip regression and reconcile
-   the dependency lock. Keep existing work that passes its contract; do not
-   start with a rewrite.
-2. Prove one path from the installed console: find the command in help,
-   describe it as JSON, execute it through the pinned library, and parse
-   both its success and its failure. Close the confirmed transport, local
-   validation, and retry issues in that shared path before adding operations.
-   Use the exact slice in the test plan.
-3. Expand that path to the documented reads by product. Workers extend
-   the registry and independent fixtures, not the CLI architecture.
-4. Finish the human setup fallback and the named additive workflows, then
-   test the final wheel and return evidence for review. Do not add a new
-   OAuth integration, rendering stack, cache, or packaging service.
+**Scope (`%delivery-scope-4`).** Here “service” means the installed `atlawire`
+tool and its Python API calling existing Atlassian servers. No new HTTP server,
+MCP server, UI, background process, cache, or separate authentication system.
+Existing special-purpose commands are worth preserving; they are neither
+another canonical API nor a substitute for documented base REST reads.
 
-The initial release is for supported self-hosted server versions, not a
-universal Atlassian SDK. An installed preview is a useful milestone, not
-acceptance of reduced standard coverage.
+**Checkpoint:** 2026-11-23, code `16b739a`, review `6af2841`.
+Use [audit-follow-up.md](audit-follow-up.md) for failure evidence and the
+smallest justified repair. Historical findings later in this document explain
+the contract; they are not a current list of open bugs. Do not redo the lock
+or catalog round-trip fix unless a current check fails.
+
+**Assessment evidence:** DeepSeek Flash reviewed the CLI, discovery, Python
+exports, credentials, and documentation (`ses_df9f7e3f2ffe0gpUZpu30Q92QN`).
+Source and local metadata checks confirm the counts below and the gap between
+the installed slice and the required interface. That review reported one
+unintended Jira GET returning 404 during a probe; it is excluded from live
+evidence. No fresh full suite, clean wheel or live validation is claimed here.
+
+### Requirements and current status
+
+| Requirement | What exists | What is still owed |
+| --- | --- | --- |
+| **R1. A new agent can discover and use the installed tool unaided.** Root and command `--help`, offline `--catalog` and `--describe`, runnable examples and stable JSON. | 65 top-level Click commands; `read <id>` runs through the registry. The catalog recommends 3 canonical IDs. Existing flat workflows remain available. | Complete one documented CLI/Python path, close the parse/discovery and environment-only credential defects, and prove a fresh agent can finish from the final wheel and shipped guide. Describe parameters, page controls, result kinds and limits accurately. |
+| **R2. Named read-only access to each supported API.** `atlassian-python-api==5.0.5`; documented semantic-read POST only, no admin/write actions. | SDK-backed `read` and fixed fallbacks, 202 registered entries (Jira 109, Confluence 36, Bitbucket 57; 199 GET, 3 POST), 7 binary entries. Those are inventory counts, not an acceptance denominator. | Close public raw-session exposure; freeze what is required against versioned sources. 180 entries declare no query fields and 152 use generic JSON. Distinguish genuinely absent fields from missing implementation; verify actual documented parameters, types, statuses, media and pagination. |
+| **R3. Ordinary reads are safe and deterministic.** Explicit paired credentials, bounded reads and retries, no false complete results, binary files never overwrite. | BBK-compatible saved loader, explicit environment mode, retry and body limits, download paths, structured SDK responses. | Fix the reproduced safety and contract issues first: overwrite, truncated binary/JSON and gzip, invalid numeric output, invalid retry header/TLS behavior. Keep exact wire and no-request regressions. |
+| **R4. Owner setup is separate from agent reads.** No agent handles raw tokens. | Existing saved credential pairs work as a provider; a real owner can keep using them while development continues. | Implement the approved manual enrollment path without guessing an unconfirmed product URL or token mechanism; preserve store on failure. Verify sanitized diagnostics and bounded log behavior per the contract. No prompt in ordinary reads. |
+| **R5. Useful BBK read workflows remain available.** Search, exact reads and cross-product workflows are additive. | Jira issues/JQL/metadata, Confluence pages/CQL/history, Bitbucket search/files/grep/PR review, `whoami`/`selftest`, `find`, and `attachment-get --out` exist with differing evidence. | Reconcile actual BBK CLI flags and public helpers, not command names. Repair `find` unavailable-pair, mixed-term and total-budget gaps. Prove parity on required workflows and disclose plugin/version limitations. Non-Atlassian migration and BBK retirement are separate. |
+| **R6. Proof follows the artifact.** Offline, clean installed wheel, representative live behavior, independent review of critical boundaries. | Focused tests and older live receipts exist. They do not establish clean-wheel or live parity on current code. | Freeze one wheel hash, make the required offline matrix green, run the supported live matrix with the owner, and record coverage and exact unresolved checks. |
+
+Reference scope starts with Jira Server 8.22, Confluence Server 6.6, and
+Bitbucket Server 5.10 documentation. Those are **reference** versions, not
+claims about current target deployments; record actual versions, authentication,
+permissions and plugins separately. Cloud and broad Data Center claims require
+separate evidence. The full release remains all agreed documented standard
+non-admin reads and required BBK workflows; an installed **review candidate**
+is an earlier checkpoint, not a scope reduction.
+
+**Decisions to obtain from the owner, without blocking step 1:** confirm the
+canonical CLI/Python migration before changing that public interface, confirm
+the deployed product versions and enrollment methods, then review the required
+inventory and any exclusions. Ask for the approved isolated wheel target and
+fixture-scoped live run only when the respective gates are ready. Existing
+credentials are not a reason to use the real provider for an offline probe.
 
 **Implementation decision:** Canonical commands and Python methods use the
 existing operation registry and a single private `atlassian-python-api`
@@ -38,8 +64,13 @@ adapter. The initial installed slice uses `jira.project.get`,
 `confluence.space.get`, and `bitbucket.repository.get`, followed by the
 page, fixed fallback, and semantic POST cases in the test plan. Do not make
 `read <id>` or the prototype's separate registry a second canonical interface.
-Start steps 1–2 now. The final inventory, enrollment, and BBK parity work
-are release gates, not prerequisites to implementing this slice.
+Follow the [execution order](#execution-order) below. Inventory research can
+start now without delaying the shared safety fixes. The approved command
+design is grouped CLI plus thin Python wrappers over the same registry.
+If the owner prefers to retain generic `read <id>` as canonical for speed,
+record that decision first. Until then, keep current spellings as working
+compatibility paths; do not advertise both forms as canonical or delay
+transport and test fixes while the decision is pending.
 
 ## The agent's acceptance test
 
@@ -571,11 +602,24 @@ and a fake-subprocess parity test are not fresh live evidence.
 
 | Order | Owner and work | Exit check |
 | --- | --- | --- |
-| 1. Recover the baseline | Integrator records tracked and untracked candidate changes, keeps the verified Jira compatibility fix, and fixes the catalog round-trip and lock. In parallel gather live versions and safe fixtures through the owner. | Focused Jira, SDK, facade and catalog selection green; `uv lock --check` passes. Do not build a second throwaway wheel just for this step. |
-| 2. Prove one vertical slice | One owner wires the existing registry, product credential resolution, private SDK transport, JSON boundary and CLI discovery. Add one high-level read per product where compatible, at least one fixed fallback, and one semantic POST. Include a real continuation, an auth error and a recovered network failure. Use the prototype as input rather than making it a second public surface. | Independent documented fixture expectations; unit → installed loopback → owner-run live smoke. Root and command `--help`, `--catalog` and `--describe` work before auth. Invoke a documented example outside the checkout; exact request, response, failed-output and retry oracles pass. |
-| 3. Complete the base by product | Split Jira, Confluence and Bitbucket into non-overlapping product batches. Each batch owns its operation data, adapter exceptions and tests. Integrator owns the release inventory, shared dispatcher, credentials, CLI and docs. Classify binary, semantic POST and ambiguous permissions early rather than leave difficult routes to the end. | Reconcile the frozen inventory with discoverable canonical reads. Every required ID passes an independent installed-loopback case; record separate live status. Apply the live minimum in the test plan. No silent exclusions. |
-| 4. Finish setup and verify additive workflows | Implement the simple browser + hidden-paste setup without requiring OAuth. Reuse implemented Jira comment search, Confluence rendering, Bitbucket repo grep, PR review/diff and search work where it passes its contract. Compare required BBK workflows against stable fixtures. | Setup survives cancellation/failed verification without replacing stored credentials. The deployment owner verifies advertised enrollment. Partial-result tests, bounded work and required BBK parity evidence pass. Base discovery and calls remain available. |
-| 5. Freeze and hand off | Run the complete offline suite and project quality checks on the reconciled candidate. Build the final wheel, repeat clean-install discovery and smoke, and collect the owner's sanitized live receipt. Have the requested fresh PonyTail reviewer challenge the original requirements, code and tests. Independent verification of the credential/read boundary uses the approved isolated candidate, not HEAD alone. | Publish a local release report: exact artifact, commands, versions, failures/skips, known unsupported scope, quickstart and feedback. No release/sign-off with unresolved material failures or missing decisive live evidence. |
+| **1. Stop false success and data loss** | Begin with one commit: no-overwrite publication for both download paths (`audit-follow-up.md`, slice A). Next close SDK body/status failures, gzip, JSON and retry defects in small commits (slice B). Repair the three known harness failures without relaxing permission checks. Log the baseline before editing. | Each critical test fails on the current behavior and passes unchanged after its fix; affected modules pass. Stop and report a blocker if the primitive cannot publish safely on the target filesystem. Do not change transports or namespaces in this phase. |
+| **2. Make one complete agent path work** | Repair env URL selection and canonical JSON parse/action errors. Agree the public CLI shape and the read-only Python migration; never expose the old facade's second registry or raw SDK session. Use the existing three lookup IDs, one paged route, one fixed fallback, one semantic POST and one binary read. Keep the fast path on the pinned private adapter. | From a clean installed **review candidate**, run help → catalog/describe → advertised argv → result/report. Compare one Python call and wrapper to the same CLI operation. Prove credentials are paired and local refusals do not do I/O. This is the first user-visible delivery checkpoint. |
+| **3. Reconcile and finish REST by product** | Start classification in parallel with step 1 if authorized; implement route batches only on the stable step-2 path. Put the required versioned inventory and reproducible generator inputs under version control. Use presence of important params, statuses, continuation and media as the gap list. Use existing valid implementations before adding metadata or fallbacks. An integrator owns shared dispatch and manifest merge; product workers must not independently change them. | Every required route has one canonical ID, a runnable call, an independent installed fixture and a disposition against documented/deployed scope. Prefer a reusable test harness with independently authored data, not hundreds of copied CLI tests. Gaps and denied classifications stay visible. |
+| **4. Close owner setup and BBK workflows** | Use the existing private provider and manual browser + hidden paste, with confirmed product-relevant auth. Close known `find` gaps and verify each required BBK workflow against its existing behavior, including mixed results and documented differences. Correct stale README/quickstart/coverage claims from evidence. | Non-interactive/unsupported setup fails without exposed input; failed replacement preserves the store. `find` keeps successful terms/products with explicit errors; budget exhaustion is distinct. Every required BBK row has a check and outcome. |
+| **5. Freeze, verify and hand off** | Run all [release gates](test-plan.md#5-release-gates-and-handoff) on the exact code and final wheel. Have a fresh reviewer challenge code and tests; isolated execution only with owner approval. Ask the owner to run the fixture-scoped live selection on that same wheel. | Provide the artifact hash, commands, counts, exits, versions, missing IDs, known limits and sanitized live results. No unresolved safety finding, in-scope missing operation, or missing decisive evidence in a release. Otherwise label it **review candidate**. Do not retire BBK or publish as part of this work. |
+
+**Instructions to the model taking this over:** Read this section and the
+matching test row. Start writing the discriminating regression for step 1
+instead of commissioning another general audit. Fix one behavior at a time;
+keep the existing SDK and established tests. Run focused checks per commit;
+run the full suite and wheel gates on the integrated candidate, not after
+every small edit. Commit only the completed slice with a descriptive message.
+Record each checkpoint in the existing local `progress.md`: commit, command,
+outcome, next open row. Do not restart completed work after a context switch.
+Delegate test execution and disjoint fixture inventories if the owner asks;
+do not give several workers ownership of the same dispatcher or credential
+boundary. A blocker report names the failing test/operation, evidence and
+specific decision needed; it does not propose another redesign.
 
 Per-operation tests should share a harness, not an oracle. The harness can
 read the manifest to enumerate IDs, but expected paths, encoded parameters and
