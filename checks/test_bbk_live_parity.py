@@ -46,8 +46,10 @@ need a shell. The AtlaWire child is ``python -P -B -m atlawire``. Both use
 allowlist: ``jql``, ``cql``, the fixed read-only ``search`` POST, ``comments``
 (BBK) or ``jira-author-comments`` (AtlaWire), and one-file ``grep`` (BBK) or
 ``grep-repo`` (AtlaWire). Missing or option-like fixtures fail before any
-subprocess starts; no check is skipped. A failure reports only the check name
-and one fixed category, or a fixed fixture name for a missing fixture.
+subprocess starts, except the BBK package root: when BBK's package is absent
+the whole suite is skipped with one fixed reason instead of failing. A failure
+reports only the check name and one fixed category, or a fixed fixture name
+for a missing fixture.
 Inconclusive results are nonzero ``inconclusive:...`` failures, not passes.
 Expected and unexpected failures use ``pytest.fail(..., pytrace=False)``, so
 ``--showlocals`` cannot print fixture, query, or captured output values.
@@ -126,15 +128,16 @@ Intentional BBK/AtlaWire differences are not hidden:
   either side reaches the 20-hit cap, the grep result is inconclusive rather
   than passed.
 
-The BBK package root defaults to ``D:/zcache/bbk``. Set
-``ATLAWIRE_PARITY_BBK_ROOT`` only to override it; it must be an absolute
-directory containing ``bbk/__main__.py``. The root is checked for existence; no
+The BBK package root defaults to ``D:/zcache/bbk``, the data directory that
+survives the package split. Set ``ATLAWIRE_PARITY_BBK_ROOT`` only to override
+it; it must be an absolute directory containing ``bbk/__main__.py``. When the
+directory is missing or no longer contains the ``bbk`` package, every check is
+skipped with one fixed reason; a missing package is not a parity failure. No
 credential file is read.
 
-The offline contract tests for this module are in
-``tests/test_bbk_live_parity_contract.py``; they use injected subprocess results,
-never contact a real service or read a real credential, and check every AtlaWire
-plan against the registered Click command and its option metadata.
+This module is opt-in: the default ``tests`` tree does not collect or run it.
+Its five plans are fixed tuples validated by the read-only allowlist before any
+child process starts.
 """
 
 import json
@@ -148,7 +151,13 @@ from pathlib import Path
 import pytest
 
 BBK_ROOT_ENV = "ATLAWIRE_PARITY_BBK_ROOT"
+# BBK's data directory survives the package split that removes its code.
 DEFAULT_BBK_ROOT = "D:/zcache/bbk"
+# Unavailable BBK is a precondition, not a parity failure; the reason is fixed.
+BBK_ROOT_SKIP_REASON = (
+    "BBK package is unavailable at the configured root; parity checks need "
+    "bbk/__main__.py (set ATLAWIRE_PARITY_BBK_ROOT to the BBK package root)."
+)
 JQL_QUERY_ENV = "ATLAWIRE_LIVE_JIRA_JQL"
 JQL_KEY_ENV = "ATLAWIRE_LIVE_JIRA_ISSUE"
 CQL_QUERY_ENV = "ATLAWIRE_LIVE_CONFLUENCE_CQL"
@@ -567,7 +576,9 @@ def bbk_root(base: Mapping[str, str]) -> str:
 
     The root defaults to ``DEFAULT_BBK_ROOT``. An explicit
     ``ATLAWIRE_PARITY_BBK_ROOT`` value replaces it and is validated instead of
-    falling back, so a bad override fails closed.
+    falling back, so a bad override never silently selects the default. A
+    missing root or a root without the ``bbk`` package raises ``FixtureError``;
+    the autouse fixture below turns that into an honest skip.
     """
     override = base.get(BBK_ROOT_ENV, "")
     if override:
@@ -593,6 +604,20 @@ def bbk_root(base: Mapping[str, str]) -> str:
     if not valid:
         raise FixtureError(BBK_ROOT_ENV)
     return str(root)
+
+
+@pytest.fixture(autouse=True)
+def _require_bbk_package() -> None:
+    """Skip the suite when BBK's package is no longer installed.
+
+    The package split removes the ``bbk`` code while keeping its data
+    directory, so an absent package is an expected precondition, not a parity
+    defect. The skip reason is fixed and never echoes the configured path.
+    """
+    try:
+        bbk_root(os.environ)
+    except FixtureError:
+        pytest.skip(BBK_ROOT_SKIP_REASON)
 
 
 def child_environment(base: Mapping[str, str], *, tool: str) -> dict[str, str]:
