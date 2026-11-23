@@ -1,13 +1,10 @@
-import inspect
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-import requests
-from atlassian.bitbucket import Bitbucket
-
+from atlawire.http import AtlaWireError
 from atlawire.bitbucket import get_repository_file
 
 
@@ -20,7 +17,7 @@ TEXT = "\ufeffПривет\r\nsecond\r\n"
 def server():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            self.server.calls.append((self.command, self.path, self.headers.get("Accept")))
+            self.server.calls.append((self.command, self.path, self.headers.get("Accept"), self.headers.get("Authorization")))
             body = self.server.body
             self.send_response(self.server.status)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -48,26 +45,6 @@ def server():
         httpd.server_close()
 
 
-def test_file_dispatches_to_sdk_without_markup(server, monkeypatch):
-    httpd, url = server
-    original = Bitbucket.get_content_of_file
-    calls = []
-
-    def spy(self, *args, **kwargs):
-        calls.append((args, kwargs))
-        return original(self, *args, **kwargs)
-
-    monkeypatch.setattr(Bitbucket, "get_content_of_file", spy)
-    get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                        at="refs/heads/feature", allow_http_loopback=True)
-    assert len(calls) == 1
-    bound = inspect.signature(original).bind(None, *calls[0][0], **calls[0][1])
-    assert bound.arguments["project_key"] == "PROJ"
-    assert bound.arguments["repository_slug"] == "repo"
-    assert bound.arguments["filename"] == "dir/file.txt"
-    assert bound.arguments["at"] == "refs/heads/feature"
-    assert len(httpd.calls) == 1
-    assert "markup" not in parse_qs(urlsplit(httpd.calls[0][1]).query)
 
 
 def test_file_wire_contract(server):
@@ -75,44 +52,40 @@ def test_file_wire_contract(server):
     get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
                         at="refs/heads/feature", allow_http_loopback=True)
     assert len(httpd.calls) == 1
-    method, target, accept = httpd.calls[0]
+    method, target, accept, authorization = httpd.calls[0]
+    assert authorization == "Bearer " + TOKEN
     parsed = urlsplit(target)
     assert method == "GET"
     assert parsed.path == "/rest/api/1.0/projects/PROJ/repos/repo/raw/dir/file.txt"
     assert parse_qs(parsed.query) == {"at": ["refs/heads/feature"]}
-    assert accept == "*/*"
+    assert accept == "text/plain"
 
 
 def test_file_preserves_utf8_bom_and_crlf(server):
     _, url = server
-    assert get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                               allow_http_loopback=True) == TEXT
+    result = get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
+                                 allow_http_loopback=True)
+    assert result == TEXT
+    assert result.encode("utf-8") == TEXT.encode("utf-8")
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429])
-def test_file_error_is_sanitized_not_retried_and_session_closed(
-    server, status, capsys, caplog, monkeypatch
-):
+def test_file_error_is_sanitized_and_not_retried(server, status, capsys, caplog):
     httpd, url = server
     httpd.status = status
     httpd.body = f"{SENTINEL} {TOKEN}".encode()
-    sessions_closed = []
-    original_session_close = requests.Session.close
-    def close_session(session):
-        sessions_closed.append(session)
-        return original_session_close(session)
-
-    monkeypatch.setattr(requests.Session, "close", close_session)
-    with pytest.raises(Exception) as error:
+    with pytest.raises(AtlaWireError) as error:
         get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
                             allow_http_loopback=True)
+    assert error.value.category == "http"
+    assert error.value.http_status == status
     output = capsys.readouterr()
     diagnostic = str(error.value) + "".join(traceback.format_exception(error.value))
     diagnostic += output.out + output.err + caplog.text
     assert SENTINEL not in diagnostic
     assert TOKEN not in diagnostic
     assert len(httpd.calls) == 1
-    assert sessions_closed
+    assert httpd.calls[0][3] == "Bearer " + TOKEN
 
 
 def test_file_rejects_more_than_one_mib(server):

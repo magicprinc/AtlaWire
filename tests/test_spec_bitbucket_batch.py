@@ -4,11 +4,8 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
-from atlassian import Bitbucket
-
 from atlawire import bitbucket
 from atlawire.http import AtlaWireError
-from atlawire.sdk import ReadOnlyClient
 
 
 TOKEN = "synthetic-batch-token"
@@ -30,7 +27,25 @@ CASES = ["pr", "merge", "tag", "commit", "repo_file", "pr_file"]
 @pytest.fixture
 def server(request):
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def handle(self):
+            try:
+                super().handle()
+            except (ConnectionResetError, ConnectionAbortedError):
+                pass
+
+        def finish(self):
+            try:
+                super().finish()
+            finally:
+                with self.server.connection_condition:
+                    self.server.closed_connections.add(self.client_address)
+                    self.server.connection_condition.notify_all()
+
         def do_GET(self):
+            with self.server.connection_condition:
+                self.server.request_connections.add(self.client_address)
             self.server.calls.append((self.command, self.path, self.headers.get("Authorization")))
             failure = self.server.status != 200 and (not self.server.fail_raw or "/raw/" in self.path)
             if failure:
@@ -52,6 +67,9 @@ def server(request):
 
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     httpd.calls = []
+    httpd.connection_condition = threading.Condition()
+    httpd.request_connections = set()
+    httpd.closed_connections = set()
     httpd.status = 200
     httpd.fail_raw = False
     httpd.echo_token = False
@@ -87,40 +105,6 @@ def invoke(case, base):
 def configure(httpd, case):
     httpd.payload = {"pr": PR, "merge": MERGE, "tag": TAG, "commit": COMMIT, "repo_file": PR, "pr_file": PR}[case]
 
-
-@pytest.mark.parametrize("case", CASES)
-def test_sdk_method_delegation(server, monkeypatch, case):
-    httpd, base = server
-    configure(httpd, case)
-    names = {"pr": "get_pull_request", "merge": "is_pull_request_can_be_merged", "tag": "get_project_tags", "commit": "get_commit_info", "repo_file": "get_content_of_file", "pr_file": "get_content_of_file"}
-    name = names[case]
-    original = getattr(Bitbucket, name)
-    calls = []
-    pr_calls = []
-    original_pr = Bitbucket.get_pull_request
-
-    def spy_pr(self, *args, **kwargs):
-        pr_calls.append((args, kwargs))
-        return original_pr(self, *args, **kwargs)
-    def spy(self, *args, **kwargs):
-        calls.append((args, kwargs))
-        return original(self, *args, **kwargs)
-
-    monkeypatch.setattr(Bitbucket, name, spy)
-    if case == "pr_file":
-        monkeypatch.setattr(Bitbucket, "get_pull_request", spy_pr)
-    invoke(case, base)
-    expected = {
-        "pr": (("PROJ", "repo", 42), {}),
-        "merge": (("PROJ", "repo", 42), {}),
-        "tag": (("PROJ", "repo"), {"tag_name": "release/v1"}),
-        "commit": (("PROJ", "repo", "aaaaaaa"), {}),
-        "repo_file": (("PROJ", "repo", "dir/a%20file.txt"), {"at": "refs/heads/main", "markup": None}),
-        "pr_file": (("FORK", "copy", "dir/a%20file.txt"), {"at": SHA, "markup": None}),
-    }
-    assert calls == [expected[case]]
-    if case == "pr_file":
-        assert pr_calls == [(("PROJ", "repo", 42), {})]
 
 
 @pytest.mark.parametrize("case", CASES)
@@ -183,34 +167,24 @@ def test_http_error_echo_of_token_is_sanitized_and_keeps_status(server, case, ca
     assert caught.value.http_status == 401
     assert len(httpd.calls) == (2 if case == "pr_file" else 1)
 
+
 @pytest.mark.parametrize("case", CASES)
 @pytest.mark.parametrize("status", [200, 401])
-def test_created_client_closed_on_success_and_error(server, monkeypatch, case, status):
+def test_connection_closes_after_success_and_error(server, case, status):
     httpd, base = server
     configure(httpd, case)
     httpd.status = status
     httpd.fail_raw = case == "pr_file"
-    created = []
-    closed = []
-    factory = bitbucket.client_for
-    original_close = ReadOnlyClient.close
-
-    def make(*args, **kwargs):
-        client = factory(*args, **kwargs)
-        created.append(client)
-        return client
-
-    def close(self):
-        closed.append(self)
-        return original_close(self)
-
-    monkeypatch.setattr(bitbucket, "client_for", make)
-    monkeypatch.setattr(ReadOnlyClient, "close", close)
     if status == 200:
         invoke(case, base)
     else:
         with pytest.raises(AtlaWireError) as caught:
             invoke(case, base)
+        assert caught.value.category == "http"
         assert caught.value.http_status == status
-    assert len(created) == 1
-    assert closed == created
+    assert len(httpd.calls) == (2 if case == "pr_file" else 1)
+    with httpd.connection_condition:
+        assert httpd.connection_condition.wait_for(
+            lambda: bool(httpd.request_connections) and httpd.request_connections <= httpd.closed_connections,
+            timeout=3,
+        ), "client left an HTTP connection open"

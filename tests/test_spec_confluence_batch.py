@@ -5,8 +5,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from atlassian.confluence import ConfluenceServer
-
 from atlawire import confluence
 from atlawire.http import AtlaWireError
 
@@ -19,7 +17,7 @@ PAGE = {"id": "123", "type": "page", "title": "Test", "body": {"storage": {"valu
 def server():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            self.server.calls.append((self.command, self.path))
+            self.server.calls.append((self.command, self.path, self.headers.get("Authorization")))
             self.send_response(self.server.status)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -56,64 +54,32 @@ CASES = [
 
 
 @pytest.mark.parametrize("function,method,args,kwargs,sdk_args,sdk_kwargs,path,query,payload,expected", CASES, ids=[c[0] for c in CASES])
-def test_sdk_dispatch_wire_and_response(server, monkeypatch, function, method, args, kwargs, sdk_args, sdk_kwargs, path, query, payload, expected):
+def test_wire_and_response(server, function, method, args, kwargs, sdk_args, sdk_kwargs, path, query, payload, expected):
     httpd, url = server
     httpd.payload = payload
-    original = getattr(ConfluenceServer, method)
-    original_close = ConfluenceServer.close
-    calls = []
-    closed = []
-
-    def spy(self, *a, **kw):
-        calls.append((self, a, kw))
-        return original(self, *a, **kw)
-
-    def close(self):
-        closed.append(self)
-        return original_close(self)
-
-    monkeypatch.setattr(ConfluenceServer, method, spy)
-    monkeypatch.setattr(ConfluenceServer, "close", close)
     result = getattr(confluence, function)(url, *args, token=TOKEN, allow_http_loopback=True, **kwargs)
     assert result == expected
-    assert len(calls) == 1
-    client, actual_args, actual_kwargs = calls[0]
-    assert (actual_args, actual_kwargs) == (sdk_args, sdk_kwargs)
-    assert closed == [client]
     assert len(httpd.calls) == 1
-    verb, target = httpd.calls[0]
+    verb, target, authorization = httpd.calls[0]
+    assert authorization == "Bearer " + TOKEN
     parsed = urlsplit(target)
     assert (verb, parsed.path, parse_qs(parsed.query)) == ("GET", path, query)
 
 
 @pytest.mark.parametrize("function,method,args,kwargs,sdk_args,sdk_kwargs,path,query,payload,expected", CASES, ids=[c[0] for c in CASES])
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 429])
-def test_http_errors_are_typed_sanitized_and_close_created_client(server, monkeypatch, capsys, caplog, status, function, method, args, kwargs, sdk_args, sdk_kwargs, path, query, payload, expected):
+def test_http_errors_are_typed_and_sanitized(server, capsys, caplog, status, function, method, args, kwargs, sdk_args, sdk_kwargs, path, query, payload, expected):
     httpd, url = server
     httpd.status = status
     httpd.payload = {"message": SENTINEL}
-    original = getattr(ConfluenceServer, method)
-    original_close = ConfluenceServer.close
-    calls, closed = [], []
-
-    def spy(self, *a, **kw):
-        calls.append(self)
-        return original(self, *a, **kw)
-
-    def close(self):
-        closed.append(self)
-        return original_close(self)
-
-    monkeypatch.setattr(ConfluenceServer, method, spy)
-    monkeypatch.setattr(ConfluenceServer, "close", close)
     with pytest.raises(AtlaWireError) as caught:
         getattr(confluence, function)(url, *args, token=TOKEN, allow_http_loopback=True, **kwargs)
     output = capsys.readouterr()
     diagnostic = str(caught.value) + "".join(traceback.format_exception(caught.value)) + output.out + output.err + caplog.text
     assert SENTINEL not in diagnostic
     assert TOKEN not in diagnostic
-    assert len(calls) == 1 and closed == calls
     assert len(httpd.calls) == 1
+    assert httpd.calls[0][2] == "Bearer " + TOKEN
     assert caught.value.category == "http"
     assert caught.value.http_status == status
 

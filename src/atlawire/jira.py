@@ -93,16 +93,17 @@ def get_issue(
     key_or_url: str,
     *,
     token: str,
+    expand: str = "renderedFields",
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
-    """Return the Jira issue JSON with rendered fields from the configured instance."""
+    """Return the Jira issue JSON expanded by ``expand``; rendered fields by default."""
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     with bearer_session(token) as session:
         issue = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}",
-            params={"expand": "renderedFields"},
+            params={"expand": expand},
         )
     # The returned key can legitimately differ from the requested one after a
     # move, so only its own syntax is checked; equality is not pinned.
@@ -320,6 +321,49 @@ def _comment_text(value: object, label: str) -> str:
         message = f"Expected the Jira comment {label} as valid UTF-8 text."
         raise AtlaWireError(message) from None
     return value
+
+
+def search_raw(
+    base_url: str,
+    jql: str,
+    *,
+    token: str,
+    fields: str = "*all",
+    limit: int | None = None,
+    start: int = 0,
+    expand: str | None = None,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return one raw ``/rest/api/2/search`` envelope without any projection.
+
+    Exactly one GET is sent: ``limit`` and ``expand`` are omitted when ``None``,
+    the body is returned unchanged including unknown keys, and nothing is
+    paginated or projected. Every argument is checked before a session exists.
+    """
+    if not isinstance(jql, str) or not jql.strip():
+        raise AtlaWireError("Expected a non-empty JQL query.")
+    if not isinstance(fields, str) or not fields.strip():
+        raise AtlaWireError("Expected non-empty Jira search fields.")
+    if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+        raise AtlaWireError("Expected a non-negative Jira search start index.")
+    if limit is not None and (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not SEARCH_LIMIT_MIN <= limit <= SEARCH_LIMIT_MAX
+    ):
+        raise AtlaWireError(
+            f"The row limit must be between {SEARCH_LIMIT_MIN} and {SEARCH_LIMIT_MAX}."
+        )
+    if expand is not None and not isinstance(expand, str):
+        raise AtlaWireError("Expected the Jira search expand as text.")
+    params: dict[str, str | int] = {"jql": jql, "fields": fields, "startAt": start}
+    if limit is not None:
+        params["maxResults"] = limit
+    if expand is not None:
+        params["expand"] = expand
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        return get_json_object(session, f"{base}/rest/api/2/search", params=params)
 
 
 def search_issues(

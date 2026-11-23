@@ -5,9 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-import requests
-from atlassian import Jira
-
+from atlawire.http import AtlaWireError
 from atlawire import jira
 
 
@@ -20,7 +18,7 @@ ISSUE = {"key": "SPEC-42", "fields": {"summary": "hello", "customfield_999": {"x
 def server():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            self.server.calls.append((self.command, self.path))
+            self.server.calls.append((self.command, self.path, self.headers.get("Authorization")))
             body = json.dumps(self.server.body).encode()
             self.send_response(self.server.status)
             self.send_header("Content-Type", "application/json")
@@ -44,50 +42,37 @@ def server():
     assert not thread.is_alive()
 
 
-def test_get_issue_dispatches_to_sdk_with_key_and_expand(server, monkeypatch):
-    httpd, base = server
-    original = Jira.get_issue
-    calls = []
-
-    def spy(self, *args, **kwargs):
-        calls.append((args, kwargs))
-        return original(self, *args, **kwargs)
-
-    monkeypatch.setattr(Jira, "get_issue", spy)
-    jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
-    assert len(calls) == 1
-    args, kwargs = calls[0]
-    import inspect
-    bound = inspect.signature(original).bind(None, *args, **kwargs)
-    assert bound.arguments["issue_id_or_key"] == "SPEC-42"
-    assert bound.arguments["expand"] == "renderedFields"
-    assert len(httpd.calls) == 1
 
 
 def test_get_issue_accepts_explicit_expand(server):
-    _, base = server
-    assert jira.get_issue(base, "SPEC-42", token=TOKEN, expand="renderedFields", allow_http_loopback=True) == ISSUE
+    httpd, base = server
+    assert jira.get_issue(base, "SPEC-42", token=TOKEN, expand="names,renderedFields", allow_http_loopback=True) == ISSUE
+    assert len(httpd.calls) == 1
+    method, target, authorization = httpd.calls[0]
+    assert method == "GET" and authorization == "Bearer " + TOKEN
+    assert urlsplit(target).path == "/rest/api/2/issue/SPEC-42"
+    assert parse_qs(urlsplit(target).query) == {"expand": ["names,renderedFields"]}
 
 
 def test_get_issue_wire_get_path_and_query(server):
     httpd, base = server
     jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
     assert len(httpd.calls) == 1
-    method, target = httpd.calls[0]
+    method, target, authorization = httpd.calls[0]
+    assert authorization == "Bearer " + TOKEN
     parsed = urlsplit(target)
     assert method == "GET"
     assert parsed.path == "/rest/api/2/issue/SPEC-42"
     query = parse_qs(parsed.query)
     assert query.pop("expand") == ["renderedFields"]
-    assert query in ({}, {"updateHistory": ["false"]})
+    assert query == {}
 
 
-def test_get_issue_read_does_not_update_history(server):
+def test_get_issue_uses_fixed_expand_without_extra_query(server):
     httpd, base = server
     jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
     assert len(httpd.calls) == 1
-    query = parse_qs(urlsplit(httpd.calls[0][1]).query, keep_blank_values=True)
-    assert query.get("updateHistory") in (None, ["false"])
+    assert parse_qs(urlsplit(httpd.calls[0][1]).query) == {"expand": ["renderedFields"]}
 
 
 def test_get_issue_preserves_unknown_response_fields(server):
@@ -95,44 +80,18 @@ def test_get_issue_preserves_unknown_response_fields(server):
     assert jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True) == ISSUE
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 429])
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 429])
 def test_get_issue_errors_are_sanitized_and_not_retried(server, status, capsys, caplog):
     httpd, base = server
     httpd.status = status
     httpd.body = {"errorMessages": [SENTINEL, TOKEN]}
-    with pytest.raises(Exception) as error:
+    with pytest.raises(AtlaWireError) as error:
         jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
+    assert error.value.category == "http"
+    assert error.value.http_status == status
     captured = capsys.readouterr()
     text = "".join(traceback.format_exception(error.value)) + captured.out + captured.err + caplog.text
     assert SENTINEL not in text
     assert TOKEN not in text
     assert len(httpd.calls) == 1
-
-
-@pytest.mark.parametrize("status", [200, 401])
-def test_get_issue_closes_session_on_success_and_error(server, status, monkeypatch):
-    httpd, base = server
-    httpd.status = status
-    closed = []
-    used = []
-    original_close = requests.Session.close
-    original_send = requests.Session.send
-
-    def send(self, *args, **kwargs):
-        used.append(self)
-        return original_send(self, *args, **kwargs)
-
-    def close(self):
-        closed.append(self)
-        return original_close(self)
-
-    monkeypatch.setattr(requests.Session, "send", send)
-    monkeypatch.setattr(requests.Session, "close", close)
-    if status == 200:
-        jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
-    else:
-        with pytest.raises(Exception):
-            jira.get_issue(base, "SPEC-42", token=TOKEN, allow_http_loopback=True)
-    assert len(httpd.calls) == 1
-    assert len(used) == 1
-    assert used[0] in closed
+    assert httpd.calls[0][2] == "Bearer " + TOKEN
