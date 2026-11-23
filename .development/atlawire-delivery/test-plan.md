@@ -46,6 +46,48 @@ against a known candidate; do not recreate them to complete the matrix.
    not a pass. Store summaries, not command dumps containing real settings or
    payloads.
 
+### Windows execution profile: no project virtual environment
+
+Use `C:/Python315/python.exe` and the libraries already visible to that
+interpreter, including its user site. Run pytest, Ruff and Pyright with that
+interpreter's `-m` entry points. Check `sys.prefix == sys.base_prefix` and
+verify the exact `atlawire` launcher used by child processes. Do not activate
+or create a project `.venv`, or use `uv run` or `uv sync`. Keep `uv.lock` for
+dependency version evidence; checking the lock does not require syncing an
+environment.
+
+Retire the old ignored `D:/REPO/github/AtlaWire/.venv` only with owner approval:
+
+1. Check that no tracked file, shell, IDE run configuration, launcher, or
+   active process depends on its interpreter. Point any authorized
+   AtlaWire-specific settings to `C:/Python315/python.exe` first.
+2. Verify the installed runtime and test package requirements from
+   `pyproject.toml` without installing or upgrading anything. On 2026-11-23
+   the shared Python satisfied all **4 runtime** and **7 dev** requirements,
+   including the SDK pin. The old environment did not contain the pinned SDK.
+   `hatchling==1.33.0` was absent from both: resolve the wheel build requirement
+   separately when building the artifact, not by recreating `.venv`. Before
+   renaming anything, record the global interpreter identity and baseline
+   results for offline help/version and focused loopback tests, with the
+   command, working directory, exit and counts.
+3. Rename just that verified directory into an unused ignored
+   `.planning/` path so recovery is possible. Repeat the global interpreter
+   identity check, offline launcher/module smoke and focused loopback tests.
+   Compare with the pre-rename baseline; an existing functional failure must
+   not be counted as an environment regression. If the switch breaks execution,
+   stop and keep the backup until the cause is understood.
+4. After those checks and explicit approval for deletion, delete only the
+   named backup. Recheck that the project `.venv` was not recreated and
+   `git status` shows no unrelated changes. Do not alter global packages.
+
+A clean-wheel test is still required: it means loading the exact artifact
+from an owner-approved separate install directory outside the checkout while
+using the same base interpreter, not reinstalling the global dependencies
+or creating a project virtual environment. Obtain approval for any build-time
+installation or network access separately. The missing build backend blocks
+wheel verification if no approved build route is available; it does not make
+the old `.venv` useful, because it is absent there too.
+
 ### What counts as a useful test
 
 Write down **input → externally observable outcome → plausible defect**
