@@ -2,7 +2,7 @@
 
 import re
 from typing import TypedDict, TypeGuard
-from urllib.parse import urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 import requests
 
@@ -29,6 +29,8 @@ _SEARCH_ALL_PAGE_SIZE = 100
 USER_RESULTS_MIN = 1
 USER_RESULTS_MAX = 1000
 USER_RESULTS_DEFAULT = 50
+_JIRA_ID_MAX = 2**63 - 1
+_PROPERTY_KEY_MAX = 255
 
 
 class IssueRow(TypedDict):
@@ -67,6 +69,70 @@ class CurrentUser(TypedDict):
     name: str
     displayName: str | None
     email: str | None
+
+
+class UserRefRow(TypedDict):
+    """Краткая ссылка на пользователя Jira: логин и отображаемое имя."""
+
+    name: str
+    displayName: str | None
+
+
+class IssueVotes(TypedDict):
+    """Проекция голосов за задачу: список, свой голос и счётчик."""
+
+    voters: list[UserRefRow]
+    hasVoted: bool | None
+    watchCount: int | None
+
+
+class IssueWatchers(TypedDict):
+    """Проекция наблюдателей задачи: список, счётчик и свой флаг."""
+
+    watchers: list[UserRefRow]
+    watchCount: int | None
+    isWatching: bool | None
+
+
+class SubtaskRow(TypedDict):
+    """Одна подзадача: ключ, краткое описание, тип и статус."""
+
+    key: str
+    summary: str | None
+    type: str | None
+    status: str | None
+
+
+class WorklogRow(TypedDict):
+    """Одна запись о трудозатратах задачи."""
+
+    id: str
+    author: str | None
+    started: str | None
+    seconds: int | None
+    comment: str | None
+
+
+class IssueLinkRow(TypedDict):
+    """Одна связь задач: тип и ключи обеих сторон."""
+
+    id: str
+    type: str | None
+    inwardIssue: str | None
+    outwardIssue: str | None
+
+
+class IssuePropertyKeys(TypedDict):
+    """Имена свойств задачи; значения читаются по одному ключу."""
+
+    keys: list[str]
+
+
+class IssueProperty(TypedDict):
+    """Одно свойство задачи: ключ и произвольное значение сервера."""
+
+    key: str
+    value: object
 
 
 def _valid_issue_key(value: object) -> TypeGuard[str]:
@@ -1400,3 +1466,441 @@ def _project_issue(value: object) -> IssueRow:
         updated=updated,
         summary=summary,
     )
+
+
+def get_issue_votes(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> IssueVotes:
+    """Вернуть голоса одной задачи: ``voters``, ``hasVoted`` и ``watchCount``.
+
+    Читается ``GET /rest/api/2/issue/{key}/votes`` из настроенного ``base_url``;
+    из ``key_or_url`` берётся только ключ задачи. Каждый элемент ``voters`` —
+    плоский ``{"name": ..., "displayName": ...}``. ``hasVoted`` и
+    ``watchCount`` остаются ``None``, если сервер поле не прислал, и никогда не
+    вычисляются из других ответов. В официальном ответе 8.22 у этого пути поля
+    ``watchCount`` нет, поэтому на проверенном сервере там всегда ``None``.
+    Сырой документ доступен через :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/rest/api/2/issue/{key}/votes", params={}
+        )
+    return _project_votes(document)
+
+
+def get_issue_watchers(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> IssueWatchers:
+    """Вернуть наблюдателей задачи: ``watchers``, ``watchCount`` и ``isWatching``.
+
+    Читается ``GET /rest/api/2/issue/{key}/watchers``; из ``key_or_url`` берётся
+    только ключ задачи. Список сервер 8.22 отдаёт целиком, без пагинации. Каждый
+    элемент ``watchers`` — плоский ``{"name": ..., "displayName": ...}``;
+    ``watchCount`` и ``isWatching`` остаются ``None``, если сервер их не прислал.
+    Сырой документ доступен через :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/rest/api/2/issue/{key}/watchers", params={}
+        )
+    return _project_watchers(document)
+
+
+def list_issue_subtasks(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> list[SubtaskRow]:
+    """Вернуть подзадачи: ``key``, ``summary``, ``type`` и ``status``.
+
+    Читается ``GET /rest/api/2/issue/{key}/subtask``. ``type`` и ``status`` —
+    имена типа и статуса, а не вложенные объекты. Отсутствующие поля остаются
+    ``None`` и не подменяются пустой строкой. Весь массив проверяется до
+    возврата, поэтому поздняя некорректная запись не даёт частичного списка.
+    Сырой документ доступен через :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        values = get_json_array(
+            session, f"{base}/rest/api/2/issue/{key}/subtask", params={}
+        )
+    return [_project_subtask(value) for value in values]
+
+
+def get_issue_comment(
+    base_url: str,
+    key_or_url: str,
+    comment_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> CommentRow:
+    """Вернуть один комментарий: ``id``, ``author``, ``body``, ``created``,
+    ``updated``.
+
+    Читается ``GET /rest/api/2/issue/{key}/comment/{id}``. ``author`` — логин
+    (``name``) автора, а не объект пользователя. ``body`` — исходная wiki-строка
+    сервера, отметки времени берутся у сервера без преобразования. Поля, которых
+    нет в ответе, остаются ``None``. Идентификатор проверяется до запроса и не
+    попадает в сообщение об ошибке. Сырой документ доступен через
+    :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    checked = _jira_id(comment_id, "comment")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session,
+            f"{base}/rest/api/2/issue/{key}/comment/{checked}",
+            params={},
+        )
+    return _project_comment(document)
+
+
+def get_issue_worklog(
+    base_url: str,
+    key_or_url: str,
+    worklog_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> WorklogRow:
+    """Вернуть одну запись о трудозатратах: ``id``, ``author``, ``started``,
+    ``seconds`` и ``comment``.
+
+    Читается ``GET /rest/api/2/issue/{key}/worklog/{id}``. ``seconds`` — это
+    ``timeSpentSeconds`` сервера, а не разобранная строка ``timeSpent``.
+    ``author`` — логин автора. Отсутствующие ``comment``, ``started`` и
+    ``seconds`` остаются ``None``. Идентификатор проверяется до запроса.
+    Сырой документ доступен через :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    checked = _jira_id(worklog_id, "worklog")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session,
+            f"{base}/rest/api/2/issue/{key}/worklog/{checked}",
+            params={},
+        )
+    return _project_worklog(document)
+
+
+def get_issue_properties(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> IssuePropertyKeys:
+    """Вернуть имена свойств задачи в виде ``{"keys": [...]}``.
+
+    Читается ``GET /rest/api/2/issue/{key}/properties``; в проекцию попадают
+    только ключи свойств, без ``self``-ссылок. Пустой ответ сервера даёт пустой
+    список, а не ошибку. Значение читается отдельно через
+    :func:`get_issue_property`. Сырой документ доступен через
+    :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/rest/api/2/issue/{key}/properties", params={}
+        )
+    return IssuePropertyKeys(keys=_project_property_keys(document))
+
+
+def get_issue_property(
+    base_url: str,
+    key_or_url: str,
+    property_key: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> IssueProperty:
+    """Вернуть одно свойство задачи: ``{"key": ..., "value": ...}``.
+
+    Читается ``GET /rest/api/2/issue/{key}/properties/{propertyKey}``; ключ
+    кодируется как один сегмент пути. ``value`` — произвольный JSON сервера,
+    возвращается без изменений (``None``, если поля нет) и не разбирается по
+    частям. Ключ проверяется до запроса: пустая строка, разделители пути и
+    значения длиннее 255 символов отклоняются. Сырой документ доступен через
+    :func:`atlawire.sdk.get_json`.
+    """
+    key = _issue_key(key_or_url)
+    checked = _property_key(property_key)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    segment = quote(checked, safe="")
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session,
+            f"{base}/rest/api/2/issue/{key}/properties/{segment}",
+            params={},
+        )
+    return _project_property(document)
+
+
+def get_issue_link(
+    base_url: str,
+    link_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> IssueLinkRow:
+    """Вернуть связь задач: ``id``, ``type``, ``inwardIssue``, ``outwardIssue``.
+
+    Читается ``GET /rest/api/2/issueLink/{linkId}``. ``type`` — имя типа связи;
+    ``inwardIssue`` и ``outwardIssue`` — ключи задач, а не вложенные объекты.
+    Сторона, которой в ответе нет, остаётся ``None``. Идентификатор проверяется
+    до запроса. Сырой документ доступен через :func:`atlawire.sdk.get_json`.
+    """
+    checked = _jira_id(link_id, "issue link")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        document = get_json_object(
+            session, f"{base}/rest/api/2/issueLink/{checked}", params={}
+        )
+    return _project_issue_link(document)
+
+
+def _project_votes(document: dict[str, object]) -> IssueVotes:
+    """Спроецировать голоса, не подставляя отсутствующие поля."""
+    return IssueVotes(
+        voters=_project_user_refs(document.get("voters"), "voter"),
+        hasVoted=_optional_flag(document.get("hasVoted"), "hasVoted"),
+        watchCount=_optional_integer(document.get("watchCount"), "watch count"),
+    )
+
+
+def _project_watchers(document: dict[str, object]) -> IssueWatchers:
+    """Спроецировать наблюдателей, не подставляя отсутствующие поля."""
+    return IssueWatchers(
+        watchers=_project_user_refs(document.get("watchers"), "watcher"),
+        watchCount=_optional_integer(document.get("watchCount"), "watch count"),
+        isWatching=_optional_flag(document.get("isWatching"), "isWatching"),
+    )
+
+
+def _project_user_refs(value: object, label: str) -> list[UserRefRow]:
+    """Спроецировать массив пользователей, отклоняя не-массив."""
+    if not isinstance(value, list):
+        raise AtlaWireError(f"Expected a Jira {label}s array.")
+    return [_project_user_ref(item, label) for item in value]
+
+
+def _project_user_ref(value: object, label: str) -> UserRefRow:
+    """Спроецировать пользователя на ``name`` и ``displayName``."""
+    if not isinstance(value, dict):
+        raise AtlaWireError(f"Expected Jira {label} objects.")
+    return UserRefRow(
+        name=_required_project_text(value.get("name"), f"{label} name"),
+        displayName=_optional_project_text(
+            value.get("displayName"), f"{label} display name"
+        ),
+    )
+
+
+def _project_subtask(value: object) -> SubtaskRow:
+    """Спроецировать подзадачу, не выдумывая отсутствующие поля."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected Jira subtask objects.")
+    key = value.get("key")
+    if not _valid_issue_key(key):
+        raise AtlaWireError("Expected a valid Jira subtask key.")
+    fields = value.get("fields")
+    if fields is None:
+        fields = {}
+    elif not isinstance(fields, dict):
+        raise AtlaWireError("Expected Jira subtask fields.")
+    return SubtaskRow(
+        key=key,
+        summary=_optional_project_text(fields.get("summary"), "subtask summary"),
+        type=_project_nested_name(fields.get("issuetype"), "subtask type"),
+        status=_project_nested_name(fields.get("status"), "subtask status"),
+    )
+
+
+def _project_worklog(value: object) -> WorklogRow:
+    """Спроецировать запись о трудозатратах без разбора ``timeSpent``."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Jira worklog object.")
+    return WorklogRow(
+        id=_required_project_text(value.get("id"), "worklog ID"),
+        author=_project_author(value.get("author"), "worklog author"),
+        started=_optional_project_text(value.get("started"), "worklog started"),
+        seconds=_optional_integer(value.get("timeSpentSeconds"), "worklog seconds"),
+        comment=_optional_project_text(value.get("comment"), "worklog comment"),
+    )
+
+
+def _project_author(value: object, label: str) -> str | None:
+    """Вернуть логин автора или ``None``, если сервер его не прислал."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError(f"Invalid Jira {label}.")
+    return _optional_project_text(value.get("name"), label)
+
+
+def _project_issue_link(value: object) -> IssueLinkRow:
+    """Спроецировать связь задач на плоские идентификаторы."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Jira issue link object.")
+    return IssueLinkRow(
+        id=_required_project_text(value.get("id"), "issue link ID"),
+        type=_project_nested_name(value.get("type"), "issue link type"),
+        inwardIssue=_project_issue_key(value.get("inwardIssue"), "inward issue"),
+        outwardIssue=_project_issue_key(value.get("outwardIssue"), "outward issue"),
+    )
+
+
+def _project_issue_key(value: object, label: str) -> str | None:
+    """Вернуть ключ связанной задачи или ``None``, если стороны нет."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError(f"Invalid Jira {label}.")
+    key = value.get("key")
+    if key is None:
+        return None
+    if not _valid_issue_key(key):
+        raise AtlaWireError(f"Invalid Jira {label} key.")
+    return key
+
+
+def _project_property_keys(document: dict[str, object]) -> list[str]:
+    """Собрать имена свойств из массива ``keys``."""
+    values = document.get("keys")
+    if not isinstance(values, list):
+        raise AtlaWireError("Expected a Jira property keys array.")
+    keys: list[str] = []
+    for value in values:
+        if not isinstance(value, dict):
+            raise AtlaWireError("Expected Jira property key objects.")
+        keys.append(_required_project_text(value.get("key"), "property key"))
+    return keys
+
+
+def _project_property(document: dict[str, object]) -> IssueProperty:
+    """Спроецировать свойство: ключ обязателен, значение — как есть."""
+    return IssueProperty(
+        key=_required_project_text(document.get("key"), "property key"),
+        value=document.get("value"),
+    )
+
+
+def _project_nested_name(value: object, label: str) -> str | None:
+    """Вернуть ``name`` вложенного объекта или ``None``, если объекта нет."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise AtlaWireError(f"Invalid Jira {label}.")
+    return _optional_project_text(value.get("name"), label)
+
+
+def _project_text(value: object, label: str) -> str:
+    """Вернуть текстовое поле, пригодное для вывода в UTF-8."""
+    if not isinstance(value, str):
+        raise AtlaWireError(f"Expected the Jira {label} as text.")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        message = f"Expected the Jira {label} as valid UTF-8 text."
+        raise AtlaWireError(message) from None
+    return value
+
+
+def _required_project_text(value: object, label: str) -> str:
+    """Вернуть непустое текстовое поле проекции."""
+    text = _project_text(value, label)
+    if not text.strip():
+        raise AtlaWireError(f"Expected the Jira {label} as non-empty text.")
+    return text
+
+
+def _optional_project_text(value: object, label: str) -> str | None:
+    """Вернуть ``None`` для отсутствующего поля и текст иначе."""
+    return None if value is None else _project_text(value, label)
+
+
+def _optional_flag(value: object, label: str) -> bool | None:
+    """Вернуть флаг сервера или ``None``, если поля нет."""
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise AtlaWireError(f"Invalid Jira {label} flag.")
+    return value
+
+
+def _optional_integer(value: object, label: str) -> int | None:
+    """Вернуть неотрицательное целое сервера или ``None``, если поля нет."""
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise AtlaWireError(f"Invalid Jira {label} integer.")
+    return value
+
+
+def _jira_id(value: object, label: str) -> str:
+    """Вернуть положительный идентификатор Jira строкой до любого запроса.
+
+    Принимается ``int`` или десятичная строка; ведущие нули, знак, пустое
+    значение и длина больше 19 цифр отклоняются, чтобы значение не могло
+    удлинить путь или упереться в предел интерпретатора.
+    """
+    invalid = f"Expected a Jira {label} as a positive integer ID."
+    if isinstance(value, bool):
+        raise AtlaWireError(invalid)
+    if isinstance(value, str):
+        # Length is checked before conversion so huge digit strings cannot stall
+        # or hit the interpreter's integer-string conversion limit.
+        if len(value) > 19 or re.fullmatch(r"[1-9][0-9]*", value) is None:
+            raise AtlaWireError(invalid)
+        identifier = int(value)
+    elif isinstance(value, int):
+        identifier = value
+    else:
+        raise AtlaWireError(invalid)
+    if not 1 <= identifier <= _JIRA_ID_MAX:
+        raise AtlaWireError(invalid)
+    return str(identifier)
+
+
+def _property_key(value: object) -> str:
+    """Вернуть ключ свойства как один безопасный сегмент пути."""
+    invalid = (
+        f"Expected a Jira property key of 1 to {_PROPERTY_KEY_MAX} characters "
+        "without path separators."
+    )
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > _PROPERTY_KEY_MAX
+    ):
+        raise AtlaWireError(invalid)
+    # The component is quoted before it reaches the path, but a server that
+    # decodes more than once must still never see a separator or a dot segment.
+    decoded = value
+    while True:
+        next_value = unquote(decoded)
+        if next_value == decoded:
+            break
+        decoded = next_value
+    if "/" in decoded or "\\" in decoded or decoded in {".", ".."}:
+        raise AtlaWireError(invalid)
+    return _project_text(value, "property key")
