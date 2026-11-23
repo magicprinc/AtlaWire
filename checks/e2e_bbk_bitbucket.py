@@ -639,7 +639,9 @@ _MY_PULL_REQUEST_KEYS = frozenset(
     {"repo", "id", "title", "state", "author", "reviewers_inactive", "created"}
 )
 _BRANCH_KEYS = frozenset({"name", "id", "commit", "default"})
-_COMMIT_KEYS = frozenset({"hash", "date", "author", "message"})
+_COMMIT_KEYS = frozenset(
+    {"hash", "date", "timestamp", "author", "email", "displayName", "message"}
+)
 _DIRECTORY_KEYS = frozenset({"path", "type", "size"})
 _BLAME_KEYS = frozenset({"line", "author", "email", "date", "commit"})
 _SEARCH_KEYS = frozenset(
@@ -754,6 +756,10 @@ def _check_commit_rows(rows: list[Row], *, newest_first: bool = True) -> None:
         hashes.add(sha)
         _require_optional_str(row.get("author"))
         _require(isinstance(row.get("message"), str), "contract")
+        _require_optional_str(row.get("email"))
+        _require_optional_str(row.get("displayName"))
+        timestamp = row.get("timestamp")
+        _require(timestamp is None or _is_int(timestamp), "contract")
         date = _require_optional_str(row.get("date"))
         if date is not None:
             _require(_DATE.fullmatch(date) is not None, "contract")

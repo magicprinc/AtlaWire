@@ -176,7 +176,10 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 
 **`list_pull_request_commits(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1131`
 - REST: `GET .../pull-requests/{id}/commits`; query `start=0`, `limit=100`.
-- → `Commit` (`hash`, `date`, `author`, `message`).
+- → `Commit` (`hash`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
+  `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
+  пустой строкой), `displayName` — `author.displayName` (на 5.10 всегда `None`: сервер
+  документирует для автора только `name` и `emailAddress`), `message`).
 - Ошибки/лимиты: `max_pages`; не-advancing `nextPageStart`.
 
 **`list_pull_requests(base_url, repo, *, token, state="OPEN", order=None, author=None, direction=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[PullRequest]`** — `bitbucket.py:1162`
@@ -224,7 +227,10 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - REST: `GET .../commits`; query `until` (из `at`), `path` (если непустой), `start`, `limit`;
   `author` фильтруется на стороне клиента по точному git-имени (серверный фильтр 5.10 не
   документирован), поэтому читаются страницы до `limit` совпадений.
-- → `Commit` (`hash`, `date`, `author`, `message` — сырое сообщение).
+- → `Commit` (`hash`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
+  `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
+  пустой строкой), `displayName` — `author.displayName` (на 5.10 всегда `None`: сервер
+  документирует для автора только `name` и `emailAddress`), `message` — сырое сообщение).
 - Ошибки/лимиты: `limit` 1..1000; управляющие символы в `path`; `max_pages`.
 
 **`list_commits_with_metadata(base_url, repo, *, token, at=None, path=None, author=None, limit=25, max_pages=100, allow_http_loopback=False) -> CommitListing`** — `bitbucket.py:1515`
