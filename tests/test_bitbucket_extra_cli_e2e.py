@@ -7,6 +7,8 @@ from http.server import BaseHTTPRequestHandler
 
 import pytest
 
+from atlawire import bitbucket
+from atlawire.http import AtlaWireError
 from tests._loopback import (
     Request,
     request_record,
@@ -382,10 +384,12 @@ def test_tags_later_page_http_failure_is_sanitized_without_partial_stdout() -> N
 
 
 def test_tags_later_page_without_a_cursor_fails_without_partial_stdout() -> None:
+    # The cap must still be unmet after page 2, otherwise the reader would stop
+    # at the projected limit and never need the missing cursor.
     result, seen, extra = run_extra(
         "tags",
         "--limit",
-        "2",
+        "3",
         "--json",
         responses=[
             (
@@ -414,7 +418,7 @@ def test_tags_later_page_without_a_cursor_fails_without_partial_stdout() -> None
     assert result.returncode == 1
     assert result.stdout == ""
     assert "nextPageStart" in result.stderr
-    assert seen == [tags_request(0, 2), tags_request(7, 1)]
+    assert seen == [tags_request(0, 3), tags_request(7, 2)]
     assert extra == []
 
 
@@ -517,8 +521,8 @@ def test_last_modified_rejects_traversal_without_any_request(path: str) -> None:
 
 @pytest.mark.parametrize(
     "at",
-    ["feature\nmain", "feature\r\nmain", "a\x00b"],
-    ids=["lf", "crlf", "nul"],
+    ["feature\nmain", "feature\r\nmain"],
+    ids=["lf", "crlf"],
 )
 def test_last_modified_rejects_an_invalid_ref_without_any_request(at: str) -> None:
     result, seen, extra = run_extra(
@@ -530,6 +534,30 @@ def test_last_modified_rejects_an_invalid_ref_without_any_request(at: str) -> No
     assert result.stderr != ""
     assert seen == []
     assert extra == []
+
+
+def test_last_modified_rejects_a_nul_in_the_ref_at_the_callable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Check the NUL ref where it can still be observed.
+
+    Windows ``CreateProcess`` cannot carry a NUL byte in argv, so the installed
+    CLI can never be launched with this ref; the callable boundary is the only
+    place where the rejection before any request is observable.
+    """
+
+    def forbidden_session(*args: object, **kwargs: object) -> object:
+        raise AssertionError("a session must not be opened for a NUL ref")
+
+    monkeypatch.setattr(bitbucket, "bearer_session", forbidden_session)
+
+    with pytest.raises(AtlaWireError, match="revision"):
+        bitbucket.get_last_modified(
+            "https://bitbucket.example.test",
+            REPO,
+            token=TOKEN,
+            at="a\x00b",
+        )
 
 
 @pytest.mark.parametrize(

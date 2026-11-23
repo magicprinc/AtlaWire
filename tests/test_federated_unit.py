@@ -484,7 +484,6 @@ def test_each_product_receives_only_its_own_pair(
 
 
 BAD_TARGETS = [
-    cast(ProductTarget, None),
     ProductTarget("", "fixture-token"),
     ProductTarget("http://confluence.example.test", "fixture-token"),
     ProductTarget("https://confluence.example.test", ""),
@@ -499,7 +498,6 @@ BAD_TARGETS = [
     "target",
     BAD_TARGETS,
     ids=[
-        "wrong-type",
         "empty-url",
         "plain-http",
         "empty-token",
@@ -522,6 +520,42 @@ def test_invalid_target_is_rejected_before_any_request(
         )
 
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("slot", "product"),
+    [
+        ("confluence", "Confluence"),
+        ("jira", "Jira"),
+        ("bitbucket", "Bitbucket"),
+    ],
+)
+def test_missing_product_is_reported_while_the_others_are_still_searched(
+    monkeypatch: pytest.MonkeyPatch, slot: str, product: str
+) -> None:
+    """``None`` means "not configured", not an invalid supplied pair."""
+    calls = install_search(monkeypatch)
+    targets: dict[str, ProductTarget | None] = {
+        "confluence": CONFLUENCE,
+        "jira": JIRA,
+        "bitbucket": BITBUCKET,
+    }
+    targets[slot] = None
+
+    result = federated_search(
+        ["ported"],
+        confluence=targets["confluence"],
+        jira=targets["jira"],
+        bitbucket=targets["bitbucket"],
+    )
+
+    assert result["complete"] is False
+    errors = cast(dict[str, str], result["errors"])
+    assert slot in errors
+    assert product in errors[slot]
+    assert [call[0] for call in calls] == [
+        name for name in ("Confluence", "Jira", "Bitbucket") if name != product
+    ]
 
 
 def test_limit_is_forwarded_to_every_product_and_term(

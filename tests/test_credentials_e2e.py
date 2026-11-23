@@ -88,6 +88,11 @@ class RecordingHandler(BaseHTTPRequestHandler):
     def _reject_method(self) -> None:
         """Record every non-GET method so exact sequences cannot miss one."""
         self.seen.append(request_record(self))
+        # Windows resets the connection when the server answers before it has
+        # read the request body, so drain the declared body first.
+        length = self.headers.get("Content-Length")
+        if length is not None and length.isdigit():
+            self.rfile.read(int(length))
         send_json(self, 405, {"message": "method not allowed"})
 
     do_POST = _reject_method
