@@ -14,30 +14,29 @@ delivered yet and does not replace them.
 
 ## Status and verified scope
 
-- 61 read-only commands are implemented. There are no write, transition-execution,
-  raw-REST passthrough, profile/keyring, cache, or MCP features.
-- The package is unpublished and installed editably from this checkout. CPython 3.15
-  is the only tested runtime.
-- A 1,562-test offline baseline (unit, adapter-boundary, and installed-CLI
-  loopback) passed on this machine before the current batch. Tests for commands
-  added or changed in this batch have not yet been run together, so their
-  behavior is not claimed as verified until the combined run.
-- Some checks are run locally with `ruff` and `pyright`; no CI workflow is
-  configured and no project-wide quality threshold is claimed.
+- 65 top-level read-only commands and 202 registered read operations are
+  advertised. Only `jira.project.get`, `confluence.space.get` and
+  `bitbucket.repository.get` are in the canonical `--catalog` operations list;
+  the rest are reachable through `read <id>` and the existing commands. There
+  are no write, transition-execution, raw-REST passthrough, profile/keyring,
+  cache, or MCP features.
+- The package is unpublished and installed editably from this checkout. CPython
+  3.15 is the only tested runtime. A wheel builds offline with the pinned
+  Hatchling backend; a clean install from that wheel is not yet verified here.
+- A 4,951-test offline run (unit, adapter-boundary, and installed-CLI loopback)
+  passed on this machine at candidate `fc8fb5d`. It proves neither a clean-wheel
+  install nor live behavior. A subsequent review found undisclosed edge cases
+  (see the delivery plans), so a green suite is not release approval.
+- Local `ruff` and `pyright` runs exist; a `pyright` error remains in the
+  existing pull-request projection, and no CI workflow or project-wide
+  threshold is configured.
 - Core read-only workflows passed on one self-hosted setup. Recheck bearer
-  authentication, permissions, TLS, and the relevant reads on any other deployment;
-  no supported-version matrix is published.
-- `find`, `operations`, `read-operation`, `whoami`, `grep-repo`,
-  `issue-remote-links`, `issue-worklogs`, `issue-changelog`, `jira-projects`,
-  `pr-merge-status`, `pr-diff-complete`, `pr-review`, `scan-extension`,
-  `attachment-get`, `jira-priorities`, `jira-resolutions`, `jira-issue-types`,
-  `jira-status-categories`, `jira-users`, `jira-author-comments`,
-  `jira-edit-meta`, `jira-create-meta`, `jira-transition-fields`, `tags`, `tag`,
-  `last-modified`, `page-attachments`, `page-comments`, `page-labels`,
-  `page-history`, `page-version`, `page-url`, `convert-body`, and `--catalog`
-  have written synthetic unit and installed-CLI loopback tests that await the
-  combined batch run. They were not exercised against a live deployment, so no
-  live success is claimed for them.
+  authentication, permissions, TLS, and the relevant reads on any other
+  deployment; no supported-version matrix is published.
+- The required REST inventory is not frozen: 180 of the 202 registered
+  operations declare no query fields and 152 use the generic JSON shape, so
+  their documented parameters and response contracts remain unverified. The
+  registry is an inventory, not proof of complete REST coverage.
 - Use JSON for exact values. TSV keeps the documented column order but escapes
   text for display; Markdown is for reading.
 
@@ -247,18 +246,29 @@ atlawire find "МВНО" --token-from-env --limit 50
 `find` searches every TERM in Confluence (`text ~ "TERM"`), Jira (the same
 clause ordered by creation time, descending), and Bitbucket's indexed code
 search, then merges duplicate pages, issues, and files. The JSON object holds
-`terms`, one row array per product, `counts`, `limits`, and `limitations`. JSON
-is always printed; `--json` is accepted for compatibility. Terms are separate
-positional arguments, so quote a phrase in the shell. Each term must be plain
-text: double quotes, backslashes, control characters, bidi controls, and lone
-surrogates are rejected before any request instead of being escaped.
+`terms`, one row array per product, `counts`, `errors`, `complete`, `budget`,
+`limits`, and `limitations`. JSON is always printed; `--json` is accepted for
+compatibility. Terms are separate positional arguments, so quote a phrase in
+the shell. Each term must be plain text: double quotes, backslashes, control
+characters, bidi controls, and lone surrogates are rejected before any request
+instead of being escaped.
 
 All three matched URL/token pairs are resolved independently. Saved-file mode
-uses each product's own BBK entry. With `--token-from-env`, all three
-`ATLAWIRE_<PRODUCT>_URL` and `ATLAWIRE_<PRODUCT>_TOKEN` pairs are required and
-kept separate. A failure in any product stops the whole call and prints no
-partial result. `--limit` sets the per-term cap for each product (default 20,
-range 1–999).
+uses each product's own BBK entry. With `--token-from-env`, each configured
+product needs its own `ATLAWIRE_<PRODUCT>_URL` and `ATLAWIRE_<PRODUCT>_TOKEN`;
+a product with no usable pair is reported in `errors` while the others are
+still searched. A product that fails contributes no rows for that term, and
+the result says `complete:false`; only a run where no read completed is an
+error. A failed product/term never contributes rows, but earlier terms and
+other products survive. `--limit` sets the per-term cap for each product
+(default 20, range 1–999).
+
+`budget` reports the bounded logical reads this workflow may spend
+(`limit` 60, `used`, `exhausted`). Exhaustion is not a product error: the
+completed results stay, `complete` is false, and no further term is started.
+The budget counts each product/term read plus each extra Bitbucket page; it
+does not promise a hard upper bound on every HTTP request, because Confluence
+and Jira may issue one follow-up request for a short page.
 
 The result is deliberately incomplete: matches beyond each per-term cap may be
 omitted, Bitbucket covers only code indexed by the Search plugin (typically the

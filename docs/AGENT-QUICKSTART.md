@@ -158,11 +158,20 @@ before any request rather than escaped, so a term cannot alter the query
 grammar.
 
 The call resolves three independent URL/token pairs. Saved-file mode reads each
-product's own BBK entry; `--token-from-env` requires all three
-`ATLAWIRE_<PRODUCT>_URL` and `ATLAWIRE_<PRODUCT>_TOKEN` pairs and never mixes
-them. Any product failure stops the whole call with no partial output. JSON is
-always printed; `--json` is accepted for compatibility. `--limit` is the
-per-term cap for each product (default 20, range 1–999).
+product's own BBK entry; `--token-from-env` needs both variables for each
+product you want searched, and never mixes one product's token with another's
+URL. A product with no usable pair is listed in `errors`; the other products
+are still searched. A product that fails contributes no rows for that term,
+`complete` is false, and earlier successful terms survive. A run where no read
+completed is an error with no partial data. JSON is always printed; `--json` is
+accepted for compatibility. `--limit` is the per-term cap for each product
+(default 20, range 1–999).
+
+`budget` reports the bounded logical reads for the whole call (`limit` 60,
+`used`, `exhausted`). Exhaustion keeps completed data, sets `complete:false`,
+and is not a product failure. The count covers each product/term read plus each
+extra Bitbucket page; Confluence and Jira may add one follow-up request for a
+short page, so it is not a strict HTTP-request cap.
 
 The answer is a lead list, not a completeness claim: matches beyond each
 per-term cap may be omitted, Bitbucket covers only code indexed by the Search
