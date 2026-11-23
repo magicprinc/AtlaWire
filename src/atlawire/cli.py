@@ -429,6 +429,11 @@ _PRODUCT_ENVIRONMENT = {
     "jira": ("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN"),
 }
 
+# The exact spelling accepted by [atlawire.http.bearer_session]. Environment
+# mode checks it before any session or client exists, so an empty or malformed
+# value fails as configuration instead of reaching the server.
+_BEARER_TOKEN_GRAMMAR = re.compile(r"[A-Za-z0-9._~+/=-]+")
+
 
 def _product_base_url_and_token(
     product: str,
@@ -440,9 +445,15 @@ def _product_base_url_and_token(
 
     Explicit ``--token-from-env`` keeps the environment-only contract and never
     opens the saved BBK file: the product's own URL variable supplies the
-    destination when no explicit URL was passed. Otherwise the saved pair is
-    required, and an explicit or environment URL is accepted only when it
-    equals the saved one.
+    destination when no explicit URL was passed, and the product's own token
+    variable must hold a non-empty value the shared bearer session accepts.
+    Otherwise the saved pair is required, and an explicit or environment URL is
+    accepted only when it equals the saved one.
+
+    A missing or malformed environment token raises a fixed generic error that
+    never repeats the value, so no caller can send a request with an empty
+    bearer credential. The canonical `read` command renders it as a JSON
+    ``credentials_error``; legacy commands keep their existing text form.
     """
     url_name, token_name = _PRODUCT_ENVIRONMENT[product]
     if token_from_env:
@@ -451,7 +462,13 @@ def _product_base_url_and_token(
             raise click.UsageError(
                 f"Missing --base-url or {url_name} when using --token-from-env."
             )
-        return resolved_url, os.environ.get(token_name, "")
+        token = os.environ.get(token_name, "")
+        if not _BEARER_TOKEN_GRAMMAR.fullmatch(token):
+            raise click.ClickException(
+                f"Missing or invalid bearer token in {token_name} "
+                "when using --token-from-env."
+            )
+        return resolved_url, token
     try:
         saved = resolve_saved_credentials(
             product,
@@ -828,7 +845,46 @@ def read_operation_command(
     click.echo(json.dumps(result))
 
 
-@cli.command("read")
+class _CanonicalReadCommand(click.Command):
+    """The canonical `read` command answers framework parse failures with JSON.
+
+    Click parses options and required parameters in
+    [parse_args][click.Command.parse_args] before the callback exists, so a
+    missing required option, an unknown option, a missing option value, or an
+    extra positional would otherwise leave stdout empty and print text on
+    stderr. The canonical contract requires exactly one
+    JSON ``validation_error`` document and exit 2 with no credential, file, or
+    network activity, so those failures are converted here.
+
+    ``product`` comes only from the already-parsed argument, never from scanning
+    raw tokens: an option-looking value stays a value, and an unparsed argument
+    leaves ``product`` null. The message is fixed and never repeats the
+    exception text.
+    """
+
+    def parse_args(self, context: click.Context, args: list[str]) -> list[str]:
+        try:
+            return super().parse_args(context, args)
+        except click.UsageError:
+            operation_id = context.params.get("operation_id")
+            product = (
+                _product_of_operation(operation_id)
+                if isinstance(operation_id, str)
+                else None
+            )
+            click.echo(
+                json.dumps(
+                    _error_envelope(
+                        product,
+                        code="validation_error",
+                        message="The read command line is invalid.",
+                    )
+                )
+            )
+            raise click.exceptions.Exit(2) from None
+
+
+@cli.command("read", cls=_CanonicalReadCommand)
 @click.argument("operation_id")
 @click.option(
     "--params",

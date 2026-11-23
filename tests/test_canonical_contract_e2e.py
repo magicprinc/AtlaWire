@@ -559,6 +559,192 @@ def test_read_binary_operation_with_out_writes_bytes_and_a_receipt(
     assert seen["jira"] == [JIRA_AVATAR_READ]
 
 
+@pytest.mark.parametrize(
+    "token",
+    ["", "bad token"],
+    ids=["missing-token", "malformed-token"],
+)
+def test_read_requires_a_valid_environment_token_before_any_request(
+    tmp_path: Path, token: str
+) -> None:
+    # The old helper substituted an empty token and still sent one request.
+    result, seen = run_jira_read(
+        tmp_path,
+        canonical_args("jira.project.get", PROJECT_PARAMS),
+        {JIRA_PROJECT_PATH: json_responder(PROJECT_PAYLOAD)},
+        mutate=lambda environment: environment.update({"ATLAWIRE_JIRA_TOKEN": token}),
+    )
+
+    assert result.returncode == 2
+    envelope = single_json(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["product"] == "jira"
+    assert envelope["error"]["code"] == "credentials_error"
+    assert envelope["error"]["status"] is None
+    assert "ATLAWIRE_JIRA_TOKEN" in envelope["error"]["message"]
+    assert all(records == [] for records in seen.values())
+    assert not (tmp_path / "fixture-missing.json").exists()
+    if token:
+        assert token not in result.stdout + result.stderr
+
+
+def test_read_never_pairs_a_token_from_another_product(tmp_path: Path) -> None:
+    # Rejects borrowing a differently named product token for this URL.
+    result, seen = run_jira_read(
+        tmp_path,
+        canonical_args("jira.project.get", PROJECT_PARAMS),
+        {JIRA_PROJECT_PATH: json_responder(PROJECT_PAYLOAD)},
+        mutate=lambda environment: environment.update(
+            {
+                "ATLAWIRE_JIRA_TOKEN": "",
+                "ATLAWIRE_BITBUCKET_TOKEN": TOKENS["bitbucket"],
+            }
+        ),
+    )
+
+    assert result.returncode == 2
+    envelope = single_json(result.stdout)
+    assert envelope["error"]["code"] == "credentials_error"
+    assert all(records == [] for records in seen.values())
+
+
+def test_legacy_command_also_requires_a_valid_environment_token(
+    tmp_path: Path,
+) -> None:
+    # The same rule applies beyond `read`; legacy commands keep their text form.
+    seen = request_log()
+    with product_origins(seen) as origins:
+        environment = blank_environment(tmp_path / "fixture-missing.json")
+        configure(environment, "jira", origins["jira"])
+        environment["ATLAWIRE_JIRA_TOKEN"] = ""
+        result = run_installed(
+            ["jira-me", "--token-from-env", "--allow-http-loopback"], environment
+        )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "Missing or invalid bearer token" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert all(records == [] for records in seen.values())
+    assert not (tmp_path / "fixture-missing.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("argv", "product"),
+    [
+        (
+            ["read", "jira.project.get", "--token-from-env", "--allow-http-loopback"],
+            "jira",
+        ),
+        (
+            [
+                "read",
+                "jira.project.get",
+                "--params",
+                "{}",
+                "--not-an-option",
+                "--token-from-env",
+            ],
+            None,
+        ),
+        (
+            [
+                "read",
+                "jira.project.get",
+                "--token-from-env",
+                "--allow-http-loopback",
+                "--params",
+            ],
+            None,
+        ),
+        (
+            [
+                "read",
+                "jira.project.get",
+                "--params",
+                "{}",
+                "stray",
+                "--token-from-env",
+            ],
+            "jira",
+        ),
+    ],
+    ids=["missing-required-option", "unknown-option", "missing-value", "extra-positional"],
+)
+def test_read_framework_parse_failures_are_one_json_validation_error(
+    tmp_path: Path, argv: list[str], product: str | None
+) -> None:
+    # Before the fix Click printed text on stderr and left stdout empty.
+    seen = request_log()
+    missing = tmp_path / "fixture-missing.json"
+    with product_origins(seen) as origins:
+        environment = blank_environment(missing)
+        configure(environment, "jira", origins["jira"])
+        result = run_installed(argv, environment)
+
+    assert result.returncode == 2
+    envelope = single_json(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["product"] == product
+    assert envelope["error"]["code"] == "validation_error"
+    assert envelope["error"]["status"] is None
+    assert envelope["error"]["message"] == "The read command line is invalid."
+    assert "not-an-option" not in result.stdout
+    assert "requires an argument" not in result.stdout
+    assert "Traceback" not in result.stdout
+    assert result.stderr == ""
+    assert all(records == [] for records in seen.values())
+    assert not missing.exists()
+
+
+def test_legacy_unknown_option_keeps_click_text_output(tmp_path: Path) -> None:
+    # The JSON boundary covers the canonical `read` command only.
+    seen = request_log()
+    with product_origins(seen) as origins:
+        environment = blank_environment(tmp_path / "fixture-missing.json")
+        configure(environment, "jira", origins["jira"])
+        result = run_installed(
+            ["jql", "--json", "--not-an-option", "--token-from-env"], environment
+        )
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "No such option" in result.stderr
+    assert all(records == [] for records in seen.values())
+
+
+def test_option_looking_legacy_value_is_not_a_canonical_parser_error(
+    tmp_path: Path,
+) -> None:
+    # An option-looking argument after `--` is a value, not a root action.
+    seen = request_log()
+    empty_search = {"startAt": 0, "maxResults": 20, "total": 0, "issues": []}
+    with product_origins(
+        seen, {"jira": {SEARCH_PATHS["jira"]: json_responder(empty_search)}}
+    ) as origins:
+        environment = blank_environment(tmp_path / "fixture-missing.json")
+        configure(environment, "jira", origins["jira"])
+        result = run_installed(
+            [
+                "jql",
+                "--json",
+                "--token-from-env",
+                "--allow-http-loopback",
+                "--",
+                "--catalog",
+            ],
+            environment,
+        )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == []
+    assert "validation_error" not in result.stdout
+    assert len(seen["jira"]) == 1
+    record = seen["jira"][0]
+    assert record[2]["jql"] == ["--catalog"]
+    assert record[3] == f"Bearer {TOKENS['jira']}"
+
+
 def test_discovery_flags_alone_stay_offline(tmp_path: Path) -> None:
     # Rejects a conflict guard that breaks a lone --catalog or --describe.
     seen = request_log()
