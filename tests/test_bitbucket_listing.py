@@ -42,6 +42,29 @@ def call_pages[RowT](
     return read(), seen
 
 
+def record_pages(
+    monkeypatch: pytest.MonkeyPatch,
+    responses: Sequence[Mapping[str, object] | Exception],
+) -> list[dict[str, object]]:
+    """Serve canned pages or raise a canned failure, recording each request."""
+    seen: list[dict[str, object]] = []
+
+    def fake_get_json_object(
+        session: object, url: str, *, params: dict[str, str | int]
+    ) -> dict[str, object]:
+        if len(seen) >= len(responses):
+            raise AssertionError("Unexpected extra Bitbucket request.")
+        response = responses[len(seen)]
+        seen.append({"url": url, **params})
+        if isinstance(response, Exception):
+            raise response
+        return dict(response)
+
+    monkeypatch.setattr(bitbucket, "bearer_session", lambda token: nullcontext(None))
+    monkeypatch.setattr(bitbucket, "get_json_object", fake_get_json_object)
+    return seen
+
+
 def test_files_follow_the_noncontiguous_cursor_and_project_legacy_shapes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -129,6 +152,84 @@ def test_an_invalid_page_limit_is_rejected_before_the_session(
             bitbucket.list_directory(
                 BASE, "DEMO/widgets", token=TOKEN, max_pages=cast(int, max_pages)
             )
+
+
+def test_files_at_the_page_cap_raise_without_returning_partial_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Rejects a pager that catches the exhausted cap and returns rows read so far.
+    seen = record_pages(
+        monkeypatch,
+        [
+            {"values": ["a.txt"], "isLastPage": False, "nextPageStart": 5},
+            {"values": ["b.txt"], "isLastPage": False, "nextPageStart": 9},
+        ],
+    )
+
+    with pytest.raises(AtlaWireError, match="page limit"):
+        bitbucket.list_repository_files(BASE, "DEMO/widgets", token=TOKEN, max_pages=2)
+
+    assert [entry["start"] for entry in seen] == [0, 5]
+
+
+def test_files_reach_the_terminal_page_exactly_at_the_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Rejects an off-by-one that raises on the last permitted, terminal page.
+    rows, seen = call_pages(
+        monkeypatch,
+        [
+            {"values": ["a.txt"], "isLastPage": False, "nextPageStart": 5},
+            {"values": ["b.txt"], "isLastPage": True},
+        ],
+        lambda: bitbucket.list_repository_files(
+            BASE, "DEMO/widgets", token=TOKEN, max_pages=2
+        ),
+    )
+
+    assert rows == ["a.txt", "b.txt"]
+    assert len(seen) == 2
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"values": ["a.txt"], "isLastPage": False, "nextPageStart": 0},
+        {"values": ["a.txt"], "isLastPage": False, "nextPageStart": -1},
+        {"values": ["a.txt"], "isLastPage": False, "nextPageStart": "5"},
+        {"values": ["a.txt"], "isLastPage": False, "nextPageStart": True},
+        {"values": ["a.txt"], "isLastPage": False},
+    ],
+    ids=["zero", "negative", "string", "boolean", "missing"],
+)
+def test_files_reject_a_malformed_or_non_advancing_cursor(
+    monkeypatch: pytest.MonkeyPatch, page: dict[str, object]
+) -> None:
+    # Rejects a pager that accepts, normalizes, or quietly stops on a bad cursor.
+    seen = record_pages(monkeypatch, [page])
+
+    with pytest.raises(AtlaWireError, match="nextPageStart"):
+        bitbucket.list_repository_files(BASE, "DEMO/widgets", token=TOKEN)
+
+    assert len(seen) == 1
+
+
+def test_files_propagate_a_late_network_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Rejects a pager that swallows a transport error and returns rows so far.
+    seen = record_pages(
+        monkeypatch,
+        [
+            {"values": ["a.txt"], "isLastPage": False, "nextPageStart": 5},
+            AtlaWireError("Bitbucket request failed."),
+        ],
+    )
+
+    with pytest.raises(AtlaWireError, match="request failed"):
+        bitbucket.list_repository_files(BASE, "DEMO/widgets", token=TOKEN)
+
+    assert [entry["start"] for entry in seen] == [0, 5]
 
 
 def test_ls_reads_the_nested_children_cursor_not_the_conflicting_outer_page(
