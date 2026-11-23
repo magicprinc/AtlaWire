@@ -80,3 +80,6 @@ pip-delete-this-directory.txt
 .AppleDouble
 Thumbs.db
 desktop.ini
+
+# Project-local private state (feedback, local notes)
+/.config/
