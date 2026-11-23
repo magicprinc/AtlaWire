@@ -78,6 +78,118 @@ def test_binary_read_writes_exact_bytes_and_a_receipt(tmp_path: Path) -> None:
     ]
 
 
+def test_binary_read_rejects_204_without_publishing(tmp_path: Path) -> None:
+    # 204 is a valid no-content response for JSON reads, but a file read
+    # promises the complete representation, so it cannot be a zero-byte file.
+    seen: list[Request] = []
+    destination = tmp_path / "avatar.png"
+    with serving(_handler(seen, b"", status=204)) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        result = run_installed(
+            [
+                "read",
+                "jira.avatar.system",
+                "--params",
+                '{"type":"user"}',
+                "--out",
+                str(destination),
+                "--allow-http-loopback",
+            ],
+            saved_credentials(tmp_path, origin),
+        )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["status"] == 204
+    assert envelope["error"]["code"] == "invalid_response"
+    assert envelope["error"]["classification"] == "unexpected_status"
+    assert "data" not in envelope
+    assert not destination.exists()
+    assert list(tmp_path.glob("*.part")) == []
+    assert len(seen) == 1
+
+
+def test_binary_read_reports_a_dropped_connection_as_one_transport_error(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "avatar.png"
+    seen: list[Request] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            seen.append(request_record(self))
+            # Drop the connection before any response header is sent.
+            self.close_connection = True
+
+    with serving(Handler) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        result = run_installed(
+            [
+                "read",
+                "jira.avatar.system",
+                "--params",
+                '{"type":"user"}',
+                "--out",
+                str(destination),
+                "--allow-http-loopback",
+            ],
+            saved_credentials(tmp_path, origin),
+        )
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert result.stdout.count("\n") == 1
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["status"] is None
+    assert envelope["error"]["code"] == "transport_error"
+    assert envelope["error"]["classification"] == "transport"
+    assert "data" not in envelope
+    assert not destination.exists()
+    assert list(tmp_path.glob("*.part")) == []
+    assert len(seen) == 1
+
+
+def test_binary_read_reports_a_local_staging_failure_as_json(tmp_path: Path) -> None:
+    # The destination parent is an ordinary file: mkdir cannot create it.
+    blocker = tmp_path / "blocker"
+    blocker.write_bytes(b"keep me")
+    destination = blocker / "avatar.png"
+    seen: list[Request] = []
+    with serving(_handler(seen, PNG)) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        result = run_installed(
+            [
+                "read",
+                "jira.avatar.system",
+                "--params",
+                '{"type":"user"}',
+                "--out",
+                str(destination),
+                "--allow-http-loopback",
+            ],
+            saved_credentials(tmp_path, origin),
+        )
+
+    assert result.returncode == 2
+    assert "Traceback" not in result.stderr
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["code"] == "validation_error"
+    assert "Could not write the destination file." in envelope["error"]["message"]
+    assert "data" not in envelope
+    assert blocker.read_bytes() == b"keep me"
+    assert list(tmp_path.glob("*.part")) == []
+    assert seen == []
+
+
 def test_binary_read_never_overwrites_an_existing_file(tmp_path: Path) -> None:
     destination = tmp_path / "archive.zip"
     destination.write_bytes(b"keep me")

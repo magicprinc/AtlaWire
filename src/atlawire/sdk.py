@@ -28,7 +28,12 @@ from atlawire.file_publication import (
     discard_temporary_file,
     publish_new_file,
 )
-from atlawire.http import _TRANSPORT_MESSAGE, AtlaWireError, normalize_base_url
+from atlawire.http import (
+    _TRANSPORT_MESSAGE,
+    AtlaWireError,
+    _NoRedirectSession,
+    normalize_base_url,
+)
 
 __all__ = [
     "SdkRequestError",
@@ -95,6 +100,9 @@ _MAX_ATTEMPTS = 3
 _RETRY_BUDGET = 5.0
 _RETRY_STATUSES = frozenset({429, 503})
 _BACKOFF_SECONDS = (1.0, 2.0)
+
+# One message for every local staging failure: the CLI reports it as JSON.
+_LOCAL_WRITE_MESSAGE = "Could not write the destination file."
 
 
 class SdkRequestError(AtlaWireError):
@@ -203,17 +211,30 @@ def _raw_client_for(
     *,
     allow_http_loopback: bool = False,
 ) -> AtlassianRestAPI:
-    """Create the underlying library client for the internal facade."""
+    """Create the underlying library client for the internal facade.
+
+    The library builds a stock [requests.Session][requests.Session] unless one
+    is supplied. Such a session honours ambient ``netrc``/proxy/CA settings and
+    its ``resolve_redirects`` generator pre-reads a refused redirect body before
+    the status reaches this adapter. The session is therefore created here as a
+    no-redirect session with ``trust_env`` disabled and handed to the library,
+    which then applies its own headers, auth, verify/cert and proxy state on top
+    of it.
+    """
     client_class = _CLIENTS.get(product)
     if client_class is None:
         raise AtlaWireError("Unknown Atlassian product.")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    session = _NoRedirectSession()
+    # Ambient netrc/proxy/CA state must not alter the explicit transport.
+    session.trust_env = False
     return client_class(
         url=base,
         token=token,
         cloud=False,
         timeout=_TIMEOUT[1],
         verify_ssl=True,
+        session=session,
         # The library must not retry: this module owns attempts and delays.
         backoff_and_retry=False,
     )
@@ -228,22 +249,37 @@ _MUTATING = re.compile(
     re.IGNORECASE,
 )
 _RAW_TRANSPORT = frozenset({"request", "get", "post", "put", "delete", "patch"})
+# Plain metadata that is safe to read from a caller; every other non-callable
+# attribute stays private, including the underlying transport session.
+_SAFE_METADATA = frozenset(
+    {"timeout", "cloud", "backoff_and_retry", "verify_ssl", "url"}
+)
 
 
 class ReadOnlyClient:
-    """Proxy that exposes only non-mutating library methods.
+    """Proxy that exposes only non-mutating library methods and safe metadata.
 
-    Named high-level reads are forwarded. Mutating names, and the generic HTTP
-    verbs that would bypass the validated route boundary, are refused.
+    A named attribute is forwarded only when it is a callable library method and
+    its name passes the mutating-name and raw-verb filters. ``timeout``,
+    ``cloud``, ``backoff_and_retry``, ``verify_ssl`` and ``url`` are exposed as
+    read-only metadata. Every other name, including the underlying
+    ``session``/``_session`` transport state, raises ``AttributeError``; the raw
+    client stays reachable only through the private ``_client`` attribute.
     """
 
     def __init__(self, client: object) -> None:
         object.__setattr__(self, "_client", client)
 
     def __getattr__(self, name: str):
-        if name in _RAW_TRANSPORT or _MUTATING.search(name):
+        client = object.__getattribute__(self, "_client")
+        if name in _SAFE_METADATA:
+            return getattr(client, name)
+        if name.startswith("_") or name in _RAW_TRANSPORT or _MUTATING.search(name):
             raise AttributeError(f"Read-only client does not expose {name}.")
-        return getattr(self._client, name)
+        candidate = getattr(client, name)
+        if callable(candidate):
+            return candidate
+        raise AttributeError(f"Read-only client does not expose {name}.")
 
     def close(self) -> None:
         self._client.close()
@@ -405,9 +441,14 @@ def download_to_file(
     temporary file and published atomically only after a complete, bounded
     read; a destination created during publication is refused, never replaced.
     On any failure the temporary file is removed and nothing is published.
-    HTTP 206 is rejected as incomplete partial content, and a body interrupted
-    after the status line is reported as one transport error that keeps the
-    real status; neither path leaves a file or a staging ``.part`` behind.
+    Only HTTP 200 is a successful file read: 206 is rejected as incomplete
+    partial content, every other non-200 status is one ``invalid_response``
+    error that keeps the status, and a body interrupted after the status line
+    is reported as one transport error that keeps the real status. A request
+    that fails before any response is one ``transport_error`` with no status.
+    A local staging failure (directory, temporary file, write) is one
+    [AtlaWireError][atlawire.http.AtlaWireError] instead of a traceback. None of
+    these paths leaves a published file, a receipt or a staging ``.part`` name.
     """
     target = Path(destination)
     if target.exists():
@@ -418,88 +459,135 @@ def download_to_file(
     client = _raw_client_for(
         product, base_url, token, allow_http_loopback=allow_http_loopback
     )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = create_temporary_file(target)
+    temporary: Path | None = None
     try:
-        response = _send(
-            client,
-            "GET",
-            path,
-            params=_checked_params(params),
-            body=None,
-        )
+        temporary = _create_staging_file(target)
+        response = _send_binary(client, path, _checked_params(params))
         try:
-            status = response.status_code
-            if 300 <= status < 400:
-                raise _error(
-                    response,
-                    path=path,
-                    code=f"http_{status}",
-                    classification="unexpected_redirect",
-                    message="The server returned a redirect; it was not followed.",
-                )
-            if status >= 400:
-                code, classification = _classify(status)
-                raise _error(
-                    response,
-                    path=path,
-                    code=code,
-                    classification=classification,
-                    message=f"HTTP {status}: request failed.",
-                )
-            if status == 206:
-                # A partial body is never the complete representation the
-                # receipt promises, even when the server chose to send 206
-                # without a Range request.
-                raise SdkRequestError(
-                    status=status,
-                    code="invalid_response",
-                    classification="partial_content",
-                    message="HTTP 206: partial content is not a supported read.",
-                    body=None,
-                    content_type=response.headers.get("Content-Type"),
-                    path=path,
-                )
-            digest = hashlib.sha256()
-            written = 0
-            try:
-                with temporary.open("wb") as stream:
-                    for chunk in response.iter_content(chunk_size=_CHUNK):
-                        written += len(chunk)
-                        if written > max_bytes:
-                            raise SdkRequestError(
-                                status=status,
-                                code="invalid_response",
-                                classification="response_too_large",
-                                message=(
-                                    f"The response exceeds the {max_bytes}-byte limit."
-                                ),
-                                body=None,
-                                content_type=response.headers.get("Content-Type"),
-                                path=path,
-                                body_truncated=True,
-                            )
-                        digest.update(chunk)
-                        stream.write(chunk)
-            except requests.RequestException:
-                # An interrupted or undecodable body must not surface as a
-                # traceback or leave a partial file behind.
-                raise SdkRequestError(
-                    status=status,
-                    code="transport_error",
-                    classification="transport",
-                    message=_TRANSPORT_MESSAGE,
-                    body=None,
-                    content_type=response.headers.get("Content-Type"),
-                    path=path,
-                ) from None
+            written, digest = _write_binary_body(response, temporary, path, max_bytes)
         finally:
             response.close()
+        content_type = response.headers.get("Content-Type")
         publish_new_file(temporary, target)
-        return response.headers.get("Content-Type"), written, digest.hexdigest()
+        return content_type, written, digest
     finally:
         client.close()
-        discard_temporary_file(temporary)
+        if temporary is not None:
+            discard_temporary_file(temporary)
+
+
+def _create_staging_file(target: Path) -> Path:
+    """Create the destination directory and one exclusive staging file."""
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        return create_temporary_file(target)
+    except OSError:
+        raise AtlaWireError(_LOCAL_WRITE_MESSAGE) from None
+
+
+def _send_binary(
+    client: AtlassianRestAPI, path: str, params: dict[str, str | int]
+) -> requests.Response:
+    """Send one binary GET; a pre-response failure is one transport error."""
+    try:
+        return _send(client, "GET", path, params=params, body=None)
+    except requests.RequestException:
+        raise SdkRequestError(
+            status=None,
+            code="transport_error",
+            classification="transport",
+            message=_TRANSPORT_MESSAGE,
+            body=None,
+            content_type=None,
+            path=path,
+        ) from None
+
+
+def _write_binary_body(
+    response: requests.Response,
+    temporary: Path,
+    path: str,
+    max_bytes: int,
+) -> tuple[int, str]:
+    """Validate the status, then stream a complete bounded body to ``temporary``."""
+    status = response.status_code
+    if 300 <= status < 400:
+        raise _error(
+            response,
+            path=path,
+            code=f"http_{status}",
+            classification="unexpected_redirect",
+            message="The server returned a redirect; it was not followed.",
+        )
+    if status >= 400:
+        code, classification = _classify(status)
+        raise _error(
+            response,
+            path=path,
+            code=code,
+            classification=classification,
+            message=f"HTTP {status}: request failed.",
+        )
+    if status == 206:
+        # A partial body is never the complete representation the
+        # receipt promises, even when the server chose to send 206
+        # without a Range request.
+        raise SdkRequestError(
+            status=status,
+            code="invalid_response",
+            classification="partial_content",
+            message="HTTP 206: partial content is not a supported read.",
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+        )
+    if status != 200:
+        # A file read promises the complete representation; only 200 is one.
+        raise SdkRequestError(
+            status=status,
+            code="invalid_response",
+            classification="unexpected_status",
+            message=f"HTTP {status}: a file read requires a complete 200 response.",
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+        )
+    digest = hashlib.sha256()
+    written = 0
+    try:
+        with temporary.open("wb") as stream:
+            for chunk in response.iter_content(chunk_size=_CHUNK):
+                written += len(chunk)
+                if written > max_bytes:
+                    raise SdkRequestError(
+                        status=status,
+                        code="invalid_response",
+                        classification="response_too_large",
+                        message=(
+                            f"The response exceeds the {max_bytes}-byte limit."
+                        ),
+                        body=None,
+                        content_type=response.headers.get("Content-Type"),
+                        path=path,
+                        body_truncated=True,
+                    )
+                digest.update(chunk)
+                stream.write(chunk)
+    except requests.RequestException:
+        # An interrupted or undecodable body must not surface as a
+        # traceback or leave a partial file behind.
+        raise SdkRequestError(
+            status=status,
+            code="transport_error",
+            classification="transport",
+            message=_TRANSPORT_MESSAGE,
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+        ) from None
+    except OSError:
+        raise AtlaWireError(_LOCAL_WRITE_MESSAGE) from None
+    return written, digest.hexdigest()
 
 
 def _check_semantic_post(product: str, path: str) -> None:
