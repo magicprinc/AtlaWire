@@ -1,0 +1,2438 @@
+{
+  "schemaVersion": 1,
+  "artifact": "jira-read-only-endpoint-to-library-mapping",
+  "target": {
+    "product": "Jira Server",
+    "version": "8.22.0",
+    "scope": "standard, non-administrative, read-only REST operations",
+    "semanticReadPostIncluded": true
+  },
+  "library": {
+    "package": "atlassian-python-api",
+    "version": "5.0.5",
+    "class": "atlassian.JiraServer",
+    "mro": [
+      "Jira",
+      "AtlassianRestAPI",
+      "object"
+    ],
+    "sourceFile": "atlassian/jira/jira_server.py",
+    "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+    "installedSource": "C:/Users/magic/AppData/Roaming/Python/Python315/site-packages/atlassian/jira/jira_server.py",
+    "installedSourceIdenticalToExtracted": true
+  },
+  "sourceInventory": {
+    "verifiedNonAdminReadOnlyOperations": 109,
+    "methodSplit": {
+      "GET": 107,
+      "POST": 2
+    },
+    "docs": "https://docs.atlassian.com/software/jira/docs/api/REST/8.22.0/",
+    "normalization": "Paths without an API prefix were normalized to /rest/api/2/...; GET /rest/session was normalized to /rest/auth/1/session.",
+    "currentCodeBaseline": {
+      "covered": 30,
+      "partial": 4,
+      "absent": 75
+    },
+    "discrepancy": "The 8.22 page has a bare GET /rest/issue/{issueIdOrKey}/subtask/move heading with no request or response, plus a mutating POST on the same path. It is retained as one inventory entry with status uncertain; excluding it gives 108 required read-only operations."
+  },
+  "classification": {
+    "covered": "Public JiraServer method constructs the exact method+path, accepts the documented identifying argument, and returns the documented representation without a material projection; pagination is either absent from the endpoint or exposed to the caller.",
+    "partial": "Public JiraServer method constructs the exact method+path but a documented dimension is materially incomplete: pagination cannot be requested, the response is projected to a subset of documented fields, or a required Server parameter is built wrongly.",
+    "gap": "No public JiraServer method constructs the method+path. A different route, a Cloud-only mixin method, the inherited low-level get()/post() escape hatch, or path injection into an ID parameter is not counted as coverage.",
+    "uncertain": "Route or authorization cannot be established from the versioned documentation."
+  },
+  "counts": {
+    "total": 109,
+    "covered": 62,
+    "partial": 5,
+    "gap": 41,
+    "uncertain": 1,
+    "requiresManualHandling": 46,
+    "correctedRequiredTotal": 108
+  },
+  "statusDefinitions": {
+    "covered": "covered",
+    "partial": "partial",
+    "gap": "gap",
+    "uncertain": "uncertain"
+  },
+  "entries": [
+    {
+      "id": "jira-001",
+      "group": "Issue",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}",
+      "libraryMethod": "get_issue",
+      "librarySignature": "get_issue(issue_id_or_key, fields=None, properties=None, update_history=True, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1435,
+        "routeLine": 1455,
+        "routeExpression": "f\"{base_url}/{issue_id_or_key}\"",
+        "signature": "get_issue(issue_id_or_key, fields=None, properties=None, update_history=True, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-002",
+      "group": "Issue comments",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/comment/{id}",
+      "libraryMethod": "issue_get_comment",
+      "librarySignature": "issue_get_comment(issue_id, comment_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 727,
+        "routeLine": 736,
+        "routeExpression": "f\"{base_url}/{issue_id}/comment/{comment_id}\"",
+        "signature": "issue_get_comment(issue_id, comment_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-003",
+      "group": "Issue",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/editmeta",
+      "libraryMethod": "issue_editmeta",
+      "librarySignature": "issue_editmeta(key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1623,
+        "routeLine": 1633,
+        "routeExpression": "f\"{base_url}/{key}/editmeta\"",
+        "signature": "issue_editmeta(key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-004",
+      "group": "Issue remote links",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink",
+      "libraryMethod": "get_issue_remote_links",
+      "librarySignature": "get_issue_remote_links(issue_key, global_id=None, internal_id=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2289,
+        "routeLine": 2300,
+        "routeExpression": "f\"{base_url}/{issue_key}/remotelink\"",
+        "signature": "get_issue_remote_links(issue_key, global_id=None, internal_id=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-005",
+      "group": "Issue",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/transitions",
+      "libraryMethod": "get_issue_transitions_full",
+      "librarySignature": "get_issue_transitions_full(issue_key, transition_id=None, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2569,
+        "routeLine": 2584,
+        "routeExpression": "f\"{base_url}/{issue_key}/transitions\"",
+        "signature": "get_issue_transitions_full(issue_key, transition_id=None, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-006",
+      "group": "Issue votes",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/votes",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method. get_votes exists only on JiraCloudCoreMethods (core_methods.py:4165); it is not in JiraServer.__mro__.",
+        "Reading fields=votes through get_issue is not the documented votes endpoint."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-007",
+      "group": "Issue watchers",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/watchers",
+      "libraryMethod": "issue_get_watchers",
+      "librarySignature": "issue_get_watchers(issue_key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2066,
+        "routeLine": 2073,
+        "routeExpression": "f\"{base_url}/{issue_key}/watchers\"",
+        "signature": "issue_get_watchers(issue_key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-008",
+      "group": "Issue worklogs",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/worklog/{id}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single worklog. issue_get_worklog reads only the collection, and POST /worklog/list is a different route."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-009",
+      "group": "Issue create metadata",
+      "method": "GET",
+      "path": "/rest/api/2/issue/createmeta",
+      "libraryMethod": "issue_createmeta",
+      "librarySignature": "issue_createmeta(project, expand='projects.issuetypes.fields')",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1565,
+        "routeLine": 1580,
+        "routeExpression": "f\"issue/createmeta?projectKeys={project}\"",
+        "signature": "issue_createmeta(project, expand='projects.issuetypes.fields')",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": [
+        "Deprecated by Atlassian; still constructs the 8.22 route and returns the raw representation.",
+        "Only a single projectKeys value is exposed; projectIds and issue-type filters are not."
+      ]
+    },
+    {
+      "id": "jira-010",
+      "group": "Issue links",
+      "method": "GET",
+      "path": "/rest/api/2/issueLink/{linkId}",
+      "libraryMethod": "get_issue_link",
+      "librarySignature": "get_issue_link(link_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3929,
+        "routeLine": 3936,
+        "routeExpression": "f\"{base_url}/{link_id}\"",
+        "signature": "get_issue_link(link_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-011",
+      "group": "Search",
+      "method": "GET",
+      "path": "/rest/api/2/search",
+      "libraryMethod": "jql",
+      "librarySignature": "jql(jql, fields='*all', start=0, limit=None, expand=None, validate_query=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4136,
+        "routeLine": 4184,
+        "routeExpression": "self.resource_url(\"search\") when not self.cloud",
+        "signature": "jql(jql, fields='*all', start=0, limit=None, expand=None, validate_query=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-012",
+      "group": "JQL",
+      "method": "GET",
+      "path": "/rest/api/2/jql/autocompletedata",
+      "libraryMethod": "get_autocomplete_data",
+      "librarySignature": "get_autocomplete_data()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4519,
+        "routeLine": 4529,
+        "routeExpression": "self.resource_url(\"jql/autocompletedata\")",
+        "signature": "get_autocomplete_data()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-013",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project",
+      "libraryMethod": "projects",
+      "librarySignature": "projects(included_archived=None, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3104,
+        "routeLine": 3126,
+        "routeExpression": "self.resource_url(\"project\")",
+        "signature": "projects(included_archived=None, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-014",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}",
+      "libraryMethod": "project",
+      "librarySignature": "project(key, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3187,
+        "routeLine": 3198,
+        "routeExpression": "f\"{base_url}/{key}\"",
+        "signature": "project(key, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-015",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/components",
+      "libraryMethod": "get_project_components",
+      "librarySignature": "get_project_components(key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3211,
+        "routeLine": 3218,
+        "routeExpression": "f\"{base_url}/{key}/components\"",
+        "signature": "get_project_components(key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-016",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/versions",
+      "libraryMethod": "get_project_versions",
+      "librarySignature": "get_project_versions(key, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3221,
+        "routeLine": 3232,
+        "routeExpression": "f\"{base_url}/{key}/versions\"",
+        "signature": "get_project_versions(key, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-017",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/statuses",
+      "libraryMethod": "get_status_for_project",
+      "librarySignature": "get_status_for_project(project_key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3847,
+        "routeLine": 3857,
+        "routeExpression": "f\"{base_url}/{project_key}/statuses\"",
+        "signature": "get_status_for_project(project_key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-018",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/role",
+      "libraryMethod": "get_project_roles",
+      "librarySignature": "get_project_roles(project_key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3412,
+        "routeLine": 3419,
+        "routeExpression": "f\"{base_url}/{project_key}/role\"",
+        "signature": "get_project_roles(project_key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-019",
+      "group": "Permissions",
+      "method": "GET",
+      "path": "/rest/api/2/mypermissions",
+      "libraryMethod": "get_permissions",
+      "librarySignature": "get_permissions(permissions, project_id=None, project_key=None, issue_id=None, issue_key=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 98,
+        "routeLine": 139,
+        "routeExpression": "self.resource_url(\"mypermissions\")",
+        "signature": "get_permissions(permissions, project_id=None, project_key=None, issue_id=None, issue_key=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": [
+        "The method adds an undocumented permissions query parameter; 8.22 documents only projectId/projectKey/issueId/issueKey context parameters. The response is the full permission map."
+      ]
+    },
+    {
+      "id": "jira-020",
+      "group": "Status categories",
+      "method": "GET",
+      "path": "/rest/api/2/statuscategory",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method. get_all_statuses reads /status only; statusCategory is only nested inside status objects."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-021",
+      "group": "Resolution",
+      "method": "GET",
+      "path": "/rest/api/2/resolution",
+      "libraryMethod": "get_all_resolutions",
+      "librarySignature": "get_all_resolutions()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4030,
+        "routeLine": 4035,
+        "routeExpression": "self.resource_url(\"resolution\")",
+        "signature": "get_all_resolutions()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-022",
+      "group": "Priority",
+      "method": "GET",
+      "path": "/rest/api/2/priority",
+      "libraryMethod": "get_all_priorities",
+      "librarySignature": "get_all_priorities()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4501,
+        "routeLine": 4506,
+        "routeExpression": "self.resource_url(\"priority\")",
+        "signature": "get_all_priorities()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-023",
+      "group": "Issue types",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype",
+      "libraryMethod": "get_issue_types",
+      "librarySignature": "get_issue_types()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3685,
+        "routeLine": 3689,
+        "routeExpression": "self.resource_url(\"issuetype\")",
+        "signature": "get_issue_types()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-024",
+      "group": "Fields",
+      "method": "GET",
+      "path": "/rest/api/2/field",
+      "libraryMethod": "get_all_fields",
+      "librarySignature": "get_all_fields()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 980,
+        "routeLine": 987,
+        "routeExpression": "self.resource_url(\"field\", api_version=3 if self.cloud else None)",
+        "signature": "get_all_fields()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-025",
+      "group": "Attachments",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/{id}",
+      "libraryMethod": "get_attachment",
+      "librarySignature": "get_attachment(attachment_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 276,
+        "routeLine": 283,
+        "routeExpression": "f\"{base_url}/{attachment_id}\"",
+        "signature": "get_attachment(attachment_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-026",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user",
+      "libraryMethod": "user",
+      "librarySignature": "user(username=None, key=None, account_id=None, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2690,
+        "routeLine": 2724,
+        "routeExpression": "self.resource_url(\"user\")",
+        "signature": "user(username=None, key=None, account_id=None, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-027",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/search",
+      "libraryMethod": "user_find_by_user_string",
+      "librarySignature": "user_find_by_user_string(username=None, query=None, account_id=None, property_key=None, start=0, limit=50, include_inactive_users=False, include_active_users=True)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2989,
+        "routeLine": 3020,
+        "routeExpression": "self.resource_url(\"user/search\")",
+        "signature": "user_find_by_user_string(username=None, query=None, account_id=None, property_key=None, start=0, limit=50, include_inactive_users=False, include_active_users=True)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-028",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/assignable/search",
+      "libraryMethod": "get_all_assignable_users_for_project",
+      "librarySignature": "get_all_assignable_users_for_project(project_key, start=0, limit=50)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3803,
+        "routeLine": 3813,
+        "routeExpression": "f\"{base_url}?project={project_key}&startAt={start}&maxResults={limit}\"",
+        "signature": "get_all_assignable_users_for_project(project_key, start=0, limit=50)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": [
+        "get_assignable_users_for_issue (line 3816) covers the same route with issueKey and username."
+      ]
+    },
+    {
+      "id": "jira-029",
+      "group": "Filters",
+      "method": "GET",
+      "path": "/rest/api/2/filter/favourite",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method. get_dashboards(filter='favourite') filters dashboards, not filters."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-030",
+      "group": "Dashboards",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard",
+      "libraryMethod": "get_dashboards",
+      "librarySignature": "get_dashboards(filter='', start=0, limit=10)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1065,
+        "routeLine": 1087,
+        "routeExpression": "self.resource_url(\"dashboard\")",
+        "signature": "get_dashboards(filter='', start=0, limit=10)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-031",
+      "group": "Issue comments",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/comment",
+      "libraryMethod": "issue_get_comments",
+      "librarySignature": "issue_get_comments(issue_id)",
+      "status": "partial",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 702,
+        "routeLine": 710,
+        "routeExpression": "f\"{base_url}/{issue_id}/comment\"",
+        "signature": "issue_get_comments(issue_id)",
+        "methodScan": null
+      },
+      "gaps": [
+        "No startAt/maxResults parameters; only the first page can be requested through the public method."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-032",
+      "group": "Statuses",
+      "method": "GET",
+      "path": "/rest/api/2/status",
+      "libraryMethod": "get_all_statuses",
+      "librarySignature": "get_all_statuses()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4659,
+        "routeLine": 4664,
+        "routeExpression": "self.resource_url(\"status\")",
+        "signature": "get_all_statuses()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-033",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/myself",
+      "libraryMethod": "myself",
+      "librarySignature": "myself()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2727,
+        "routeLine": 2732,
+        "routeExpression": "self.resource_url(\"myself\")",
+        "signature": "myself()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-034",
+      "group": "Issue worklogs",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/worklog",
+      "libraryMethod": "issue_get_worklog",
+      "librarySignature": "issue_get_worklog(issue_id_or_key)",
+      "status": "partial",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1716,
+        "routeLine": 1724,
+        "routeExpression": "f\"{base_url}/{issue_id_or_key}/worklog\"",
+        "signature": "issue_get_worklog(issue_id_or_key)",
+        "methodScan": null
+      },
+      "gaps": [
+        "No startAt/maxResults parameters; only the first worklog page can be requested through the public method."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-035",
+      "group": "Attachments",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/meta",
+      "libraryMethod": "get_attachment_meta",
+      "librarySignature": "get_attachment_meta()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 476,
+        "routeLine": 482,
+        "routeExpression": "self.resource_url(\"attachment/meta\")",
+        "signature": "get_attachment_meta()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-036",
+      "group": "Attachments",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/{id}/expand/human",
+      "libraryMethod": "get_attachment_expand_human",
+      "librarySignature": "get_attachment_expand_human(attachment_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 485,
+        "routeLine": 492,
+        "routeExpression": "f\"{base_url}/{attachment_id}/expand/human\"",
+        "signature": "get_attachment_expand_human(attachment_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-037",
+      "group": "Attachments",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/{id}/expand/raw",
+      "libraryMethod": "get_attachment_expand_raw",
+      "librarySignature": "get_attachment_expand_raw(attachment_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 495,
+        "routeLine": 502,
+        "routeExpression": "f\"{base_url}/{attachment_id}/expand/raw\"",
+        "signature": "get_attachment_expand_raw(attachment_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-038",
+      "group": "Avatars",
+      "method": "GET",
+      "path": "/rest/api/2/avatar/{type}/system",
+      "libraryMethod": "get_all_system_avatars",
+      "librarySignature": "get_all_system_avatars(avatar_type='user')",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 561,
+        "routeLine": 569,
+        "routeExpression": "f\"{base_url}/{avatar_type}/system\"",
+        "signature": "get_all_system_avatars(avatar_type='user')",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-039",
+      "group": "Comment properties",
+      "method": "GET",
+      "path": "/rest/api/2/comment/{commentId}/properties",
+      "libraryMethod": "get_comment_properties_keys",
+      "librarySignature": "get_comment_properties_keys(comment_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 744,
+        "routeLine": 751,
+        "routeExpression": "f\"{base_url}/{comment_id}/properties\"",
+        "signature": "get_comment_properties_keys(comment_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-040",
+      "group": "Comment properties",
+      "method": "GET",
+      "path": "/rest/api/2/comment/{commentId}/properties/{propertyKey}",
+      "libraryMethod": "get_comment_property",
+      "librarySignature": "get_comment_property(comment_id, property_key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 754,
+        "routeLine": 762,
+        "routeExpression": "f\"{base_url}/{comment_id}/properties/{property_key}\"",
+        "signature": "get_comment_property(comment_id, property_key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-041",
+      "group": "Components",
+      "method": "GET",
+      "path": "/rest/api/2/component/{id}",
+      "libraryMethod": "component",
+      "librarySignature": "component(component_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 794,
+        "routeLine": 804,
+        "routeExpression": "f\"{base_url}/{component_id}\"",
+        "signature": "component(component_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-042",
+      "group": "Components",
+      "method": "GET",
+      "path": "/rest/api/2/component/{id}/relatedIssueCounts",
+      "libraryMethod": "get_component_related_issues",
+      "librarySignature": "get_component_related_issues(component_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 806,
+        "routeLine": 813,
+        "routeExpression": "f\"{base_url}/{component_id}/relatedIssueCounts\"",
+        "signature": "get_component_related_issues(component_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-043",
+      "group": "Configuration",
+      "method": "GET",
+      "path": "/rest/api/2/configuration",
+      "libraryMethod": "get_configurations_of_jira",
+      "librarySignature": "get_configurations_of_jira()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 877,
+        "routeLine": 883,
+        "routeExpression": "self.resource_url(\"configuration\")",
+        "signature": "get_configurations_of_jira()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-044",
+      "group": "Custom fields",
+      "method": "GET",
+      "path": "/rest/api/2/customFieldOption/{id}",
+      "libraryMethod": "get_custom_field_option",
+      "librarySignature": "get_custom_field_option(option_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 893,
+        "routeLine": 900,
+        "routeExpression": "f\"{base_url}/{option_id}\"",
+        "signature": "get_custom_field_option(option_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-045",
+      "group": "Dashboards",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard/{id}",
+      "libraryMethod": "get_dashboard",
+      "librarySignature": "get_dashboard(dashboard_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1090,
+        "routeLine": 1097,
+        "routeExpression": "f\"dashboard/{dashboard_id}\"",
+        "signature": "get_dashboard(dashboard_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-046",
+      "group": "Dashboard items",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for dashboard item properties."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-047",
+      "group": "Dashboard items",
+      "method": "GET",
+      "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties/{propertyKey}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single dashboard item property."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-048",
+      "group": "Filters",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}",
+      "libraryMethod": "get_filter",
+      "librarySignature": "get_filter(filter_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1149,
+        "routeLine": 1156,
+        "routeExpression": "f\"{base_url}/{filter_id}\"",
+        "signature": "get_filter(filter_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-049",
+      "group": "Filters",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}/columns",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for filter columns."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-050",
+      "group": "Filters",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}/permission",
+      "libraryMethod": "get_filter_share_permissions",
+      "librarySignature": "get_filter_share_permissions(filter_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1185,
+        "routeLine": 1192,
+        "routeExpression": "f\"{base_url}/{filter_id}/permission\"",
+        "signature": "get_filter_share_permissions(filter_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-051",
+      "group": "Filters",
+      "method": "GET",
+      "path": "/rest/api/2/filter/{id}/permission/{permissionId}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single filter share permission; only the list method exists."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-052",
+      "group": "Filters",
+      "method": "GET",
+      "path": "/rest/api/2/filter/defaultShareScope",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the default filter share scope."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-053",
+      "group": "Groups",
+      "method": "GET",
+      "path": "/rest/api/2/groups/picker",
+      "libraryMethod": "get_groups",
+      "librarySignature": "get_groups(query=None, exclude=None, limit=20)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1252,
+        "routeLine": 1266,
+        "routeExpression": "self.resource_url(\"groups/picker\")",
+        "signature": "get_groups(query=None, exclude=None, limit=20)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-054",
+      "group": "Groups",
+      "method": "GET",
+      "path": "/rest/api/2/groupuserpicker",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for groupuserpicker; get_groups targets only /groups/picker."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-055",
+      "group": "Issue create metadata",
+      "method": "GET",
+      "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes",
+      "libraryMethod": "issue_createmeta_issuetypes",
+      "librarySignature": "issue_createmeta_issuetypes(project, start=None, limit=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1583,
+        "routeLine": 1593,
+        "routeExpression": "f\"issue/createmeta/{project}/issuetypes\"",
+        "signature": "issue_createmeta_issuetypes(project, start=None, limit=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-056",
+      "group": "Issue create metadata",
+      "method": "GET",
+      "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}",
+      "libraryMethod": "issue_createmeta_fieldtypes",
+      "librarySignature": "issue_createmeta_fieldtypes(project, issue_type_id, start=None, limit=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1601,
+        "routeLine": 1615,
+        "routeExpression": "f\"issue/createmeta/{project}/issuetypes/{issue_type_id}\"",
+        "signature": "issue_createmeta_fieldtypes(project, issue_type_id, start=None, limit=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-057",
+      "group": "Issue picker",
+      "method": "GET",
+      "path": "/rest/api/2/issue/picker",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the issue picker."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-058",
+      "group": "Issue properties",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/properties",
+      "libraryMethod": "get_issue_property_keys",
+      "librarySignature": "get_issue_property_keys(issue_key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2592,
+        "routeLine": 2600,
+        "routeExpression": "f\"{base_url}/{issue_key}/properties\"",
+        "signature": "get_issue_property_keys(issue_key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-059",
+      "group": "Issue properties",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/properties/{propertyKey}",
+      "libraryMethod": "get_issue_property",
+      "librarySignature": "get_issue_property(issue_key, property_key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2616,
+        "routeLine": 2626,
+        "routeExpression": "f\"{base_url}/{issue_key}/properties/{property_key}\"",
+        "signature": "get_issue_property(issue_key, property_key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-060",
+      "group": "Issue remote links",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink/{linkId}",
+      "libraryMethod": "get_issue_remote_link_by_id",
+      "librarySignature": "get_issue_remote_link_by_id(issue_key, link_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2387,
+        "routeLine": 2397,
+        "routeExpression": "f\"{base_url}/{issue_key}/remotelink/{link_id}\"",
+        "signature": "get_issue_remote_link_by_id(issue_key, link_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-061",
+      "group": "Issue subtasks",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/subtask",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the subtask endpoint. get_issue_tree_recursive reads fields=subtasks through GET /issue/{key}, not this route."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-062",
+      "group": "Issue subtasks",
+      "method": "GET",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/subtask/move",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "uncertain",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "The 8.22 page contains a bare 'Can move sub task' GET heading with no request or response, while the same path is documented as a state-changing POST.",
+        "No JiraServer GET method exists; the POST operation is mutating and is outside the read-only scope.",
+        "Classified uncertain rather than gap because a functional read-only route is not established."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-063",
+      "group": "Issue link types",
+      "method": "GET",
+      "path": "/rest/api/2/issueLinkType",
+      "libraryMethod": "get_issue_link_types",
+      "librarySignature": "get_issue_link_types()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3956,
+        "routeLine": 3963,
+        "routeExpression": "self.resource_url(\"issueLinkType\")",
+        "signature": "get_issue_link_types()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": [
+        "Returns the issueLinkTypes array rather than the {issueLinkTypes: [...]} wrapper; all link-type fields are retained."
+      ]
+    },
+    {
+      "id": "jira-064",
+      "group": "Issue link types",
+      "method": "GET",
+      "path": "/rest/api/2/issueLinkType/{issueLinkTypeId}",
+      "libraryMethod": "get_issue_link_type",
+      "librarySignature": "get_issue_link_type(issue_link_type_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3998,
+        "routeLine": 4001,
+        "routeExpression": "f\"{base_url}/{issue_link_type_id}\"",
+        "signature": "get_issue_link_type(issue_link_type_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-065",
+      "group": "Issue types",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{id}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single issue type; only the collection get_issue_types exists."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-066",
+      "group": "Issue types",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{id}/alternatives",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for issue type alternatives."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-067",
+      "group": "Issue types",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{issueTypeId}/properties",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for issue type properties."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-068",
+      "group": "Issue types",
+      "method": "GET",
+      "path": "/rest/api/2/issuetype/{issueTypeId}/properties/{propertyKey}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single issue type property."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-069",
+      "group": "JQL",
+      "method": "GET",
+      "path": "/rest/api/2/jql/autocompletedata/suggestions",
+      "libraryMethod": "get_autocomplete_suggestion",
+      "librarySignature": "get_autocomplete_suggestion(field_name=None, field_value=None, predicate_name=None, predicate_value=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4532,
+        "routeLine": 4561,
+        "routeExpression": "self.resource_url(\"jql/autocompletedata/suggestions\")",
+        "signature": "get_autocomplete_suggestion(field_name=None, field_value=None, predicate_name=None, predicate_value=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-070",
+      "group": "User preferences",
+      "method": "GET",
+      "path": "/rest/api/2/mypreferences",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for my preferences."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-071",
+      "group": "Security",
+      "method": "GET",
+      "path": "/rest/api/2/password/policy",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the password policy."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-072",
+      "group": "Priority",
+      "method": "GET",
+      "path": "/rest/api/2/priority/{id}",
+      "libraryMethod": "get_priority_by_id",
+      "librarySignature": "get_priority_by_id(priority_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4509,
+        "routeLine": 4516,
+        "routeExpression": "f\"{base_url}/{priority_id}\"",
+        "signature": "get_priority_by_id(priority_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-073",
+      "group": "Project types",
+      "method": "GET",
+      "path": "/rest/api/2/project/type",
+      "libraryMethod": "get_all_project_types",
+      "librarySignature": "get_all_project_types()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 5046,
+        "routeLine": 5052,
+        "routeExpression": "self.resource_url(\"project/type\")",
+        "signature": "get_all_project_types()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-074",
+      "group": "Project types",
+      "method": "GET",
+      "path": "/rest/api/2/project/type/{projectTypeKey}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for one project type; only the collection exists."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-075",
+      "group": "Project types",
+      "method": "GET",
+      "path": "/rest/api/2/project/type/{projectTypeKey}/accessible",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for accessible project types."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-076",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/avatars",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for project avatars. get_all_system_avatars reads /avatar/{type}/system, a different route."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-077",
+      "group": "Project properties",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/properties",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for project properties. get_property targets application-properties, a different resource."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-078",
+      "group": "Project properties",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/properties/{propertyKey}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single project property."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-079",
+      "group": "Project roles",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/role/{id}",
+      "libraryMethod": "get_project_actors_for_role_project",
+      "librarySignature": "get_project_actors_for_role_project(project_key, role_id)",
+      "status": "partial",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3422,
+        "routeLine": 3430,
+        "routeExpression": "f\"{base_url}/{project_key}/role/{role_id}\"",
+        "signature": "get_project_actors_for_role_project(project_key, role_id)",
+        "methodScan": null
+      },
+      "gaps": [
+        "Returns only the actors array (fields=[('actors',)]); documented role id, name and description are dropped."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-080",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectIdOrKey}/version",
+      "libraryMethod": "get_project_versions_paginated",
+      "librarySignature": "get_project_versions_paginated(key, start=None, limit=None, order_by=None, expand=None, query=None, status=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3235,
+        "routeLine": 3277,
+        "routeExpression": "f\"{base_url}/{key}/version\"",
+        "signature": "get_project_versions_paginated(key, start=None, limit=None, order_by=None, expand=None, query=None, status=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": [
+        "The status filter accepts only a single value; a comma-separated list is silently not sent."
+      ]
+    },
+    {
+      "id": "jira-081",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/securitylevel",
+      "libraryMethod": "get_security_level_for_project",
+      "librarySignature": "get_security_level_for_project(project_key_or_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 5030,
+        "routeLine": 5038,
+        "routeExpression": "f\"{base_url}/{project_key_or_id}/securitylevel\"",
+        "signature": "get_security_level_for_project(project_key_or_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-082",
+      "group": "Project categories",
+      "method": "GET",
+      "path": "/rest/api/2/projectCategory",
+      "libraryMethod": "get_all_project_categories",
+      "librarySignature": "get_all_project_categories()",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 5060,
+        "routeLine": 5065,
+        "routeExpression": "self.resource_url(\"projectCategory\")",
+        "signature": "get_all_project_categories()",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-083",
+      "group": "Project categories",
+      "method": "GET",
+      "path": "/rest/api/2/projectCategory/{id}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single project category; only the collection exists."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-084",
+      "group": "Project picker",
+      "method": "GET",
+      "path": "/rest/api/2/projects/picker",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the projects picker."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-085",
+      "group": "Project",
+      "method": "GET",
+      "path": "/rest/api/2/projectvalidate/key",
+      "libraryMethod": "get_project_validated_key",
+      "librarySignature": "get_project_validated_key(key)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 5073,
+        "routeLine": 5080,
+        "routeExpression": "self.resource_url(\"projectvalidate/key\")",
+        "signature": "get_project_validated_key(key)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-086",
+      "group": "Resolution",
+      "method": "GET",
+      "path": "/rest/api/2/resolution/{id}",
+      "libraryMethod": "get_resolution_by_id",
+      "librarySignature": "get_resolution_by_id(resolution_id)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 4038,
+        "routeLine": 4045,
+        "routeExpression": "f\"{base_url}/{resolution_id}\"",
+        "signature": "get_resolution_by_id(resolution_id)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-087",
+      "group": "Security",
+      "method": "GET",
+      "path": "/rest/api/2/securitylevel/{id}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single security level. get_security_level_for_project reads the project map, a different route."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-088",
+      "group": "Server",
+      "method": "GET",
+      "path": "/rest/api/2/serverInfo",
+      "libraryMethod": "get_server_info",
+      "librarySignature": "get_server_info(do_health_check=False)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 5222,
+        "routeLine": 5231,
+        "routeExpression": "self.resource_url(\"serverInfo\")",
+        "signature": "get_server_info(do_health_check=False)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-089",
+      "group": "Auth",
+      "method": "GET",
+      "path": "/rest/auth/1/session",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the authenticated session. /rest/session from the 8.22 page is normalized to /rest/auth/1/session here."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-090",
+      "group": "Statuses",
+      "method": "GET",
+      "path": "/rest/api/2/status/{idOrName}",
+      "libraryMethod": "get_status_id_from_name",
+      "librarySignature": "get_status_id_from_name(status_name)",
+      "status": "partial",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3834,
+        "routeLine": 3844,
+        "routeExpression": "f\"{base_url}/{status_name}\"",
+        "signature": "get_status_id_from_name(status_name)",
+        "methodScan": null
+      },
+      "gaps": [
+        "Returns only int(id) via fields=[('id',)]; the documented status representation is dropped."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-091",
+      "group": "Status categories",
+      "method": "GET",
+      "path": "/rest/api/2/statuscategory/{idOrKey}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single status category."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-092",
+      "group": "Terminology",
+      "method": "GET",
+      "path": "/rest/api/2/terminology/entries",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for terminology entries."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-093",
+      "group": "Terminology",
+      "method": "GET",
+      "path": "/rest/api/2/terminology/entries/{originalName}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for a single terminology entry."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-094",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/a11y/personal-settings",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for accessibility personal settings."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-095",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/assignable/multiProjectSearch",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for multi-project assignable search; only single project/issue variants exist."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-096",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/avatars",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for user avatars. get_all_system_avatars reads /avatar/{type}/system, not /user/avatars."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-097",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/columns",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for user columns."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-098",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/picker",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for the user picker."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-099",
+      "group": "User properties",
+      "method": "GET",
+      "path": "/rest/api/2/user/properties",
+      "libraryMethod": "user_properties",
+      "librarySignature": "user_properties(username=None, account_id=None)",
+      "status": "partial",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2827,
+        "routeLine": 2837,
+        "routeExpression": "f\"{base_url}?accountId={username}\" for non-cloud",
+        "signature": "user_properties(username=None, account_id=None)",
+        "methodScan": null
+      },
+      "gaps": [
+        "On Server it sends ?accountId=<username> instead of ?username=<username>; the documented Server lookup can fail."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-100",
+      "group": "User properties",
+      "method": "GET",
+      "path": "/rest/api/2/user/properties/{propertyKey}",
+      "libraryMethod": "user_property",
+      "librarySignature": "user_property(username=None, account_id=None, key_property=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2842,
+        "routeLine": 2857,
+        "routeExpression": "f\"{base_url}/{key_property}\" with params username on Server",
+        "signature": "user_property(username=None, account_id=None, key_property=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-101",
+      "group": "Users",
+      "method": "GET",
+      "path": "/rest/api/2/user/viewissue/search",
+      "libraryMethod": "get_users_with_browse_permission_to_a_project",
+      "librarySignature": "get_users_with_browse_permission_to_a_project(username, issue_key=None, project_key=None, start=0, limit=100)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 1379,
+        "routeLine": 1399,
+        "routeExpression": "self.resource_url(\"user/viewissue/search\")",
+        "signature": "get_users_with_browse_permission_to_a_project(username, issue_key=None, project_key=None, start=0, limit=100)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-102",
+      "group": "Versions",
+      "method": "GET",
+      "path": "/rest/api/2/version/remotelink",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for version remote links."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-103",
+      "group": "Versions",
+      "method": "GET",
+      "path": "/rest/api/2/version/{id}",
+      "libraryMethod": "get_version",
+      "librarySignature": "get_version(version)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 3280,
+        "routeLine": 3286,
+        "routeExpression": "f\"{base_url}/{version}\"",
+        "signature": "get_version(version)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": []
+    },
+    {
+      "id": "jira-104",
+      "group": "Versions",
+      "method": "GET",
+      "path": "/rest/api/2/version/{id}/relatedIssueCounts",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for version related-issue counts."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-105",
+      "group": "Versions",
+      "method": "GET",
+      "path": "/rest/api/2/version/{id}/unresolvedIssueCount",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for unresolved issue count."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-106",
+      "group": "Versions",
+      "method": "GET",
+      "path": "/rest/api/2/version/{versionId}/remotelink",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for remote links of one version."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-107",
+      "group": "Versions",
+      "method": "GET",
+      "path": "/rest/api/2/version/{versionId}/remotelink/{globalId}",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "No JiraServer method for one version remote link."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-108",
+      "group": "Search",
+      "method": "POST",
+      "path": "/rest/api/2/search",
+      "libraryMethod": null,
+      "librarySignature": null,
+      "status": "gap",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": null,
+        "routeLine": null,
+        "routeExpression": null,
+        "signature": null,
+        "methodScan": "full public-method scan of jira_server.py; JiraServer MRO is [Jira, AtlassianRestAPI]"
+      },
+      "gaps": [
+        "JiraServer only exposes GET /search through jql(). No method sends the documented semantic-read POST /search body."
+      ],
+      "notes": []
+    },
+    {
+      "id": "jira-109",
+      "group": "Issue worklogs",
+      "method": "POST",
+      "path": "/rest/api/2/worklog/list",
+      "libraryMethod": "get_worklogs",
+      "librarySignature": "get_worklogs(ids, expand=None)",
+      "status": "covered",
+      "evidence": {
+        "sourceFile": "atlassian/jira/jira_server.py",
+        "sourceBase": "C:/TMP/opencode/atlassian-api-review/extracted",
+        "definitionLine": 2670,
+        "routeLine": 2678,
+        "routeExpression": "self.resource_url(\"worklog/list\")",
+        "signature": "get_worklogs(ids, expand=None)",
+        "methodScan": null
+      },
+      "gaps": [],
+      "notes": [
+        "Semantic read: POST body carries worklog ids; no server state is changed."
+      ]
+    }
+  ],
+  "excluded": {
+    "administrativeOrMutating": "Excluded from the 109; no admin or mutating method is mapped.",
+    "authorizationUncertain": [
+      "GET /rest/api/2/customFields",
+      "GET /rest/api/2/universal_avatar/type/{type}/owner/{owningObjectId}",
+      "GET /rest/api/2/worklog/deleted",
+      "GET /rest/api/2/worklog/updated"
+    ],
+    "authorizationUncertainNote": "Reported separately by the 8.22 inventory; not counted in the 109 because only HTTP 200 is documented and the resources are system-shaped."
+  },
+  "currentCodeOverlap": {
+    "libraryGapEndpointsCoveredByCurrentCode": [
+      "GET /rest/api/2/issue/{issueIdOrKey}/votes",
+      "GET /rest/api/2/issue/{issueIdOrKey}/worklog/{id}",
+      "GET /rest/api/2/statuscategory",
+      "GET /rest/api/2/filter/favourite"
+    ],
+    "netNewGapCountIfCurrentAdaptersRetained": 37,
+    "totalEndpointsStillNeedingWorkIfCurrentAdaptersRetained": 42,
+    "note": "The manualGapList is the library-only set (41 gaps + 5 partials). Four library gaps are already covered by current code; retaining those adapters leaves 37 new gaps plus the 5 partial repairs, i.e. 42 endpoints that still need work."
+  },
+  "verification": {
+    "jsonParses": true,
+    "entryCount": 109,
+    "uniqueMethodPathPairs": 109,
+    "officialDocsPathPresence": "109/109 inventory paths found as GET or POST headings in the 8.22.0 page after normalization",
+    "installedSourceByteIdenticalToExtracted": true,
+    "exactCountsAsserted": true
+  },
+  "manualGapCount": 46,
+  "manualGapList": [
+    "GET /rest/api/2/issue/{issueIdOrKey}/votes",
+    "GET /rest/api/2/issue/{issueIdOrKey}/worklog/{id}",
+    "GET /rest/api/2/statuscategory",
+    "GET /rest/api/2/filter/favourite",
+    "GET /rest/api/2/issue/{issueIdOrKey}/comment",
+    "GET /rest/api/2/issue/{issueIdOrKey}/worklog",
+    "GET /rest/api/2/project/{projectIdOrKey}/role/{id}",
+    "GET /rest/api/2/status/{idOrName}",
+    "GET /rest/api/2/user/properties",
+    "GET /rest/api/2/issuetype/{id}",
+    "GET /rest/api/2/issuetype/{id}/alternatives",
+    "GET /rest/api/2/issuetype/{issueTypeId}/properties",
+    "GET /rest/api/2/issuetype/{issueTypeId}/properties/{propertyKey}",
+    "GET /rest/api/2/project/{projectIdOrKey}/avatars",
+    "GET /rest/api/2/project/{projectIdOrKey}/properties",
+    "GET /rest/api/2/project/{projectIdOrKey}/properties/{propertyKey}",
+    "GET /rest/api/2/project/type/{projectTypeKey}",
+    "GET /rest/api/2/project/type/{projectTypeKey}/accessible",
+    "GET /rest/api/2/projectCategory/{id}",
+    "GET /rest/api/2/projects/picker",
+    "GET /rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties",
+    "GET /rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties/{propertyKey}",
+    "GET /rest/api/2/filter/{id}/columns",
+    "GET /rest/api/2/filter/{id}/permission/{permissionId}",
+    "GET /rest/api/2/filter/defaultShareScope",
+    "GET /rest/api/2/groupuserpicker",
+    "GET /rest/api/2/issue/picker",
+    "GET /rest/api/2/issue/{issueIdOrKey}/subtask",
+    "GET /rest/api/2/mypreferences",
+    "GET /rest/api/2/password/policy",
+    "GET /rest/api/2/securitylevel/{id}",
+    "GET /rest/auth/1/session",
+    "GET /rest/api/2/statuscategory/{idOrKey}",
+    "GET /rest/api/2/terminology/entries",
+    "GET /rest/api/2/terminology/entries/{originalName}",
+    "GET /rest/api/2/user/a11y/personal-settings",
+    "GET /rest/api/2/user/assignable/multiProjectSearch",
+    "GET /rest/api/2/user/avatars",
+    "GET /rest/api/2/user/columns",
+    "GET /rest/api/2/user/picker",
+    "GET /rest/api/2/version/remotelink",
+    "GET /rest/api/2/version/{id}/relatedIssueCounts",
+    "GET /rest/api/2/version/{id}/unresolvedIssueCount",
+    "GET /rest/api/2/version/{versionId}/remotelink",
+    "GET /rest/api/2/version/{versionId}/remotelink/{globalId}",
+    "POST /rest/api/2/search"
+  ],
+  "limitations": [
+    "Counts are endpoint-level coverage of JiraServer 5.0.5, not current AtlaWire code coverage.",
+    "Four authorization-uncertain GETs are excluded, as in the source inventory; if they are non-admin the denominator becomes 113.",
+    "The inherited low-level AtlassianRestAPI.get()/post() methods are not counted as endpoint coverage; the migration plan uses them only for confirmed manual gaps.",
+    "The 109-entry inventory contains one documented-but-inconsistent GET (subtask/move). Excluding it gives 108 required read-only operations: 62 covered, 5 partial, 41 gap, 0 uncertain.",
+    "No live calls, credentials, tests or production edits were used for this artifact.",
+    "The extracted source and the installed 5.0.5 jira_server.py are byte-identical per cmp."
+  ]
+}

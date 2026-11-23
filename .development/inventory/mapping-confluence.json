@@ -1,0 +1,449 @@
+{
+  "schema": "atlawire-readonly-rest-mapping/v1",
+  "generated": "2026-11-22",
+  "scope": {
+    "product": "Confluence Server",
+    "target_version": "6.6",
+    "operation_class": "standard non-administrative read-only REST",
+    "denominator": 36,
+    "request_class_counts": {
+      "GET": 35,
+      "POST": 1
+    },
+    "post_note": "The single POST is the documented semantic conversion POST /rest/contentbody/convert/{to}; it is read-only in intent and is the only non-GET in the inventory."
+  },
+  "inventory_provenance": {
+    "primary_source": "C:/TMP/opencode/att-docs/conf6.6.0.html",
+    "source_identity": "Cached Confluence 6.6 REST API reference HTML (324 KB); operation rows carry 6.6-era anchors such as content-getContent and contentbody/convert/{to}-convert.",
+    "extraction": "Regex over <h4 ...><code>{METHOD}&nbsp;{path}</code> produced 69 unique operation rows: GET=39, POST=15, PUT=7, DELETE=8.",
+    "exclusion_rule": "Excluded the 4 audit GETs (GET /rest/audit, /rest/audit/export, /rest/audit/retention, /rest/audit/since), all 15 POST, 7 PUT and 8 DELETE rows, because they are administrative and/or mutating. Remaining: 35 GET + the semantic conversion POST = 36.",
+    "path_normalization": "The 6.6 HTML lists paths as /rest/{resource}. Its own example URIs use /rest/api/{resource}; the real Server base is /rest/api. Every 'path' below is the actual /rest/api/... route.",
+    "inventory_stability": "Count 35 GET + 1 POST reproduces the previously established 36-request inventory exactly; no operation was added or dropped."
+  },
+  "library_provenance": {
+    "package": "atlassian-python-api",
+    "version": "5.0.5",
+    "installed_path": "C:/Users/magic/AppData/Roaming/Python/Python315/site-packages/atlassian",
+    "reviewed_source": "C:/TMP/opencode/atlassian-api-review/extracted/atlassian",
+    "integrity": "sha256 of extracted confluence/server/__init__.py and confluence_base.py equals the installed copies (df09b7f5... and 8122028d...); VERSION=5.0.5 in both.",
+    "entry_classes": "ConfluenceServer aliases atlassian.confluence.server.Server (confluence/__init__.py:13, confluence/server/confluence_server.py). Method mapping below uses Server.",
+    "url_construction": "Server.__init__ sets cloud=False, api_root='rest/api', api_version='latest' when not supplied (server/__init__.py:75-88). Server._server_api_path prefixes rest/api for a first path segment in _api_resources {content, contentbody, group, longtask, search, space, user, ...} and omits the version unless api_version was passed explicitly (server/__init__.py:45-62, 90-104, 115-145)."
+  },
+  "status_rubric": {
+    "covered": "A public Server method constructs exactly the documented route and performs the documented read (pagination/subset caveats recorded separately).",
+    "partial": "A public method exists but constructs a different route, exposes only a subset of documented representations/parameters, or cannot reach the documented operation.",
+    "gap": "No public Server (or inherited ConfluenceBase) method constructs the documented route.",
+    "uncertain": "Source inspection cannot decide the mapping."
+  },
+  "counts": {
+    "total": 36,
+    "covered": 24,
+    "partial": 5,
+    "gap": 7,
+    "uncertain": 0
+  },
+  "operations": [
+    {
+      "id": "content-list",
+      "method": "GET",
+      "path": "/rest/api/content",
+      "library_method": "Server.get_content_by_type; Server.get_page_by_title; Server.get_all_pages_from_space; Server.get_all_pages_from_space_raw",
+      "status": "covered",
+      "evidence": "server/__init__.py:166-168 self.get('content', params={'type': content_type}); :198-200 spaceKey/title; :206-212 _get_paged('content', params={'spaceKey', 'type'}); :713-764 explicit url='rest/api/content'. Prefixing at :90-104 yields /rest/api/content.",
+      "gaps": null
+    },
+    {
+      "id": "content-get",
+      "method": "GET",
+      "path": "/rest/api/content/{id}",
+      "library_method": "Server.get_content; Server.get_content_by_id; Server.get_page_by_id",
+      "status": "covered",
+      "evidence": "server/__init__.py:162-164 self.get(f'content/{content_id}'); :202-204 same route with expand; :513-538 get_page_by_id builds f'content/{page_id}' with expand/status/version. All resolve to /rest/api/content/{id}.",
+      "gaps": null
+    },
+    {
+      "id": "content-history",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/history",
+      "library_method": "Server.history; Server.get_content_history",
+      "status": "covered",
+      "evidence": "server/__init__.py:1844-1859 url=f'content/{page_id}/history' via self.get; :1861-1862 get_content_history delegates to history.",
+      "gaps": null
+    },
+    {
+      "id": "content-macro-hash",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/history/{version}/macro/hash/{hash}",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "No 'macro/hash' construction anywhere in confluence/server/__init__.py or confluence_base.py; grep 'macro' returns only docstring/HTML-escaping text (:2040, :2313).",
+      "gaps": ["No public method for GET macro body by hash."]
+    },
+    {
+      "id": "content-macro-id",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/history/{version}/macro/id/{macroId}",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "No 'macro/id' construction in the Server client; the macro methods present are only conversion/update helpers unrelated to this read route.",
+      "gaps": ["No public method for GET macro body by macro id."]
+    },
+    {
+      "id": "content-search",
+      "method": "GET",
+      "path": "/rest/api/content/search",
+      "library_method": "Server.search_content",
+      "status": "covered",
+      "evidence": "server/__init__.py:3098-3100 self.get('content/search', params={'cql': query}). Resolves to /rest/api/content/search.",
+      "gaps": ["Returns one response page; no iter_all helper for this route (callers can pass start/limit via **kwargs)."]
+    },
+    {
+      "id": "content-child",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child",
+      "library_method": "Server.get_content_children",
+      "status": "covered",
+      "evidence": "server/__init__.py:182-184 self.get(f'content/{content_id}/child'). Resolves to /rest/api/content/{id}/child.",
+      "gaps": ["Single response page; no internal pagination loop."]
+    },
+    {
+      "id": "content-child-type",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child/{type}",
+      "library_method": "Server.get_page_child_by_type",
+      "status": "covered",
+      "evidence": "server/__init__.py:361-397 builds url=f'rest/api/content/{page_id}/child/{type}' and uses _get_paged when start/limit are absent; returns .results list otherwise.",
+      "gaps": ["Non-advanced mode returns a list, not the raw envelope; callers needing total/links must use advanced_mode."]
+    },
+    {
+      "id": "content-child-comment",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child/comment",
+      "library_method": "Server.get_page_comments; Server.get_comments",
+      "status": "covered",
+      "evidence": "server/__init__.py:644-696 url=f'rest/api/content/{content_id}/child/comment' with expand/parentVersion/location/depth; :3077-3079 get_comments same route.",
+      "gaps": ["Single response page (start/limit parameters are exposed, no automatic pagination)."]
+    },
+    {
+      "id": "content-child-attachment",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/child/attachment",
+      "library_method": "Server.get_attachments_from_content; Server.get_attachments",
+      "status": "covered",
+      "evidence": "server/__init__.py:1742-1787 url=f'rest/api/content/{page_id}/child/attachment' with start/limit/expand/filename/mediaType; :3039-3041 same route.",
+      "gaps": ["Single response page only."]
+    },
+    {
+      "id": "content-descendant",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/descendant",
+      "library_method": "Server.get_content_descendants",
+      "status": "covered",
+      "evidence": "server/__init__.py:186-188 self.get(f'content/{content_id}/descendant'). Resolves to /rest/api/content/{id}/descendant.",
+      "gaps": ["Single response page; no internal pagination."]
+    },
+    {
+      "id": "content-descendant-type",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/descendant/{type}",
+      "library_method": "Server.get_descendant_pages",
+      "status": "partial",
+      "evidence": "server/__init__.py:190-192 hardcodes f'content/{content_id}/descendant/page'. The 6.6 operation (content/{id}/descendant-descendantsOfType) states the only supported descendant type is comment for non-comment content; thus the one implemented subtype is outside the documented 6.6 contract and the documented comment subtype is unreachable.",
+      "gaps": ["No {type} parameter; /descendant/page is not the 6.6-documented subtype."]
+    },
+    {
+      "id": "content-label",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/label",
+      "library_method": "Server.get_page_labels; Server.get_content_labels",
+      "status": "covered",
+      "evidence": "server/__init__.py:608-642 url=f'rest/api/content/{page_id}/label' with prefix/start/limit; :3018-3020 get_content_labels same route.",
+      "gaps": null
+    },
+    {
+      "id": "content-property-list",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/property",
+      "library_method": "Server.get_page_properties; Server.get_content_properties",
+      "status": "covered",
+      "evidence": "server/__init__.py:2550-2581 list(self._get_paged(f'content/{page_id}/property', params={'limit'})) follows pagination; :3107-3109 get_content_properties same route.",
+      "gaps": null
+    },
+    {
+      "id": "content-property-key",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/property/{key}",
+      "library_method": "Server.get_page_property; Server.get_content_property",
+      "status": "covered",
+      "evidence": "server/__init__.py:2526-2548 self.get(f'content/{page_id}/property/{page_property_key}'); :3111-3113 same route.",
+      "gaps": null
+    },
+    {
+      "id": "content-restriction-byoperation",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/restriction/byOperation",
+      "library_method": "Server.get_all_restrictions_for_content",
+      "status": "covered",
+      "evidence": "server/__init__.py:812-819 url=f'rest/api/content/{content_id}/restriction/byOperation' + self.get.",
+      "gaps": null
+    },
+    {
+      "id": "content-restriction-operation",
+      "method": "GET",
+      "path": "/rest/api/content/{id}/restriction/byOperation/{operationKey}",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "Only the byOperation route is constructed at server/__init__.py:818; grep for 'forOperation' returns nothing. No method appends an operationKey.",
+      "gaps": ["No public method for restrictions of a single operation."]
+    },
+    {
+      "id": "group-list",
+      "method": "GET",
+      "path": "/rest/api/group",
+      "library_method": "Server.get_groups; Server.get_all_groups",
+      "status": "covered",
+      "evidence": "server/__init__.py:2964-2966 self.get('group'); :3515-3536 explicit 'rest/api/group?limit=...&start=...' and returns .results.",
+      "gaps": null
+    },
+    {
+      "id": "group-get",
+      "method": "GET",
+      "path": "/rest/api/group/{groupName}",
+      "library_method": "Server.get_group",
+      "status": "partial",
+      "evidence": "server/__init__.py:2968-2970 get_group issues self.get('group', params={'groupname': group_name}) => GET /rest/api/group?groupname=..., but 6.6 documents GET /rest/group/{groupName} and the collection operation lists only expand/start/limit (no groupname). Route and param contract do not match.",
+      "gaps": ["Constructs the collection route with an undocumented query parameter instead of /group/{groupName}; may return a paginated list or ignore the filter."]
+    },
+    {
+      "id": "group-members",
+      "method": "GET",
+      "path": "/rest/api/group/{groupName}/member",
+      "library_method": "Server.get_group_members; Server.get_all_members",
+      "status": "covered",
+      "evidence": "server/__init__.py:2972-3011 self.get(f'group/{group_name}/member') with start/limit/expand; :3574-3598 get_all_members loops to completion.",
+      "gaps": null
+    },
+    {
+      "id": "longtask-list",
+      "method": "GET",
+      "path": "/rest/api/longtask",
+      "library_method": "Server.check_long_tasks_result",
+      "status": "covered",
+      "evidence": "server/__init__.py:3994-4010 self.get('rest/api/longtask', params={expand,start,limit}).",
+      "gaps": null
+    },
+    {
+      "id": "longtask-get",
+      "method": "GET",
+      "path": "/rest/api/longtask/{id}",
+      "library_method": "Server.check_long_task_result",
+      "status": "covered",
+      "evidence": "server/__init__.py:4012-4035 self.get(f'rest/api/longtask/{task_id}', params=...) with 404 handling.",
+      "gaps": null
+    },
+    {
+      "id": "search",
+      "method": "GET",
+      "path": "/rest/api/search",
+      "library_method": "Server.cql; Server.iter_cql; Server.cql_all",
+      "status": "covered",
+      "evidence": "server/__init__.py:3601-3647 self.get('rest/api/search', params={cql,start,limit,expand,includeArchivedSpaces,excerpt}); :3649-3673 iter_cql follows pagination; :3675-3680 cql_all materializes.",
+      "gaps": null
+    },
+    {
+      "id": "space-list",
+      "method": "GET",
+      "path": "/rest/api/space",
+      "library_method": "Server.get_all_spaces; Server.get_spaces",
+      "status": "covered",
+      "evidence": "server/__init__.py:2605-2638 url='rest/api/space' with start/limit/expand/type/status/label; :2701-2703 get_spaces self.get('space').",
+      "gaps": ["Both return one response page; no iterator for all spaces."]
+    },
+    {
+      "id": "space-get",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}",
+      "library_method": "Server.get_space",
+      "status": "covered",
+      "evidence": "server/__init__.py:2705-2730 url=f'space/{space_key}' with expand/params and 404 mapping.",
+      "gaps": null
+    },
+    {
+      "id": "space-content",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/content",
+      "library_method": "Server.get_space_content",
+      "status": "partial",
+      "evidence": "server/__init__.py:2796-2839 builds params={'spaceKey': space_key, depth,start,limit,type,expand} and calls self.get('content'), i.e. GET /rest/api/content?spaceKey=..., not the documented GET /rest/api/space/{spaceKey}/content. Semantics overlap but the documented route is not constructed.",
+      "gaps": ["Dedicated /space/{spaceKey}/content route absent; depth/space route contract unverified. Semantic substitution uses GET /rest/api/content."]
+    },
+    {
+      "id": "space-content-type",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/content/{type}",
+      "library_method": "Server.get_space_content",
+      "status": "partial",
+      "evidence": "server/__init__.py:2825-2830 adds type=<content_type> to the same GET /rest/api/content?spaceKey=... call; the documented /space/{spaceKey}/content/{type} route is never constructed.",
+      "gaps": ["Dedicated typed space-content route absent; only the equivalent type filter on /rest/api/content is available."]
+    },
+    {
+      "id": "space-property-list",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/property",
+      "library_method": "Server.get_space_property",
+      "status": "covered",
+      "evidence": "server/__init__.py:2775-2794 url=f'rest/api/space/{space_key}/property' + self.get with expand.",
+      "gaps": ["Single response page (start/limit not exposed as parameters; could be passed through request params only by bypassing the method signature)."]
+    },
+    {
+      "id": "space-property-key",
+      "method": "GET",
+      "path": "/rest/api/space/{spaceKey}/property/{key}",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "server/__init__.py:2775-2794 is the only space-property GET and has no key argument; grep 'space/{...}/property' finds only the collection URL at :2776. No by-key read method exists.",
+      "gaps": ["No public method for a single space property by key."]
+    },
+    {
+      "id": "user-get",
+      "method": "GET",
+      "path": "/rest/api/user",
+      "library_method": "Server.get_users; Server.get_user; Server.get_user_by_key; Server.get_user_details_by_username; Server.get_user_details_by_userkey; Server.get_user_details_by_accountid",
+      "status": "covered",
+      "evidence": "server/__init__.py:2947-2961 self.get('user') variants with username/key; :2854-2883 and :2916-2945 explicit 'rest/api/user' with username/key. GET /rest/user documents key/username/expand.",
+      "gaps": ["get_users forwards arbitrary kwargs as request kwargs; callers must pass params={'start':...} for pagination."]
+    },
+    {
+      "id": "user-anonymous",
+      "method": "GET",
+      "path": "/rest/api/user/anonymous",
+      "library_method": "Server.anonymous",
+      "status": "covered",
+      "evidence": "server/__init__.py:3976-3992 self.get('rest/api/user/anonymous') with 403 mapping.",
+      "gaps": null
+    },
+    {
+      "id": "user-current",
+      "method": "GET",
+      "path": "/rest/api/user/current",
+      "library_method": "Server.get_current_user",
+      "status": "covered",
+      "evidence": "server/__init__.py:2955-2957 self.get('user/current'); _server_api_path resolves to /rest/api/user/current.",
+      "gaps": null
+    },
+    {
+      "id": "user-memberof",
+      "method": "GET",
+      "path": "/rest/api/user/memberof",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "No 'memberof' string anywhere in the package (grep over atlassian/confluence, confluence_base.py). The only user-group read is group/{group}/member, which is the inverse query.",
+      "gaps": ["No public method for groups of a user."]
+    },
+    {
+      "id": "user-watch-content",
+      "method": "GET",
+      "path": "/rest/api/user/watch/content/{contentId}",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "No 'watch' route construction in confluence/server/__init__.py (grep 'watch' only matches unrelated docstrings such as :2084 and the calendar status route :4093).",
+      "gaps": ["No public method for is-watching-content."]
+    },
+    {
+      "id": "user-watch-space",
+      "method": "GET",
+      "path": "/rest/api/user/watch/space/{spaceKey}",
+      "library_method": null,
+      "status": "gap",
+      "evidence": "No 'user/watch' or 'watch/space' construction in the Server client.",
+      "gaps": ["No public method for is-watching-space."]
+    },
+    {
+      "id": "contentbody-convert",
+      "method": "POST",
+      "path": "/rest/api/contentbody/convert/{to}",
+      "library_method": "Server.convert_storage_to_view; Server.convert_wiki_to_storage",
+      "status": "partial",
+      "evidence": "server/__init__.py:2407-2414 posts to rest/api/contentbody/convert/view with representation='storage'; :2398-2405 posts to .../convert/storage with representation='wiki'. The 6.6 operation documents storage -> {view, export_view, styled_view, editor} and editor -> storage; it does not list wiki as a 6.6 source, and no method exposes the {to} destination or export_view/styled_view/editor.",
+      "gaps": ["Only storage->view is contract-aligned; editor->storage, storage->export_view and storage->styled_view are absent; wiki->storage is undocumented for 6.6 and unverified."]
+    }
+  ],
+  "manual_gap_list": [
+    {
+      "id": "content-macro-hash",
+      "route": "GET /rest/api/content/{id}/history/{version}/macro/hash/{hash}",
+      "why_manual": "No route construction exists; a new adapter method is required."
+    },
+    {
+      "id": "content-macro-id",
+      "route": "GET /rest/api/content/{id}/history/{version}/macro/id/{macroId}",
+      "why_manual": "No route construction exists; a new adapter method is required."
+    },
+    {
+      "id": "content-restriction-operation",
+      "route": "GET /rest/api/content/{id}/restriction/byOperation/{operationKey}",
+      "why_manual": "Only the byOperation aggregate route exists; a key-scoped read must be added."
+    },
+    {
+      "id": "space-property-key",
+      "route": "GET /rest/api/space/{spaceKey}/property/{key}",
+      "why_manual": "Only the collection read exists; a by-key read must be added."
+    },
+    {
+      "id": "user-memberof",
+      "route": "GET /rest/api/user/memberof",
+      "why_manual": "No method exists; the inverse group-member read cannot substitute for the documented user-group listing."
+    },
+    {
+      "id": "user-watch-content",
+      "route": "GET /rest/api/user/watch/content/{contentId}",
+      "why_manual": "No watch route anywhere in the Server client."
+    },
+    {
+      "id": "user-watch-space",
+      "route": "GET /rest/api/user/watch/space/{spaceKey}",
+      "why_manual": "No watch route anywhere in the Server client."
+    }
+  ],
+  "manual_partial_list": [
+    {
+      "id": "content-descendant-type",
+      "route": "GET /rest/api/content/{id}/descendant/{type}",
+      "why_manual": "Method hardcodes descendant/page; 6.6 supports only comment descendants, so a type parameter/contract correction is required."
+    },
+    {
+      "id": "group-get",
+      "route": "GET /rest/api/group/{groupName}",
+      "why_manual": "Method uses GET /rest/api/group?groupname=; the single-group route must be constructed instead."
+    },
+    {
+      "id": "space-content",
+      "route": "GET /rest/api/space/{spaceKey}/content",
+      "why_manual": "Method substitutes GET /rest/api/content?spaceKey=; exact route (and its depth/pagination contract) is not implemented."
+    },
+    {
+      "id": "space-content-type",
+      "route": "GET /rest/api/space/{spaceKey}/content/{type}",
+      "why_manual": "Only a type filter on /rest/api/content is implemented; the typed space route is absent."
+    },
+    {
+      "id": "contentbody-convert",
+      "route": "POST /rest/api/contentbody/convert/{to}",
+      "why_manual": "Only storage->view is contract-aligned; editor->storage and export_view/styled_view destinations need fixed adapters or a {to}-validated method."
+    }
+  ],
+  "manual_work_summary": {
+    "hard_gap_operations": 7,
+    "partial_operations_requiring_correction": 5,
+    "total_operations_not_fully_covered": 12,
+    "fully_covered": 24
+  },
+  "limitations": [
+    "Source-only mapping: no HTTP request was executed and no credentials were used; runtime behavior of every route is unverified.",
+    "The library defaults to api_version='latest' and omits the version segment, which matches Confluence 6.6's /rest/api base. Passing api_version explicitly makes _server_api_path append it (e.g. /rest/api/1/content), which is not a Confluence Server 6.6 route; the mapping assumes default construction.",
+    "_get_paged branches on api_version == 1; with the Server default ('latest') it takes the V2/cursor branch but still follows _links.next, so V1 offset pagination works incidentally. This is an untested coupling.",
+    "Pagination caveats are stated per operation; 'covered' does not imply an iterator for every paginated collection.",
+    "The 6.6 HTML is a cached snapshot; no live documentation or target-server probe was available in this read-only task.",
+    "Administrative and mutating rows (4 admin audit GETs, 15 POST, 7 PUT, 8 DELETE) were excluded by rule, not implemented or assessed."
+  ]
+}
