@@ -93,7 +93,31 @@ class AtlaWireError(Exception):
         self.path = path
 
 
-class _NoRedirectSession(requests.Session):
+class _PolicySession(requests.Session):
+    """Session that applies one optional default timeout to every request.
+
+    A bare [requests.Session][requests.Session] has no default timeout, so a
+    caller that omits ``timeout`` waits forever. The factory records one policy
+    value instead of rewriting every call site. ``send`` is the single funnel
+    [requests.Session.request][requests.Session.request] and the redirect
+    machinery pass through, so the default also covers followed redirects.
+    """
+
+    default_timeout: float | None
+
+    def __init__(self, *, default_timeout: float | None = None) -> None:
+        super().__init__()
+        self.default_timeout = default_timeout
+
+    def send(
+        self, request: requests.PreparedRequest, **kwargs: object
+    ) -> requests.Response:
+        if kwargs.get("timeout") is None and self.default_timeout is not None:
+            kwargs["timeout"] = self.default_timeout
+        return super().send(request, **kwargs)
+
+
+class _NoRedirectSession(_PolicySession):
     """Session specialisation that never resolves or drains a redirect.
 
     Requests 2.34.2 asks [Session.resolve_redirects][requests.Session.resolve_redirects]
@@ -126,20 +150,75 @@ def normalize_base_url(value: str, *, allow_http_loopback: bool) -> str:
     return value.rstrip("/")
 
 
+def new_session(
+    base_url: str,
+    token: str | None = None,
+    *,
+    follow_redirects: bool = False,
+    trust_env: bool = False,
+    timeout: float | None = None,
+    allow_http_loopback: bool = False,
+) -> requests.Session:
+    """Create a transport session for ``base_url``; the caller must close it.
+
+    The defaults keep the strict AtlaWire transport policy: a 3xx response is
+    returned as-is and its ``Location`` is never requested, while ambient
+    proxy/netrc/CA settings are ignored. ``follow_redirects=True`` restores the
+    standard [requests.Session][requests.Session] behavior of following
+    ``Location``, and ``trust_env=True`` lets the ambient settings apply; a
+    transport adapter that must preserve the earlier ``requests`` behavior
+    needs both switches.
+
+    ``base_url`` is validated with the same rules as the product functions, so
+    a bad destination fails before a session exists. The session itself does
+    not bind a base URL because requests has no such concept: the caller still
+    passes absolute URLs. ``timeout`` becomes the default for requests that do
+    not pass their own.
+
+    ``token`` is checked with the exact grammar of
+    [bearer_session][atlawire.http.bearer_session] and sent as a Bearer header.
+    ``token=None`` yields a session without an Authorization header, which lets
+    a transport that selects Bearer/Basic itself (or relies on netrc) avoid a
+    private class; an empty or malformed token is still rejected.
+    """
+    normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    return _new_session(
+        token,
+        follow_redirects=follow_redirects,
+        trust_env=trust_env,
+        timeout=timeout,
+    )
+
+
 def bearer_session(token: str) -> requests.Session:
     """Create a session that the caller must close.
 
     The session sends the bearer token, ignores ambient netrc/proxy settings,
     and never follows or pre-reads a redirect response.
     """
-    if not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
+    return _new_session(token, follow_redirects=False, trust_env=False, timeout=None)
+
+
+def _new_session(
+    token: str | None,
+    *,
+    follow_redirects: bool,
+    trust_env: bool,
+    timeout: float | None,
+) -> requests.Session:
+    """Build the one session policy shared by the public factories."""
+    if token is not None and not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
         raise AtlaWireError("Missing or invalid bearer token.", category="credentials")
-    session = _NoRedirectSession()
-    # Do not let ambient netrc settings replace the explicit Authorization header.
-    session.trust_env = False
-    session.headers.update(
-        {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    session: _PolicySession = (
+        _PolicySession(default_timeout=timeout)
+        if follow_redirects
+        else _NoRedirectSession(default_timeout=timeout)
     )
+    session.trust_env = trust_env
+    headers = {"Accept": "application/json"}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    session.headers.update(headers)
     return session
 
 
