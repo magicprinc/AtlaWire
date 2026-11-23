@@ -34,8 +34,63 @@ type _JsonValue = (
 )
 
 
+# The fixed set of values allowed in AtlaWireError.category. A category names
+# what a caller can act on; it is never inferred from the message text.
+ERROR_CATEGORIES = frozenset(
+    {
+        "transport",
+        "http",
+        "validation",
+        "unknown_operation",
+        "credentials",
+        "upstream",
+    }
+)
+
+
 class AtlaWireError(Exception):
-    """An operation failed with a message safe for CLI diagnostics."""
+    """An operation failed with a message safe for CLI diagnostics.
+
+    The message never contains a response body or excerpt, a credential, or raw
+    caller arguments. A caller that needs to branch reads the optional
+    structured attributes instead of parsing text:
+
+    * ``product`` -- ``"jira"``, ``"confluence"`` or ``"bitbucket"`` when known.
+    * ``operation`` -- the registry operation ID when known.
+    * ``category`` -- one value of ``ERROR_CATEGORIES``, or ``None`` when the
+      failure could not be classified without guessing.
+    * ``http_status`` -- the real status of an arrived response; never inferred.
+    * ``method`` / ``path`` -- the failed request when known.
+
+    Every attribute defaults to ``None`` so a plain ``AtlaWireError(message)``
+    stays a normal exception and existing raise sites keep working unchanged.
+    """
+
+    product: str | None
+    operation: str | None
+    category: str | None
+    http_status: int | None
+    method: str | None
+    path: str | None
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        product: str | None = None,
+        operation: str | None = None,
+        category: str | None = None,
+        http_status: int | None = None,
+        method: str | None = None,
+        path: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.product = product
+        self.operation = operation
+        self.category = category
+        self.http_status = http_status
+        self.method = method
+        self.path = path
 
 
 class _NoRedirectSession(requests.Session):
@@ -56,18 +111,18 @@ class _NoRedirectSession(requests.Session):
 def normalize_base_url(value: str, *, allow_http_loopback: bool) -> str:
     invalid = "Use an HTTPS base URL without credentials, query, or fragment."
     if re.search(r"[\s\\\x00-\x1f\x7f?#]", value):
-        raise AtlaWireError(invalid)
+        raise AtlaWireError(invalid, category="validation")
     try:
         url = urlsplit(value)
         host, port = url.hostname, url.port
     except ValueError:
-        raise AtlaWireError(invalid) from None
+        raise AtlaWireError(invalid, category="validation") from None
     if not host or "@" in url.netloc or "%" in url.netloc or port == 0:
-        raise AtlaWireError(invalid)
+        raise AtlaWireError(invalid, category="validation")
     if url.scheme != "https" and not (
         allow_http_loopback and url.scheme == "http" and host in {"127.0.0.1", "::1"}
     ):
-        raise AtlaWireError(invalid)
+        raise AtlaWireError(invalid, category="validation")
     return value.rstrip("/")
 
 
@@ -78,7 +133,7 @@ def bearer_session(token: str) -> requests.Session:
     and never follows or pre-reads a redirect response.
     """
     if not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
-        raise AtlaWireError("Missing or invalid bearer token.")
+        raise AtlaWireError("Missing or invalid bearer token.", category="credentials")
     session = _NoRedirectSession()
     # Do not let ambient netrc settings replace the explicit Authorization header.
     session.trust_env = False
@@ -99,22 +154,49 @@ def _finite_float(value: str) -> float:
     return number
 
 
-def _check_status(status: int) -> None:
+def _check_status(
+    status: int, *, method: str | None = None
+) -> None:
     """Apply the shared read-only status policy without echoing the request.
 
     A 206 carries only part of a representation, so it is never a successful
     complete read for this client. Every caller consumes a complete document.
     """
     if 300 <= status < 400:
-        raise AtlaWireError(f"HTTP {status}: redirect refused; check the base URL.")
+        raise AtlaWireError(
+            f"HTTP {status}: redirect refused; check the base URL.",
+            category="http",
+            http_status=status,
+            method=method,
+        )
     if status == 401:
-        raise AtlaWireError("HTTP 401: authentication rejected.")
+        raise AtlaWireError(
+            "HTTP 401: authentication rejected.",
+            category="http",
+            http_status=status,
+            method=method,
+        )
     if status == 403:
-        raise AtlaWireError("HTTP 403: access denied.")
+        raise AtlaWireError(
+            "HTTP 403: access denied.",
+            category="http",
+            http_status=status,
+            method=method,
+        )
     if status == 206:
-        raise AtlaWireError(_PARTIAL_RESPONSE_MESSAGE)
+        raise AtlaWireError(
+            _PARTIAL_RESPONSE_MESSAGE,
+            category="http",
+            http_status=status,
+            method=method,
+        )
     if not 200 <= status < 300:
-        raise AtlaWireError(f"HTTP {status}: request failed.")
+        raise AtlaWireError(
+            f"HTTP {status}: request failed.",
+            category="http",
+            http_status=status,
+            method=method,
+        )
 
 
 def _bearer_token(session: object) -> str | None:
@@ -304,16 +386,26 @@ def _get_json(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code)
+            _check_status(
+                response.status_code, method="GET"
+            )
             if allow_no_content and response.status_code == 204:
                 return _NO_CONTENT
             payload = _read_limited(
                 response, limit=_JSON_LIMIT, message=_JSON_LIMIT_MESSAGE
             )
     except requests.Timeout:
-        raise AtlaWireError("Request timed out.") from None
+        raise AtlaWireError(
+            "Request timed out.",
+            category="transport",
+            method="GET",
+        ) from None
     except requests.RequestException:
-        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
+        raise AtlaWireError(
+            _TRANSPORT_MESSAGE,
+            category="transport",
+            method="GET",
+        ) from None
     decoded = _decode_json(payload, token=_bearer_token(session))
     return decoded
 
@@ -336,7 +428,7 @@ def _decode_json(payload: bytes, *, token: str | None = None) -> object:
     try:
         text = payload.decode("utf-8")
     except UnicodeDecodeError:
-        raise AtlaWireError("Expected UTF-8 JSON.") from None
+        raise AtlaWireError("Expected UTF-8 JSON.", category="upstream") from None
     text = text.removeprefix("\ufeff")
     try:
         decoded = json.loads(
@@ -345,7 +437,7 @@ def _decode_json(payload: bytes, *, token: str | None = None) -> object:
             parse_float=_finite_float,
         )
     except ValueError, RecursionError:
-        raise AtlaWireError("Expected a valid JSON response.") from None
+        raise AtlaWireError("Expected a valid JSON response.", category="upstream") from None
     if token is not None:
         _reject_json_echo(text, decoded, token)
     return decoded
@@ -373,17 +465,27 @@ def post_json_object(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code)
+            _check_status(
+                response.status_code, method="POST"
+            )
             data = _read_limited(
                 response, limit=_JSON_LIMIT, message=_JSON_LIMIT_MESSAGE
             )
     except requests.Timeout:
-        raise AtlaWireError("Request timed out.") from None
+        raise AtlaWireError(
+            "Request timed out.",
+            category="transport",
+            method="POST",
+        ) from None
     except requests.RequestException:
-        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
+        raise AtlaWireError(
+            _TRANSPORT_MESSAGE,
+            category="transport",
+            method="POST",
+        ) from None
     decoded = _decode_json(data, token=_bearer_token(session))
     if not isinstance(decoded, dict):
-        raise AtlaWireError("Expected a JSON object.")
+        raise AtlaWireError("Expected a JSON object.", category="upstream")
     return decoded
 
 
@@ -399,7 +501,7 @@ def get_json_object(
 ) -> dict[str, object]:
     data = _get_json(session, url, params=params)
     if not isinstance(data, dict):
-        raise AtlaWireError("Expected a JSON object.")
+        raise AtlaWireError("Expected a JSON object.", category="upstream")
     return data
 
 
@@ -417,7 +519,7 @@ def get_json_object_allow_no_content(
     if data is _NO_CONTENT:
         return None
     if not isinstance(data, dict):
-        raise AtlaWireError("Expected a JSON object.")
+        raise AtlaWireError("Expected a JSON object.", category="upstream")
     return data
 
 
@@ -426,7 +528,7 @@ def get_json_array(
 ) -> list[object]:
     data = _get_json(session, url, params=params)
     if not isinstance(data, list):
-        raise AtlaWireError("Expected a JSON array.")
+        raise AtlaWireError("Expected a JSON array.", category="upstream")
     return data
 
 
@@ -451,15 +553,25 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code)
+            _check_status(
+                response.status_code, method="GET"
+            )
             _check_text_type(response.headers.get("Content-Type"))
             payload = _read_limited(
                 response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
             )
     except requests.Timeout:
-        raise AtlaWireError("Request timed out.") from None
+        raise AtlaWireError(
+            "Request timed out.",
+            category="transport",
+            method="GET",
+        ) from None
     except requests.RequestException:
-        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
+        raise AtlaWireError(
+            _TRANSPORT_MESSAGE,
+            category="transport",
+            method="GET",
+        ) from None
     text = _decode_utf8_text(payload)
     _reject_token_echo(session, text)
     return text
@@ -468,7 +580,7 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
 def _check_text_type(value: str | None) -> None:
     media_type = (value or "").split(";", 1)[0].strip().lower()
     if media_type != "text/plain":
-        raise AtlaWireError("Expected a text/plain response.")
+        raise AtlaWireError("Expected a text/plain response.", category="upstream")
 
 
 def _read_limited(response: requests.Response, *, limit: int, message: str) -> bytes:
@@ -484,7 +596,7 @@ def _read_limited(response: requests.Response, *, limit: int, message: str) -> b
     for chunk in response.iter_content(chunk_size=_CHUNK_SIZE):
         total += len(chunk)
         if total > limit:
-            raise AtlaWireError(message)
+            raise AtlaWireError(message, category="upstream")
         chunks.append(chunk)
     return b"".join(chunks)
 
@@ -537,14 +649,16 @@ def _read_gzip_limited(
             try:
                 decoded = decoder.decompress(data, limit - total + 1)
             except zlib.error:
-                raise AtlaWireError(_TRANSPORT_MESSAGE) from None
+                raise AtlaWireError(
+                    _TRANSPORT_MESSAGE, category="transport"
+                ) from None
             total += len(decoded)
             if total > limit:
-                raise AtlaWireError(message)
+                raise AtlaWireError(message, category="upstream")
             parts.append(decoded)
             data = decoder.unused_data if decoder.eof else decoder.unconsumed_tail
     if not decoder.eof:
-        raise AtlaWireError(_TRANSPORT_MESSAGE)
+        raise AtlaWireError(_TRANSPORT_MESSAGE, category="transport")
     return b"".join(parts)
 
 
@@ -567,16 +681,18 @@ def _iter_encoded(response: requests.Response) -> Iterator[bytes]:
     except AtlaWireError:
         raise
     except requests.RequestException, urllib3.exceptions.HTTPError, OSError:
-        raise AtlaWireError(_TRANSPORT_MESSAGE) from None
+        raise AtlaWireError(_TRANSPORT_MESSAGE, category="transport") from None
 
 
 def _decode_utf8_text(payload: bytes) -> str:
     try:
         text = payload.decode("utf-8")
     except UnicodeDecodeError:
-        raise AtlaWireError("Expected UTF-8 text.") from None
+        raise AtlaWireError("Expected UTF-8 text.", category="upstream") from None
     if not _has_safe_text_chars(text):
-        raise AtlaWireError("Unsafe control character in the text response.")
+        raise AtlaWireError(
+            "Unsafe control character in the text response.", category="upstream"
+        )
     return text
 
 

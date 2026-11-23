@@ -462,10 +462,12 @@ def collect_pr_review(
     context_lines = _require_context(context)
     identifier = _require_pr_id(pr_id)
     repository = _require_repo(repo)
-    bearer = _require_token(token)
+    bearer = _require_token(token, product="bitbucket")
     jira_config = _jira_config(jira_base_url, jira_token, loopback)
     if not isinstance(base_url, str):
-        raise AtlaWireError(_BASE_URL_INVALID)
+        raise AtlaWireError(
+            _BASE_URL_INVALID, category="validation", product="bitbucket"
+        )
     base = normalize_base_url(base_url, allow_http_loopback=loopback)
 
     info, commits, changed, diff_value = _core_reads(
@@ -805,9 +807,11 @@ def _require_repo(value: object) -> str:
     return value
 
 
-def _require_token(value: object) -> str:
+def _require_token(value: object, *, product: str) -> str:
     if not isinstance(value, str) or not value or _TOKEN.fullmatch(value) is None:
-        raise AtlaWireError(_TOKEN_INVALID)
+        raise AtlaWireError(
+            _TOKEN_INVALID, category="credentials", product=product
+        )
     return value
 
 
@@ -817,11 +821,15 @@ def _jira_config(
     if base_url is None and token is None:
         return None
     if base_url is None or token is None:
-        raise AtlaWireError(_JIRA_PAIR_INVALID)
+        raise AtlaWireError(
+            _JIRA_PAIR_INVALID, category="credentials", product="jira"
+        )
     if not isinstance(base_url, str) or not isinstance(token, str):
-        raise AtlaWireError(_JIRA_PAIR_INVALID)
+        raise AtlaWireError(
+            _JIRA_PAIR_INVALID, category="credentials", product="jira"
+        )
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    return _JiraConfig(base_url=base, token=_require_token(token))
+    return _JiraConfig(base_url=base, token=_require_token(token, product="jira"))
 
 
 def _text(value: object) -> str:

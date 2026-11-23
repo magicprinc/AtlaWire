@@ -301,15 +301,31 @@ def _target(
     them.
     """
     if not isinstance(value, ProductTarget):
-        raise _InvalidTarget(f"Expected an explicit {product} base URL and token pair.")
+        raise _InvalidTarget(
+            f"Expected an explicit {product} base URL and token pair.",
+            category="credentials",
+            product=product,
+        )
     if not isinstance(value.base_url, str) or not isinstance(value.token, str):
-        raise _InvalidTarget(f"The {product} base URL or token is invalid.")
+        raise _InvalidTarget(
+            f"The {product} base URL or token is invalid.",
+            category="credentials",
+            product=product,
+        )
     try:
         base_url = normalize_base_url(
             value.base_url, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError:
-        raise _InvalidTarget(f"The {product} base URL is invalid.") from None
+        raise _InvalidTarget(
+            f"The {product} base URL is invalid.",
+            category="validation",
+            product=product,
+        ) from None
     if _BEARER_TOKEN.fullmatch(value.token) is None:
-        raise _InvalidTarget(f"The {product} token is missing or invalid.")
+        raise _InvalidTarget(
+            f"The {product} token is missing or invalid.",
+            category="credentials",
+            product=product,
+        )
     return ProductTarget(base_url=base_url, token=value.token)

@@ -80,6 +80,15 @@ _CLIENTS = {
     "confluence": ConfluenceServer,
     "bitbucket": Bitbucket,
 }
+
+
+def _supported_product(product: str) -> str | None:
+    """Return the product name only when it is one of the fixed supported names.
+
+    Pre-request errors run before ``_raw_client_for`` validates the product, so
+    an arbitrary caller string must not reach structured metadata.
+    """
+    return product if isinstance(product, str) and product in _CLIENTS else None
 # Each semantic-read POST belongs to exactly one product. A Confluence
 # conversion sent through the Jira client is a product mismatch, not a read.
 _READ_ONLY_POSTS: dict[str, tuple[frozenset[str], tuple[str, ...]]] = {
@@ -105,6 +114,23 @@ _BACKOFF_SECONDS = (1.0, 2.0)
 _LOCAL_WRITE_MESSAGE = "Could not write the destination file."
 
 
+_TRANSPORT_CLASSIFICATIONS = frozenset({"transport", "timeout"})
+_UPSTREAM_CLASSIFICATIONS = frozenset({"invalid_response", "response_too_large"})
+# Only categories that describe an arrived response keep the real status.
+_STATUS_CATEGORIES = frozenset({"http", "upstream"})
+
+
+def _error_category(status: int | None, classification: str) -> str | None:
+    """Map the adapter classification to the public category without guessing."""
+    if classification in _TRANSPORT_CLASSIFICATIONS:
+        return "transport"
+    if classification in _UPSTREAM_CLASSIFICATIONS:
+        return "upstream"
+    if status is not None:
+        return "http"
+    return None
+
+
 class SdkRequestError(AtlaWireError):
     """One failed library request with the original response preserved."""
 
@@ -119,8 +145,22 @@ class SdkRequestError(AtlaWireError):
         content_type: str | None,
         path: str,
         body_truncated: bool = False,
+        product: str | None = None,
+        method: str | None = None,
     ) -> None:
-        super().__init__(message)
+        category = _error_category(status, classification)
+        super().__init__(
+            message,
+            product=product,
+            category=category,
+            http_status=(
+                status
+                if category in _STATUS_CATEGORIES and status is not None
+                else None
+            ),
+            method=method,
+            path=path,
+        )
         self.status = status
         self.code = code
         self.classification = classification
@@ -223,7 +263,7 @@ def _raw_client_for(
     """
     client_class = _CLIENTS.get(product)
     if client_class is None:
-        raise AtlaWireError("Unknown Atlassian product.")
+        raise AtlaWireError("Unknown Atlassian product.", category="validation")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     session = _NoRedirectSession()
     # Ambient netrc/proxy/CA state must not alter the explicit transport.
@@ -404,14 +444,28 @@ def request_json_with_status(
     """
     normalized = method.upper()
     if normalized not in {"GET", "POST"}:
-        raise AtlaWireError("Only read-only GET and POST are supported.")
-    _validate_path(path)
+        raise AtlaWireError(
+            "Only read-only GET and POST are supported.",
+            category="validation",
+            product=_supported_product(product),
+        )
+    _validate_path(path, product=product)
     if normalized == "POST":
         _check_semantic_post(product, path)
     if normalized == "GET" and body is not None:
-        raise AtlaWireError("A GET request cannot carry a JSON body.")
+        raise AtlaWireError(
+            "A GET request cannot carry a JSON body.",
+            category="validation",
+            product=_supported_product(product),
+            method="GET",
+        )
     if normalized == "POST" and body is None:
-        raise AtlaWireError("A POST request requires a JSON body.")
+        raise AtlaWireError(
+            "A POST request requires a JSON body.",
+            category="validation",
+            product=_supported_product(product),
+            method="POST",
+        )
 
     client = _raw_client_for(
         product, base_url, token, allow_http_loopback=allow_http_loopback
@@ -421,9 +475,10 @@ def request_json_with_status(
             client,
             normalized,
             path,
-            params=_checked_params(params),
+            params=_checked_params(params, product=product),
             body=dict(body) if body is not None else None,
             retryable=normalized == "GET",
+            product=product,
         )
     finally:
         client.close()
@@ -457,19 +512,34 @@ def download_to_file(
     """
     target = Path(destination)
     if target.exists():
-        raise AtlaWireError("The destination already exists.")
-    _validate_path(path)
+        raise AtlaWireError(
+            "The destination already exists.",
+            category="validation",
+            product=_supported_product(product),
+        )
+    _validate_path(path, product=product)
     if max_bytes < 1:
-        raise AtlaWireError("The byte limit must be a positive integer.")
+        raise AtlaWireError(
+            "The byte limit must be a positive integer.",
+            category="validation",
+            product=_supported_product(product),
+        )
     client = _raw_client_for(
         product, base_url, token, allow_http_loopback=allow_http_loopback
     )
     temporary: Path | None = None
     try:
         temporary = _create_staging_file(target)
-        response = _send_binary(client, path, _checked_params(params))
+        response = _send_binary(
+            client,
+            path,
+            _checked_params(params, product=product),
+            product=product,
+        )
         try:
-            written, digest = _write_binary_body(response, temporary, path, max_bytes)
+            written, digest = _write_binary_body(
+                response, temporary, path, max_bytes, product=product
+            )
         finally:
             response.close()
         content_type = response.headers.get("Content-Type")
@@ -491,7 +561,11 @@ def _create_staging_file(target: Path) -> Path:
 
 
 def _send_binary(
-    client: AtlassianRestAPI, path: str, params: dict[str, str | int]
+    client: AtlassianRestAPI,
+    path: str,
+    params: dict[str, str | int],
+    *,
+    product: str,
 ) -> requests.Response:
     """Send one binary GET; a pre-response failure is one transport error."""
     try:
@@ -505,6 +579,8 @@ def _send_binary(
             body=None,
             content_type=None,
             path=path,
+            product=product,
+            method="GET",
         ) from None
 
 
@@ -513,6 +589,8 @@ def _write_binary_body(
     temporary: Path,
     path: str,
     max_bytes: int,
+    *,
+    product: str,
 ) -> tuple[int, str]:
     """Validate the status, then stream a complete bounded body to ``temporary``."""
     status = response.status_code
@@ -523,6 +601,8 @@ def _write_binary_body(
             code=f"http_{status}",
             classification="unexpected_redirect",
             message="The server returned a redirect; it was not followed.",
+            product=product,
+            method="GET",
         )
     if status >= 400:
         code, classification = _classify(status)
@@ -532,6 +612,8 @@ def _write_binary_body(
             code=code,
             classification=classification,
             message=f"HTTP {status}: request failed.",
+            product=product,
+            method="GET",
         )
     if status == 206:
         # A partial body is never the complete representation the
@@ -545,6 +627,8 @@ def _write_binary_body(
             body=None,
             content_type=response.headers.get("Content-Type"),
             path=path,
+            product=product,
+            method="GET",
         )
     if status != 200:
         # A file read promises the complete representation; only 200 is one.
@@ -556,6 +640,8 @@ def _write_binary_body(
             body=None,
             content_type=response.headers.get("Content-Type"),
             path=path,
+            product=product,
+            method="GET",
         )
     digest = hashlib.sha256()
     written = 0
@@ -575,6 +661,8 @@ def _write_binary_body(
                         content_type=response.headers.get("Content-Type"),
                         path=path,
                         body_truncated=True,
+                        product=product,
+                        method="GET",
                     )
                 digest.update(chunk)
                 stream.write(chunk)
@@ -589,6 +677,8 @@ def _write_binary_body(
             body=None,
             content_type=response.headers.get("Content-Type"),
             path=path,
+            product=product,
+            method="GET",
         ) from None
     except OSError:
         raise AtlaWireError(_LOCAL_WRITE_MESSAGE) from None
@@ -599,15 +689,25 @@ def _check_semantic_post(product: str, path: str) -> None:
     exact, prefixes = _READ_ONLY_POSTS.get(product, (frozenset(), ()))
     if path in exact or path.startswith(prefixes):
         return
-    raise AtlaWireError("This POST endpoint is not read-only for this product.")
+    raise AtlaWireError(
+        "This POST endpoint is not read-only for this product.",
+        category="validation",
+        product=_supported_product(product),
+    )
 
 
-def _checked_params(params: Mapping[str, object] | None) -> dict[str, str | int]:
+def _checked_params(
+    params: Mapping[str, object] | None, *, product: str
+) -> dict[str, str | int]:
     """Accept only scalar query values, so encoding is predictable."""
     checked: dict[str, str | int] = {}
     for name, value in (params or {}).items():
         if isinstance(value, bool) or not isinstance(value, (str, int)):
-            raise AtlaWireError("Query parameters must be strings or integers.")
+            raise AtlaWireError(
+                "Query parameters must be strings or integers.",
+                category="validation",
+                product=_supported_product(product),
+            )
         checked[name] = value
     return checked
 
@@ -620,6 +720,7 @@ def _attempt_loop(
     params: dict[str, str | int],
     body: dict[str, object] | None,
     retryable: bool,
+    product: str,
 ) -> tuple[int, object]:
     waited = 0.0
     for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -636,6 +737,8 @@ def _attempt_loop(
                     body=None,
                     content_type=None,
                     path=path,
+                    product=product,
+                    method=method,
                 ) from None
             if delay:
                 time.sleep(delay)
@@ -652,6 +755,8 @@ def _attempt_loop(
                 body=None,
                 content_type=None,
                 path=path,
+                product=product,
+                method=method,
             ) from None
         except requests.ConnectionError:
             delay = _pause(attempt, waited, None) if retryable else None
@@ -664,6 +769,8 @@ def _attempt_loop(
                     body=None,
                     content_type=None,
                     path=path,
+                    product=product,
+                    method=method,
                 ) from None
             if delay:
                 time.sleep(delay)
@@ -678,10 +785,20 @@ def _attempt_loop(
                 body=None,
                 content_type=None,
                 path=path,
+                product=product,
+                method=method,
             ) from None
 
         try:
-            return _consume(response, path, attempt, waited, retryable=retryable)
+            return _consume(
+                response,
+                path,
+                attempt,
+                waited,
+                retryable=retryable,
+                product=product,
+                method=method,
+            )
         except _Retry as retry:
             waited = retry.waited
             continue
@@ -696,6 +813,8 @@ def _attempt_loop(
         body=None,
         content_type=None,
         path=path,
+        product=product,
+        method=method,
     )
 
 
@@ -749,6 +868,8 @@ def _consume(
     waited: float,
     *,
     retryable: bool,
+    product: str,
+    method: str,
 ) -> tuple[int, object]:
     """Validate status and return the decoded JSON, or schedule one retry."""
     status = response.status_code
@@ -759,6 +880,8 @@ def _consume(
             code=f"http_{status}",
             classification="unexpected_redirect",
             message="The server returned a redirect; it was not followed.",
+            product=product,
+            method=method,
         )
     if status >= 400:
         delay = (
@@ -777,6 +900,8 @@ def _consume(
             code=code,
             classification=classification,
             message=f"HTTP {status}: request failed.",
+            product=product,
+            method=method,
         )
 
     if status == 206:
@@ -789,6 +914,8 @@ def _consume(
             body=None,
             content_type=response.headers.get("Content-Type"),
             path=path,
+            product=product,
+            method=method,
         )
 
     try:
@@ -805,6 +932,8 @@ def _consume(
             content_type=response.headers.get("Content-Type"),
             path=path,
             body_truncated=True,
+            product=product,
+            method=method,
         ) from None
     except requests.RequestException:
         # The status line arrived but the body did not: the request is neither a
@@ -818,6 +947,8 @@ def _consume(
             body=None,
             content_type=response.headers.get("Content-Type"),
             path=path,
+            product=product,
+            method=method,
         ) from None
     if not payload:
         if status == 204:
@@ -830,6 +961,8 @@ def _consume(
             code="invalid_response",
             classification="invalid_response",
             message="The response body is empty; JSON was expected.",
+            product=product,
+            method=method,
         )
     try:
         return status, _strict_json(payload.decode("utf-8"))
@@ -844,6 +977,8 @@ def _consume(
             content_type=response.headers.get("Content-Type"),
             path=path,
             body_truncated=truncated,
+            product=product,
+            method=method,
         ) from None
 
 
@@ -918,6 +1053,8 @@ def _error(
     code: str,
     classification: str,
     message: str,
+    product: str,
+    method: str,
 ) -> SdkRequestError:
     body, truncated = _read_excerpt(response)
     if not truncated and body is not None and body.endswith("\n"):
@@ -931,10 +1068,12 @@ def _error(
         content_type=response.headers.get("Content-Type"),
         path=path,
         body_truncated=truncated,
+        product=product,
+        method=method,
     )
 
 
-def _validate_path(path: str) -> None:
+def _validate_path(path: str, *, product: str | None = None) -> None:
     if (
         not isinstance(path, str)
         or not path.startswith("/rest/")
@@ -943,7 +1082,15 @@ def _validate_path(path: str) -> None:
         or _UNSAFE_PATH.search(path)
         or any(part in {".", ".."} for part in path.split("/"))
     ):
-        raise AtlaWireError("Expected a safe standard REST path.")
+        raise AtlaWireError(
+            "Expected a safe standard REST path.",
+            category="validation",
+            product=_supported_product(product),
+        )
     segments = [part for part in path.split("/") if part]
     if any(segment in _ADMIN_SEGMENTS for segment in segments):
-        raise AtlaWireError("Administrative REST paths are not supported.")
+        raise AtlaWireError(
+            "Administrative REST paths are not supported.",
+            category="validation",
+            product=_supported_product(product),
+        )

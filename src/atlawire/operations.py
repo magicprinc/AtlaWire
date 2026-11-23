@@ -75,8 +75,21 @@ class OperationShapeError(AtlaWireError):
     the received HTTP status when it is known.
     """
 
-    def __init__(self, message: str, *, status: int | None = None) -> None:
-        super().__init__(message)
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: int | None = None,
+        product: str | None = None,
+        operation: str | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            product=product,
+            operation=operation,
+            category="upstream",
+            http_status=status,
+        )
         self.status = status
 
 
@@ -1795,6 +1808,14 @@ def canonical_operations() -> list[dict[str, object]]:
         for operation_id in sorted(CANONICAL_IDS)
     ]
 
+def _invalid(message: str, operation: _Operation) -> AtlaWireError:
+    """Build one argument-validation error for a known registered operation."""
+    return AtlaWireError(
+        message,
+        product=operation.product,
+        operation=operation.id,
+        category="validation",
+    )
 
 def _validated_body(
     operation: _Operation, body: Mapping[str, object] | None
@@ -1802,18 +1823,18 @@ def _validated_body(
     """Accept only declared body fields with their documented types."""
     if operation.method == "GET":
         if body is not None:
-            raise AtlaWireError(_INVALID_BODY)
+            raise _invalid(_INVALID_BODY, operation)
         return None
     if not isinstance(body, Mapping) or not operation.body:
-        raise AtlaWireError(_INVALID_BODY)
+        raise _invalid(_INVALID_BODY, operation)
     declared = {field.name: field for field in operation.body}
     if any(not isinstance(name, str) or name not in declared for name in body):
-        raise AtlaWireError(_INVALID_BODY)
+        raise _invalid(_INVALID_BODY, operation)
     validated: dict[str, object] = {}
     for field in operation.body:
         if field.name not in body:
             if field.required:
-                raise AtlaWireError(_INVALID_BODY)
+                raise _invalid(_INVALID_BODY, operation)
             continue
         value = body[field.name]
         if field.kind == "integer":
@@ -1823,7 +1844,7 @@ def _validated_body(
                 or (field.maximum is not None and value > field.maximum)
                 or value < 0
             ):
-                raise AtlaWireError(_INVALID_BODY)
+                raise _invalid(_INVALID_BODY, operation)
         elif field.kind == "integer_array":
             if (
                 not isinstance(value, list)
@@ -1834,14 +1855,14 @@ def _validated_body(
                     for item in value
                 )
             ):
-                raise AtlaWireError(_INVALID_BODY)
+                raise _invalid(_INVALID_BODY, operation)
         elif (
             not isinstance(value, str)
             or not value
             or (field.allowed and value not in field.allowed)
             or any(ord(char) < 0x20 and ord(char) not in (9, 10, 13) for char in value)
         ):
-            raise AtlaWireError(_INVALID_BODY)
+            raise _invalid(_INVALID_BODY, operation)
         validated[field.name] = value
     return validated
 
@@ -1863,13 +1884,18 @@ def read_binary(
     """
     operation = _operation(operation_id)
     if operation.kind != "binary":
-        raise AtlaWireError(_NOT_BINARY)
+        raise _invalid(_NOT_BINARY, operation)
     if not isinstance(destination, str) or not destination:
-        raise AtlaWireError(_BINARY_TARGET)
+        raise _invalid(_BINARY_TARGET, operation)
     path = _render_path(operation, arguments)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if not isinstance(token, str):
-        raise AtlaWireError(_INVALID_TOKEN)
+        raise AtlaWireError(
+            _INVALID_TOKEN,
+            category="credentials",
+            product=operation.product,
+            operation=operation.id,
+        )
     content_type, written, digest = sdk_download_to_file(
         operation.product,
         base,
@@ -1921,7 +1947,12 @@ def read_operation(
     payload_body = _validated_body(operation, body)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if not isinstance(token, str):
-        raise AtlaWireError(_INVALID_TOKEN)
+        raise AtlaWireError(
+            _INVALID_TOKEN,
+            category="credentials",
+            product=operation.product,
+            operation=operation.id,
+        )
     url = f"{base}{path}"
     if use_library:
         status, payload = sdk_request_json_with_status(
@@ -1936,7 +1967,7 @@ def read_operation(
         )
         no_content = status == 204 and payload is None
     elif operation.method != "GET":
-        raise AtlaWireError("This operation requires the library transport.")
+        raise _invalid("This operation requires the library transport.", operation)
     else:
         status = None
         with bearer_session(token) as session:
@@ -1962,26 +1993,30 @@ def read_operation(
 
 def _operation(operation_id: object) -> _Operation:
     if not isinstance(operation_id, str):
-        raise AtlaWireError(_UNKNOWN_ID)
+        raise AtlaWireError(_UNKNOWN_ID, category="unknown_operation")
     operation = _OPERATIONS.get(operation_id)
     if operation is None:
-        raise AtlaWireError(_UNKNOWN_ID)
+        raise AtlaWireError(_UNKNOWN_ID, category="unknown_operation")
     return operation
 
 
 def _render_path(operation: _Operation, arguments: Mapping[str, object]) -> str:
     if not isinstance(arguments, Mapping):
-        raise AtlaWireError(_INVALID_ARGUMENTS)
+        raise _invalid(_INVALID_ARGUMENTS, operation)
     expected = tuple(argument.name for argument in operation.arguments)
     try:
         provided = set(arguments)
     except TypeError:
-        raise AtlaWireError(_INVALID_ARGUMENTS) from None
+        raise _invalid(_INVALID_ARGUMENTS, operation) from None
     if provided != set(expected):
         names = ", ".join(expected)
-        raise AtlaWireError(f"Expected exactly the registered path arguments: {names}.")
+        raise _invalid(
+            f"Expected exactly the registered path arguments: {names}.", operation
+        )
     rendered = {
-        argument.name: _segment(argument, arguments[argument.name])
+        argument.name: _segment(
+            argument, arguments[argument.name], operation=operation
+        )
         for argument in operation.arguments
     }
     # Replace explicitly: a repository-relative placeholder is written as
@@ -1995,9 +2030,11 @@ def _render_path(operation: _Operation, arguments: Mapping[str, object]) -> str:
     return path
 
 
-def _segment(argument: _Argument, value: object) -> str:
+def _segment(
+    argument: _Argument, value: object, *, operation: _Operation
+) -> str:
     if not isinstance(value, str) or not value or len(value) > _MAX_ARGUMENT_LENGTH:
-        raise AtlaWireError(_INVALID_VALUE.format(name=argument.name))
+        raise _invalid(_INVALID_VALUE.format(name=argument.name), operation)
     parts = value.split("/") if argument.allow_slash else [value]
     if any(
         not part
@@ -2006,7 +2043,7 @@ def _segment(argument: _Argument, value: object) -> str:
         or argument.pattern.fullmatch(part) is None
         for part in parts
     ):
-        raise AtlaWireError(_INVALID_VALUE.format(name=argument.name))
+        raise _invalid(_INVALID_VALUE.format(name=argument.name), operation)
     # The accepted patterns already contain only unreserved ASCII, so this is
     # a single, idempotent encoding step rather than a second escape of an
     # already-encoded or escaped value.
@@ -2023,48 +2060,52 @@ def _validated_query(
         try:
             supplied = dict(query)
         except TypeError:
-            raise AtlaWireError(_INVALID_QUERY) from None
+            raise _invalid(_INVALID_QUERY, operation) from None
     else:
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     fields = {field.name: field for field in operation.query}
     if any(not isinstance(name, str) or name not in fields for name in supplied):
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     present = set(supplied)
     if sum(name in present for name in operation.query_at_most_one) > 1:
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     if (
         operation.query_at_least_one
         and sum(name in present for name in operation.query_at_least_one) < 1
     ):
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     if (
         operation.query_exactly_one
         and sum(name in present for name in operation.query_exactly_one) != 1
     ):
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     validated: dict[str, str | int] = {}
     for field in operation.query:
         if field.name not in supplied:
             if field.required:
-                raise AtlaWireError(_INVALID_QUERY)
+                raise _invalid(_INVALID_QUERY, operation)
             continue
         if any(name not in present for name in field.depends_on):
-            raise AtlaWireError(_INVALID_QUERY)
-        validated[field.name] = _query_value(field, supplied[field.name])
+            raise _invalid(_INVALID_QUERY, operation)
+        validated[field.name] = _query_value(
+            field, supplied[field.name], operation=operation
+        )
     return validated
 
 
-def _query_value(field: _QueryField, value: object) -> str | int:
+def _query_value(
+    field: _QueryField, value: object, *, operation: _Operation
+) -> str | int:
     if field.kind == "integer":
         if not isinstance(value, int) or isinstance(value, bool):
-            raise AtlaWireError(_INVALID_QUERY)
+            raise _invalid(_INVALID_QUERY, operation)
         if field.minimum is not None and value < field.minimum:
-            raise AtlaWireError(_INVALID_QUERY)
+            raise _invalid(_INVALID_QUERY, operation)
         if field.maximum is not None and value > field.maximum:
-            raise AtlaWireError(_INVALID_QUERY)
+            raise _invalid(_INVALID_QUERY, operation)
         return value
     if not isinstance(value, str):
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     unsafe = _UNSAFE_QUERY_CONTROL if field.allow_spaces else _UNSAFE_QUERY_TEXT
     if (
         not value
@@ -2073,9 +2114,9 @@ def _query_value(field: _QueryField, value: object) -> str | int:
         or any(0xD800 <= ord(char) <= 0xDFFF for char in value)
         or (field.allowed and value not in field.allowed)
     ):
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     if field.from_repo and not _valid_from_repo(value):
-        raise AtlaWireError(_INVALID_QUERY)
+        raise _invalid(_INVALID_QUERY, operation)
     return value
 
 
@@ -2146,5 +2187,8 @@ def _matches(value: object, kind: FieldKind) -> bool:
 
 def _shape_error(operation: _Operation, status: int | None = None) -> AtlaWireError:
     return OperationShapeError(
-        _BAD_SHAPE.format(operation_id=operation.id), status=status
+        _BAD_SHAPE.format(operation_id=operation.id),
+        status=status,
+        product=operation.product,
+        operation=operation.id,
     )

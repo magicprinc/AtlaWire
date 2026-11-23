@@ -271,7 +271,7 @@ def _validated_targets(
                 f"The {product} base URL and token are not configured or invalid."
             )
             continue
-        targets[slot] = _target(product, value, allow_http_loopback)
+        targets[slot] = _target(slot, product, value, allow_http_loopback)
     return targets, errors
 
 
@@ -741,18 +741,36 @@ def _check_limit(limit: object) -> None:
         )
 
 
-def _target(product: str, value: object, allow_http_loopback: bool) -> ProductTarget:
+def _target(
+    slot: str, product: str, value: object, allow_http_loopback: bool
+) -> ProductTarget:
     """Validate one explicit pair and normalize only its destination."""
     if not isinstance(value, ProductTarget):
-        raise AtlaWireError(f"Expected an explicit {product} base URL and token pair.")
+        raise AtlaWireError(
+            f"Expected an explicit {product} base URL and token pair.",
+            category="credentials",
+            product=slot,
+        )
     if not isinstance(value.base_url, str) or not isinstance(value.token, str):
-        raise AtlaWireError(f"The {product} base URL or token is invalid.")
+        raise AtlaWireError(
+            f"The {product} base URL or token is invalid.",
+            category="credentials",
+            product=slot,
+        )
     try:
         base_url = normalize_base_url(
             value.base_url, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError:
-        raise AtlaWireError(f"The {product} base URL is invalid.") from None
+        raise AtlaWireError(
+            f"The {product} base URL is invalid.",
+            category="validation",
+            product=slot,
+        ) from None
     if _BEARER_TOKEN.fullmatch(value.token) is None:
-        raise AtlaWireError(f"The {product} token is missing or invalid.")
+        raise AtlaWireError(
+            f"The {product} token is missing or invalid.",
+            category="credentials",
+            product=slot,
+        )
     return ProductTarget(base_url=base_url, token=value.token)

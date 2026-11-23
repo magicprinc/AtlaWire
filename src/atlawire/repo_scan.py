@@ -170,7 +170,11 @@ def _validate_token(token: object) -> None:
     exposes no projects or repositories.
     """
     if not isinstance(token, str):
-        raise AtlaWireError("Missing or invalid bearer token.")
+        raise AtlaWireError(
+            "Missing or invalid bearer token.",
+            category="credentials",
+            product="bitbucket",
+        )
     bearer_session(token).close()
 
 

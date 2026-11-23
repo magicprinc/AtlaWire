@@ -46,15 +46,25 @@ def _read_document(product: str) -> dict[str, object]:
         with credentials_path().open("rb") as stream:
             raw = stream.read(_MAX_FILE_SIZE + 1)
     except OSError:
-        raise AtlaWireError(_UNAVAILABLE.format(product=product)) from None
+        raise AtlaWireError(
+            _UNAVAILABLE.format(product=product),
+            category="credentials",
+            product=product,
+        ) from None
     if len(raw) > _MAX_FILE_SIZE:
-        raise AtlaWireError(_INVALID.format(product=product))
+        raise AtlaWireError(
+            _INVALID.format(product=product), category="credentials", product=product
+        )
     try:
         document = json.loads(raw.decode("utf-8"))
     except ValueError, RecursionError:
-        raise AtlaWireError(_INVALID.format(product=product)) from None
+        raise AtlaWireError(
+            _INVALID.format(product=product), category="credentials", product=product
+        ) from None
     if not isinstance(document, dict):
-        raise AtlaWireError(_INVALID.format(product=product))
+        raise AtlaWireError(
+            _INVALID.format(product=product), category="credentials", product=product
+        )
     return document
 
 
@@ -77,11 +87,15 @@ def load_saved_credentials(
         or not isinstance(token, str)
         or _BEARER_TOKEN.fullmatch(token) is None
     ):
-        raise AtlaWireError(_INVALID.format(product=product))
+        raise AtlaWireError(
+            _INVALID.format(product=product), category="credentials", product=product
+        )
     try:
         base_url = normalize_base_url(url, allow_http_loopback=allow_http_loopback)
     except AtlaWireError:
-        raise AtlaWireError(_INVALID.format(product=product)) from None
+        raise AtlaWireError(
+            _INVALID.format(product=product), category="credentials", product=product
+        ) from None
     return SavedCredentials(base_url=base_url, token=token)
 
 
@@ -106,5 +120,9 @@ def resolve_saved_credentials(
         supplied_base_url, allow_http_loopback=allow_http_loopback
     )
     if supplied != credentials.base_url:
-        raise AtlaWireError(_MISMATCH.format(product=product))
+        raise AtlaWireError(
+            _MISMATCH.format(product=product),
+            category="credentials",
+            product=product,
+        )
     return credentials
