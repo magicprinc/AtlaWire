@@ -34,6 +34,9 @@ _COMMENT_DEPTH_ALL = "all"
 _LABEL_PATH = "/rest/api/content/{id}/label"
 _SEARCH_PATH = "/rest/api/search"
 _SPACE_PATH = "/rest/api/space"
+_SPACE_CONTENT_PATH = "/rest/api/space/{key}/content"
+_SPACE_CONTENT_TYPE_PATH = "/rest/api/space/{key}/content/{type}"
+_CONTENT_EXPAND = "version"
 # One explicit page; the server may cap the limit. Defaults follow Confluence
 # 6.6.0 documentation.
 PAGE_START_MIN = 0
@@ -52,6 +55,11 @@ CHILD_LIMIT_MIN = 0
 CHILD_LIMIT_MAX = 1000
 CHILD_LIMIT_DEFAULT = 100
 _PAGE_ID = re.compile(r"[1-9][0-9]*")
+# A Confluence space key is one path segment; reject dots-only and separators.
+_SPACE_KEY = re.compile(r"[A-Za-z0-9_~][A-Za-z0-9_.~\-]*")
+# The registry documents the content type as one path segment as well, but the
+# public argument additionally rejects dots-only values that could traverse it.
+_CONTENT_TYPE = re.compile(r"[A-Za-z0-9_~][A-Za-z0-9_.~\-]*")
 _RAW_ASCII_CONTROL = re.compile(r"[\x00-\x20\x7f]")
 _UNSAFE_WEBUI = re.compile(
     r"[\x00-\x20\x7f-\x9f\\\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]"
@@ -67,6 +75,9 @@ _INVALID_PAGE_VERSION = "Expected the requested Confluence page version."
 _INVALID_VERSION_ARGUMENT = "The page version must be a positive integer."
 _INVALID_RESULT = "Invalid Confluence content metadata in search results."
 _INVALID_SPACE = "Invalid Confluence space metadata in spaces results."
+_INVALID_SPACE_KEY = "Expected a Confluence space key."
+_INVALID_CONTENT_TYPE = "Expected a Confluence content type."
+_INVALID_SPACE_CONTENT = "Invalid Confluence space content metadata."
 _INVALID_CHILD = "Invalid Confluence child page metadata in children results."
 
 
@@ -86,6 +97,33 @@ class SpaceRow(TypedDict):
     key: str | None
     name: str | None
     type: str | None
+
+
+class SpaceDetail(TypedDict):
+    """A single space projected for the text and JSON output."""
+
+    key: str | None
+    name: str | None
+    type: str | None
+    status: str | None
+    url: str | None
+
+
+class ContentSummary(TypedDict):
+    """One content row projected from the space content listing."""
+
+    id: str | int | None
+    title: str | None
+    type: str | None
+    version: int | None
+    url: str | None
+
+
+class ContentRows(TypedDict):
+    """A bounded content listing plus the server's own truncation signal."""
+
+    rows: list[ContentSummary]
+    truncated: bool
 
 
 class ChildRow(TypedDict):
@@ -396,6 +434,63 @@ def list_spaces(
             empty_hint="retry the request.",
             project=_space_row,
             identity=_space_identity,
+        )
+
+
+def get_space(
+    base_url: str,
+    space_key: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> SpaceDetail:
+    """Return one space projected to its five stable fields.
+
+    Only the configured instance's space endpoint is read. A response whose
+    ``key`` differs from the requested key is rejected instead of being
+    returned as that space, and unknown server fields are dropped. ``status``
+    and ``url`` stay optional because the server returns them only when it has
+    them.
+    """
+    requested_key = _validated_space_key(space_key)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    with bearer_session(token) as session:
+        value = get_json_object(
+            session,
+            f"{base}{_SPACE_PATH}/{requested_key}",
+            params={},
+        )
+    return _space_detail(value, requested_key)
+
+
+def list_space_content(
+    base_url: str,
+    space_key: str,
+    *,
+    token: str,
+    type: str | None = None,
+    limit: int = SPACE_LIMIT_DEFAULT,
+    allow_http_loopback: bool = False,
+) -> ContentRows:
+    """Return up to ``limit`` space content rows in a deterministic order.
+
+    Without ``type`` the server's per-type map is read and the rows are ordered
+    pages, blog posts, then other types alphabetically; with ``type`` only that
+    endpoint is read. A full budget is never an error: ``truncated`` reports
+    whether the server still had rows. Only the configured instance is read.
+    A zero limit returns an empty listing and creates no session.
+    """
+    requested_key = _validated_space_key(space_key)
+    requested_type = None if type is None else _validated_content_type(type)
+    _validate_limit(limit, SPACE_LIMIT_MIN, SPACE_LIMIT_MAX)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    if limit == 0:
+        return ContentRows(rows=[], truncated=False)
+    with bearer_session(token) as session:
+        if requested_type is None:
+            return _read_all_space_content(session, base, requested_key, limit)
+        return _read_typed_space_content(
+            session, base, requested_key, requested_type, limit
         )
 
 
@@ -758,6 +853,19 @@ def _check_next(link: object, count: int, offset: int, label: str) -> None:
         raise AtlaWireError(f"Invalid Confluence {label} continuation offset.")
 
 
+def _page_has_next(page: dict[str, object]) -> bool:
+    """Return whether the server reported a next page through ``_links.next``."""
+    links = page.get("_links")
+    return isinstance(links, dict) and "next" in links
+
+
+def _page_has_more(page: dict[str, object], total: int | None, count: int) -> bool:
+    """Return whether rows remain after the ``count`` already collected."""
+    if total is not None:
+        return total > count
+    return _page_has_next(page)
+
+
 def _valid_utf8(value: str) -> bool:
     """Return whether output text can be encoded as strict UTF-8."""
     try:
@@ -765,6 +873,13 @@ def _valid_utf8(value: str) -> bool:
     except UnicodeEncodeError:
         return False
     return True
+
+
+def _validated_space_key(value: str) -> str:
+    """Return one path-safe space key, or raise before any request is made."""
+    if not isinstance(value, str) or _SPACE_KEY.fullmatch(value) is None:
+        raise AtlaWireError(_INVALID_SPACE_KEY)
+    return value
 
 
 def _space_row(value: object) -> SpaceRow:
@@ -784,6 +899,221 @@ def _space_text(item: dict[str, object], key: str) -> str | None:
     if not isinstance(value, str) or not _valid_utf8(value):
         raise AtlaWireError(_INVALID_SPACE)
     return value
+
+
+def _space_detail(value: dict[str, object], requested_key: str) -> SpaceDetail:
+    """Project one space, rejecting a response for a different space key."""
+    key = _space_text(value, "key")
+    if key is None or key != requested_key:
+        raise AtlaWireError(_INVALID_SPACE)
+    return SpaceDetail(
+        key=key,
+        name=_space_text(value, "name"),
+        type=_space_text(value, "type"),
+        status=_space_text(value, "status"),
+        url=_webui(value),
+    )
+
+
+def _validated_content_type(value: str) -> str:
+    """Return one path-safe content type, or raise before any request is made."""
+    if not isinstance(value, str) or _CONTENT_TYPE.fullmatch(value) is None:
+        raise AtlaWireError(_INVALID_CONTENT_TYPE)
+    return value
+
+
+def _space_content_order(content_type: str) -> int:
+    """Order space content buckets deterministically: pages, blog posts, rest."""
+    if content_type == "page":
+        return 0
+    if content_type == "blogpost":
+        return 1
+    return 2
+
+
+def _summary_id(item: dict[str, object]) -> str | int | None:
+    """Read the optional content id of one space content row."""
+    value = item.get("id")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        raise AtlaWireError(_INVALID_RESULT)
+    if isinstance(value, str) and not _valid_utf8(value):
+        raise AtlaWireError(_INVALID_RESULT)
+    return value
+
+
+def _summary_version(item: dict[str, object]) -> int | None:
+    """Read the optional version number of one space content row."""
+    version = item.get("version")
+    if version is None:
+        return None
+    if not isinstance(version, dict):
+        raise AtlaWireError(_INVALID_RESULT)
+    number = version.get("number")
+    if number is None:
+        return None
+    if isinstance(number, bool) or not isinstance(number, int) or number < 0:
+        raise AtlaWireError(_INVALID_RESULT)
+    return number
+
+
+def _content_summary(value: object) -> ContentSummary:
+    """Project one space content row, dropping unknown server fields."""
+    if not isinstance(value, dict):
+        raise AtlaWireError(_INVALID_RESULT)
+    return ContentSummary(
+        id=_summary_id(value),
+        title=_string(value, "title"),
+        type=_string(value, "type"),
+        version=_summary_version(value),
+        url=_webui(value),
+    )
+
+
+def _content_summary_identity(result: dict[str, object]) -> str | None:
+    """Identify one content row by its nonempty id, else fall back to raw equality."""
+    stable_id = _stable_id(result.get("id"))
+    if stable_id is None:
+        return None
+    return "content-id:" + stable_id
+
+
+def _bucket_has_rows(
+    bucket: tuple[str, list[dict[str, object]], bool],
+) -> bool:
+    """Return whether a bucket still holds unread rows or a next page."""
+    return bool(bucket[1]) or bucket[2]
+
+
+def _space_content_buckets(
+    page: dict[str, object], requested: int
+) -> list[tuple[str, list[dict[str, object]], bool]]:
+    """Split the per-type space content map into validated ordered buckets."""
+    buckets: list[tuple[str, list[dict[str, object]], bool]] = []
+    for name, value in page.items():
+        if name.startswith("_"):
+            continue
+        if _CONTENT_TYPE.fullmatch(name) is None or not isinstance(value, dict):
+            raise AtlaWireError(_INVALID_SPACE_CONTENT)
+        results, total = _page(value, 0, requested, "space content")
+        links = value.get("_links")
+        if not isinstance(links, dict):
+            raise AtlaWireError(_INVALID_SPACE_CONTENT)
+        buckets.append((name, results, _page_has_more(value, total, len(results))))
+    buckets.sort(key=lambda bucket: (_space_content_order(bucket[0]), bucket[0]))
+    return buckets
+
+
+def _append_content_rows(
+    results: list[dict[str, object]],
+    rows: list[ContentSummary],
+    seen_ids: set[str],
+    seen_fallback_pages: set[bytes],
+) -> None:
+    """Validate one page of content rows for repeats, then append its projection."""
+    _check_repeated_rows(
+        results,
+        _content_summary_identity,
+        seen_ids,
+        seen_fallback_pages,
+        "space content",
+    )
+    rows.extend(_content_summary(result) for result in results)
+
+
+def _read_typed_space_content(
+    session: requests.Session,
+    base: str,
+    space_key: str,
+    content_type: str,
+    limit: int,
+) -> ContentRows:
+    """Read one content type by explicit offset and report truncation."""
+    rows: list[ContentSummary] = []
+    seen_ids: set[str] = set()
+    seen_fallback_pages: set[bytes] = set()
+    offset = 0
+    url = f"{base}{_SPACE_CONTENT_TYPE_PATH.format(key=space_key, type=content_type)}"
+    while len(rows) < limit:
+        requested = limit - len(rows)
+        page = get_json_object(
+            session,
+            url,
+            params={"expand": _CONTENT_EXPAND, "start": offset, "limit": requested},
+        )
+        results, total = _page(page, offset, requested, "space content")
+        if not results:
+            if total is not None and total > offset:
+                raise AtlaWireError(
+                    "Confluence space content returned an empty page before all matches."
+                )
+            return ContentRows(rows=rows, truncated=False)
+        _append_content_rows(results, rows, seen_ids, seen_fallback_pages)
+        offset += len(results)
+        if len(rows) >= limit:
+            return ContentRows(rows=rows, truncated=_page_has_more(page, total, offset))
+        if not _page_has_next(page):
+            return ContentRows(rows=rows, truncated=_page_has_more(page, total, offset))
+    return ContentRows(rows=rows, truncated=False)
+
+
+def _read_all_space_content(
+    session: requests.Session, base: str, space_key: str, limit: int
+) -> ContentRows:
+    """Read the per-type space content map and fill up to ``limit`` rows."""
+    page = get_json_object(
+        session,
+        f"{base}{_SPACE_CONTENT_PATH.format(key=space_key)}",
+        params={"expand": _CONTENT_EXPAND, "start": 0, "limit": limit},
+    )
+    buckets = _space_content_buckets(page, limit)
+    rows: list[ContentSummary] = []
+    seen_ids: set[str] = set()
+    seen_fallback_pages: set[bytes] = set()
+    for index, (content_type, first, has_next) in enumerate(buckets):
+        if len(rows) >= limit:
+            return ContentRows(
+                rows=rows,
+                truncated=any(_bucket_has_rows(bucket) for bucket in buckets[index:]),
+            )
+        take = first[: limit - len(rows)]
+        _append_content_rows(take, rows, seen_ids, seen_fallback_pages)
+        if len(take) < len(first):
+            return ContentRows(rows=rows, truncated=True)
+        if len(rows) >= limit:
+            return ContentRows(
+                rows=rows,
+                truncated=has_next
+                or any(_bucket_has_rows(bucket) for bucket in buckets[index + 1 :]),
+            )
+        offset = len(first)
+        while has_next:
+            requested = limit - len(rows)
+            if requested <= 0:
+                return ContentRows(rows=rows, truncated=True)
+            continuation = get_json_object(
+                session,
+                f"{base}{_SPACE_CONTENT_TYPE_PATH.format(key=space_key, type=content_type)}",
+                params={"expand": _CONTENT_EXPAND, "start": offset, "limit": requested},
+            )
+            results, total = _page(continuation, offset, requested, "space content")
+            if not results:
+                if total is not None and total > offset:
+                    raise AtlaWireError(
+                        "Confluence space content returned an empty page before all matches."
+                    )
+                has_next = False
+                break
+            _append_content_rows(results, rows, seen_ids, seen_fallback_pages)
+            offset += len(results)
+            if len(rows) >= limit:
+                return ContentRows(
+                    rows=rows,
+                    truncated=_page_has_more(continuation, total, offset),
+                )
+            has_next = _page_has_more(continuation, total, offset)
+    return ContentRows(rows=rows, truncated=False)
 
 
 def _child_row(value: object) -> ChildRow:
@@ -885,17 +1215,21 @@ def _space_key(content: dict[str, object], item: dict[str, object]) -> str | Non
         if not isinstance(key, str) or not _valid_utf8(key):
             raise AtlaWireError(_INVALID_RESULT)
         return key
-    expandable = item.get("_expandable")
-    if expandable is None:
-        return None
-    if not isinstance(expandable, dict):
-        raise AtlaWireError(_INVALID_RESULT)
-    path = expandable.get("space")
-    if path is None:
-        return None
-    if not isinstance(path, str) or not _valid_utf8(path):
-        raise AtlaWireError(_INVALID_RESULT)
-    return path.rsplit("/", 1)[-1] or None
+    # The live server exposes the space key only through the nested
+    # content._expandable.space; a flat search result carries its own
+    # _expandable. Therefore read both sources, otherwise cql/find rows lose it.
+    for expandable in (item.get("_expandable"), content.get("_expandable")):
+        if expandable is None:
+            continue
+        if not isinstance(expandable, dict):
+            raise AtlaWireError(_INVALID_RESULT)
+        path = expandable.get("space")
+        if path is None:
+            continue
+        if not isinstance(path, str) or not _valid_utf8(path):
+            raise AtlaWireError(_INVALID_RESULT)
+        return path.rsplit("/", 1)[-1] or None
+    return None
 
 
 def _content_url(content: dict[str, object], item: dict[str, object]) -> str | None:
