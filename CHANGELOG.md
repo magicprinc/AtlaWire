@@ -6,81 +6,105 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 intends to use [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once releases begin.
 No version has been released yet.
 
+Changes below cover the unreleased read-only surface: the initial command batch and the
+subsequent agent-facing batch (the latter spans commits `2960a43..a4efee1`).
+
 ## [Unreleased]
 
 ### Added
 
-- Initial repository design documentation: a pre-implementation `README.md` describing goals,
-  non-goals, security boundaries, and the quality/testing plan, plus a dependency-ordered
-  `TODO.md`.
-- `atlawire repos PROJECT` lists a Bitbucket project's repositories with `bbk`-compatible TSV
-  or JSON output. It follows server-provided pagination and fails without printing partial rows.
-- `atlawire projects` lists visible Bitbucket projects with `bbk`-compatible TSV or JSON
-  including optional descriptions and server-provided links.
-- `atlawire find-repos` searches visible projects in server order under one total page budget.
-- `atlawire search` searches indexed Bitbucket code and distinguishes server highlights from context.
-- `atlawire prs` lists a repository's pull requests with state and order filters.
-- `atlawire my-prs` lists the authenticated user's dashboard pull requests by state and role.
-- `atlawire pr PROJECT/SLUG PR_ID [show]` retrieves a pull request as raw Bitbucket JSON.
-- `atlawire pr PROJECT/SLUG PR_ID files` lists changed paths and rejects responses that
-  reach the server's reported cap.
-- `atlawire pr PROJECT/SLUG PR_ID comments` reads paginated comment activity as TSV or JSON.
-- `atlawire pr PROJECT/SLUG PR_ID commits` lists pull request commits as TSV or JSON.
-- `atlawire pr PROJECT/SLUG PR_ID diff --json` retrieves Bitbucket diff JSON and rejects
-  declared truncation.
-- `atlawire pr PROJECT/SLUG PR_ID diff` shows a terminal-safe review, not a patch to apply.
-- `atlawire pr PROJECT/SLUG PR_ID diff PATH` reviews one file, with `--source-path` for renames.
-- `atlawire file` and `pr … file` read bounded UTF-8 source, preserving bytes and selecting
-  the correct repository and commit for forked pull requests.
-- `atlawire branches` and `commits` list repository history with fixed filters across
-  cursor requests and legacy-compatible TSV or JSON.
-- `atlawire branch` looks up one exact, case-sensitive branch display name.
-- `atlawire files` lists paths recursively; `atlawire ls` lists a directory's direct children.
-- `atlawire blame` lists the author, date, and commit for each line of a repository file.
-- `atlawire commit` retrieves one commit and checks its full ID against the requested ID or prefix.
-- `atlawire commit-changes` lists changed files; `atlawire commit-diff` reviews a whole
-  commit or explicit paths.
-- `atlawire issue KEY_OR_URL` retrieves Jira issue JSON, including rendered fields when returned.
-- `atlawire issue KEY_OR_URL --markdown` renders issue details and comments while keeping JSON
-  as the default. Missing or ambiguous rendered comments fall back to raw text.
-- `atlawire issue-comments` reads one issue's comments with bounded pagination.
-- `atlawire jql QUERY` searches Jira with bounded pagination and `bbk`-compatible TSV and JSON rows.
-- `atlawire mine` lists the current user's issues; `atlawire statuses` lists visible status names.
-- `atlawire jira-me` returns the current Jira user's identity as JSON.
-- `atlawire transitions` lists available Jira workflow actions without changing the issue.
-- `atlawire page ID_OR_URL` retrieves Confluence page JSON, including the storage body.
-- `atlawire page ID_OR_URL --markdown` converts stored Confluence content without extra
-  requests, preserving basic document structure and code macros.
-- `atlawire cql QUERY` searches Confluence with bounded pagination and TSV or JSON output.
-- `atlawire spaces` lists Confluence spaces with `bbk`-compatible TSV columns or JSON output.
-- `atlawire children ID_OR_URL` lists direct child pages with their version numbers.
+**Initial read-only surface**
+
+- Flat, read-only CLI and Python library for Jira, Confluence, and Bitbucket: Bitbucket
+  projects, repositories, files, directories, blame, branches, commits, commit changes/diffs,
+  pull requests/files/comments/commits/diffs and indexed code search; Jira JQL search, current
+  user issues, issue cards, comments, statuses, and transitions; Confluence page reads, CQL
+  search, spaces, and child pages; plus `whoami`, `find`, and the offline `operations` catalog.
+- `atlawire --catalog` and `--describe <operation-id>` describe commands and registered reads
+  without credentials or network; `atlawire read <id>` runs one registered operation and prints
+  a JSON envelope.
+- Standard REST reads through `atlassian-python-api==5.0.5`: `api-get`, `api-request`,
+  `client_for`, `get_json`, `get_json_with_status`, `request_json`, `request_json_with_status`,
+  and `download_to_file`. Only standard non-administrative GETs and four documented read-only
+  POSTs are accepted; mutating and administrative routes are rejected before any request.
+- Public `atlawire.http.new_session` factory with explicit redirect, environment, timeout, and
+  token policy; `bearer_session` remains the strict read transport.
+
+**Agent-facing batch**
+
+- Structured `AtlaWireError` metadata (`product`, `operation`, `category`, `http_status`,
+  `method`, `path`) with bounded, credential-free messages.
+- Raw JQL and raw projections: `jira.search_raw`, `atlawire jql --fields/--expand`, and
+  `atlawire issue --expand`; `atlawire cql --expand` and `atlawire page --expand` print one
+  unprojected server document.
+- `jira.titles` maps issue keys to summaries in batches of 50 (`key in (...)`) to keep request
+  URLs bounded; `jira.resolve_user` resolves a login/display name to one identity and fails on
+  ambiguity instead of guessing.
+- Full-walk readers: `list_issue_worklogs`, `list_issue_changelog`, `search_all_issues`,
+  `list_all_repositories`, and `get_repository_archive` (zip/tar/tar.gz/tgz, 64 MiB
+  default byte bound). A budget or metadata inconsistency raises instead of returning a
+  partial list.
+- Jira issue subresource readers with flat projections: votes, watchers, subtasks, one comment,
+  one worklog, issue properties/property, and issue link; exposed as `issue-votes`,
+  `issue-watchers`, `issue-subtasks`, `issue-comment`, `issue-worklog`, `issue-properties`,
+  `issue-property`, `issue-link` with `--json` (projection, default) or `--raw`.
+- Bitbucket repository/PR readers: `get_project`, `get_repository`, `get_default_branch`,
+  `get_repository_changes`, `list_commit_comments`, `get_commit_comment`,
+  `list_repository_participants`, `list_repository_forks`, `get_related_repositories`; CLI
+  commands `project`, `repository`, `default-branch`, `repo-changes`, `commit-comments`,
+  `commit-comment`, `repo-participants`, `repo-forks`, `related-repos` with `--json`/`--raw`.
+- Confluence space readers: `get_space` (five stable fields), `list_space_content`
+  (`rows` + `truncated`), and the `space` / `space-content` commands with `--raw`.
+- Truncation and completeness metadata instead of a bare list where a cap can hide rows:
+  `list_issue_comments_with_metadata` (`rows`/`truncated`/`total`), `search_issues_with_metadata`,
+  `search_all_issues_with_metadata`, `list_children_with_metadata`,
+  `get_page_comments_with_metadata`, `get_page_attachments_with_metadata`,
+  `list_tags_with_metadata` (`tags`/`limit`/`complete`), `list_commits_with_metadata`
+  (`commits`/`limit`/`complete`), and `scan_repository_extensions_report`
+  (`rows`/`complete`/`repositories_scanned`/`repositories_total`/`reason`).
+- Agent-facing CLI aliases: `grep` (`grep-repo`), `scan` (`scan-extension`), `pr-files`,
+  `pr-comments`, and `selftest` (`whoami` probe under the BBK name).
+- Author filters on Bitbucket reads: `list_pull_requests(author=..., direction=...)`
+  (server participant filter) and `list_commits(author=...)` (exact git author name,
+  matched client-side while paging).
+- `issue-comments --limit` now narrows the server request (`maxResults`) and reports a truncated
+  thread as `{rows, truncated, total}` with a stderr note instead of silently trimming rows.
+- Live read-only E2E and parameter-matrix checks under `checks/` (`e2e_bbk_*`, `e2e_param_matrix*`,
+  `e2e_semantic_live.py`) with a short report in `checks/e2e_param_matrix_report.md`.
 
 ### Fixed
 
-- JSON reads reject HTTP 206 partial responses instead of returning an incomplete body
-  as a successful result.
-- JSON responses are limited to 8 MiB after decompression and must decode as UTF-8.
-  Refused redirects are no longer read or followed.
-- Bitbucket list commands reject contradictory page offsets or sizes. `find-repos`
-  stops repository paging when it reaches the requested match count.
-- Jira and Confluence search reject known duplicate identities and contradictory
-  totals instead of publishing incomplete rows. Jira issue reads reject malformed
-  return keys while allowing a valid canonical key after an issue move.
-- Jira and Confluence listings reject malformed Unicode before output. TSV and
-  Markdown show bidirectional formatting controls as visible escapes.
-- Repository TSV escapes data that would otherwise split a row or change terminal output.
+- Confluence and Jira Markdown conversion no longer drops link destinations, images, user
+  mentions, or macro parameters; plain XHTML links and attachment macro parameters are preserved.
+- Confluence paged CQL sends the correct space key.
+- Repository grep handles its cooperative timeout budget and reports truthful
+  `status`/`truncated`/`complete` instead of an incomplete list that looks complete.
+- Jira search uses one field set for short rows and reports truncation when a known `total`
+  exceeds the rows or the limit was reached without a `total`; a later page that omits `total`
+  is accepted.
+- `last-modified` resolves the requested ref correctly before the request.
+- Bitbucket file reads accept the media type the server derives from the stored file
+  (for example `text/markdown`) and reject only a JSON error document.
+- Credential echo and percent-encoded administrative paths are rejected on every SDK path.
+- Jira reads accept responses without `total` without claiming completeness, and a moved issue's
+  canonical key is allowed after the move.
+- Jira comment limits now drive the server request instead of trimming a fully read page.
+- The previous read batch keeps its safety fixes: HTTP 206 partial responses are rejected, JSON is
+  capped at 8 MiB after decompression, cursor-paged Bitbucket reads validate echoed `start`/`size`,
+  and duplicate identities or contradictory totals fail instead of publishing partial rows.
 
 ### Changed
 
-- Replaced the inherited Java-era `.editorconfig` and `.gitignore` with Python-oriented
-  versions (4-space indent, line length 88, Python caches, virtual environments, coverage and
-  local database artifacts).
-- Added the initial Python package, Click entry point, and smoke tests for the module and
-  console-script entry points.
+- Jira, Confluence, and Bitbucket reads go through `atlassian-python-api==5.0.5` with guarded
+  responses; the shared HTTP transport remains for functions that pin their own `requests` calls.
+- The test suite was rewritten specification-first; the legacy suite was archived before the
+  rewrite.
+- Bitbucket file content-type handling was relaxed while keeping the 1 MiB text bound and unsafe
+  control rejection.
 
 ### Removed
 
-- Removed unused direct runtime dependencies on `keyring` and `platformdirs`.
+- Unused direct runtime dependencies on `keyring` and `platformdirs`.
 - Marketing-style README claims, non-executable quickstart commands, duplicated quality gates,
   and a "License TBD" statement that contradicted the Apache-2.0 `LICENSE` file present in the
   repository.

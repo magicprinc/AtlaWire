@@ -7,32 +7,39 @@ Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server*
 
 ## Layers
 
-The existing low-level Python REST-library adapters and per-product commands are
-the supported layer for Jira, Confluence, and Bitbucket. A cross-product query
-API is planned as an additive layer that will use these adapters; it is not
-delivered yet and does not replace them.
+The per-product commands and the library-backed `api-get`/`api-request` surface are
+the supported layer for Jira, Confluence, and Bitbucket. The cross-product `find`
+command composes those readers into one bounded lead search; it is additive and does
+not replace opening the underlying issue, page, or file as evidence.
 
 ## Status and verified scope
 
-- 65 top-level read-only commands and 202 registered read operations are
-  advertised. Only `jira.project.get`, `confluence.space.get` and
-  `bitbucket.repository.get` are in the canonical `--catalog` operations list;
-  the rest are reachable through `read <id>` and the existing commands. There
-  are no write, transition-execution, raw-REST passthrough, profile/keyring,
-  cache, or MCP features.
+- 88 visible read-only commands (`atlawire --catalog`) and 202 registered read
+  operations (`atlawire operations`) are advertised. Only `jira.project.get`,
+  `confluence.space.get` and `bitbucket.repository.get` are in the canonical
+  `--catalog` operations list; the rest are reachable through `read <id>` and the
+  existing commands. There are no writes, transition execution, arbitrary or
+  mutating REST calls beyond the read-only `api-get`/`api-request` layer described
+  below (non-administrative GETs and four documented read-only POSTs), profile/keyring,
+  response caches, or MCP features.
 - The package is unpublished and installed editably from this checkout. CPython
   3.15 is the only tested runtime. A wheel builds offline with the pinned
   Hatchling backend; a clean install from that wheel is not yet verified here.
-- A 4,951-test offline run (unit, adapter-boundary, and installed-CLI loopback)
-  passed on this machine at candidate `fc8fb5d`. It proves neither a clean-wheel
-  install nor live behavior. A subsequent review found undisclosed edge cases
-  (see the delivery plans), so a green suite is not release approval.
-- Local `ruff` and `pyright` runs exist; a `pyright` error remains in the
-  existing pull-request projection, and no CI workflow or project-wide
-  threshold is configured.
-- Core read-only workflows passed on one self-hosted setup. Recheck bearer
-  authentication, permissions, TLS, and the relevant reads on any other
-  deployment; no supported-version matrix is published.
+- The offline suite in `tests/` is specification-first and runs with the installed
+  CPython 3.15 (`python -B -m pytest -p no:cacheprovider -q tests`). It covers unit,
+  adapter-boundary, and installed-CLI loopback behaviour and never contacts a real
+  instance. A green suite is not release approval and does not prove live behaviour
+  or a clean-wheel install.
+- Local `ruff` and `pyright` runs exist; `pyright src` still reports one
+  `reportReturnType` error in the pull-request projection
+  (`src/atlawire/pr_review.py:562`), and no CI workflow or project-wide threshold is
+  configured (the repository has no CI configuration files).
+- Live read-only checks passed on one self-hosted setup on 2026-11-23
+  (`checks/e2e_param_matrix_report.md`: CLI check 32/32 observations, Jira/Confluence
+  CLI 22/22 steps, parameter matrix PASS=70 CAP=8 GAP=3 DEFECT=0, REST matrix 86 rows
+  with 0 failed). They prove neither production scale nor other deployments; recheck
+  bearer authentication, permissions, TLS, and the relevant reads elsewhere. No
+  supported-version matrix is published.
 - The required REST inventory is not frozen: 180 of the 202 registered
   operations declare no query fields and 152 use the generic JSON shape, so
   their documented parameters and response contracts remain unverified. The
@@ -40,9 +47,10 @@ delivered yet and does not replace them.
 - Use JSON for exact values. TSV keeps the documented column order but escapes
   text for display; Markdown is for reading.
 
-Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), verify a deployment
-with the [read-only runbook](docs/LIVE-READ-ONLY.md), and report practical gaps with
-the [feedback template](docs/FEEDBACK.md). See the [research coverage
+Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), use the
+[agent skill table](docs/AGENT-SKILL.md) for task-to-command lookup, verify a
+deployment with the [read-only runbook](docs/LIVE-READ-ONLY.md), and report practical
+gaps with the [feedback template](docs/FEEDBACK.md). See the [research coverage
 matrix](docs/RESEARCH-COVERAGE.md) for BBK replacement limits and the
 [historical write API reference](docs/DEFERRED-WRITES.md) for operations
 deliberately excluded from AtlaWire.
@@ -121,6 +129,36 @@ base URL including any deployment context path.
   must equal the returned row count; an inconsistent echo is a failed read with
   no rows. An omitted echo is accepted, and the next cursor always comes from
   the server's `nextPageStart`.
+- **`--json` vs `--raw`.** `--json` prints the command's stable projection; `--raw`
+  prints the server's decoded response instead. New agent-facing commands
+  (`project`, `repository`, `default-branch`, `repo-changes`, `space`, `space-content`,
+  `issue-votes`, `issue-watchers`, `issue-subtasks`, `issue-comment`, `issue-worklog`,
+  `issue-properties`, `issue-property`, `issue-link`, `commit-comments`,
+  `commit-comment`, `repo-participants`, `repo-forks`, `related-repos`) offer both and
+  reject `--json --raw` together as a usage error (exit 2).
+  Some commands always print JSON and accept `--json` only for symmetry or
+  compatibility (`tags`, `scan`/`scan-extension`, `selftest`, `whoami`,
+  `grep`/`grep-repo`, `find`, `commit`, `jira-author-comments`, `pr-diff-complete`).
+- **`--fields`, `--expand`.** `jql --fields/--expand` switches from the fixed short
+  projection to one raw `/rest/api/2/search` envelope with those fields/expansions
+  sent verbatim. `issue --expand` replaces the default `renderedFields` expansion;
+  `cql --expand` prints one raw search page; `page --expand` prints one raw page and
+  cannot be combined with `--markdown`/`--storage`.
+- **`--limit`, `--max-pages`.** `--limit` caps rows where the command declares it
+  (on `issue-comments` it becomes the per-page `maxResults`); `--max-pages` caps the
+  page walk. Reaching a cap is not proof of completeness.
+- **Completeness metadata.** Results that can be capped carry `truncated`/`complete`
+  and, when the server reports it, `total` (`issue-comments`,
+  `space-content`, `scan-extension`, `grep-repo`, Jira search and Bitbucket tag/commit
+  metadata functions). A bare list without such a field cannot claim completeness.
+- **Exit codes.** `0` success; `2` usage/validation failure (unknown flag, malformed
+  `--params`, conflicting output flags); `1` read failure (HTTP, transport, or a
+  capped/incomplete read that the command refuses to return).
+- **Errors.** Expected failures never print a traceback and never include the bearer
+  token. Legacy commands print one `Error: …` line on stderr; the canonical
+  `read`/`read-operation` paths print one JSON envelope (`ok:false`, `error.code`,
+  `message`) and may include a bounded server `body` for an arrived HTTP response.
+  `whoami` exits `1` when any product is not `ok` but still prints the complete JSON.
 
 ## Discover the command catalog
 
@@ -371,8 +409,10 @@ walk (default 100).
 Pattern mode can be expensive: one listing walk plus one raw read per eligible
 file. Any listing, ref, file-read, regex-helper, or page-budget failure aborts
 the whole call with no stdout. Default text-suffix selection can miss files
-without a known suffix; pass `--glob` or `--path` to widen it. Real-service
-verification is pending.
+without a known suffix; pass `--glob` or `--path` to widen it. CLI alias and core
+behaviour were exercised on one self-hosted setup in the 2026-11-23 live run
+(`checks/e2e_param_matrix_report.md`); BBK parity and other deployments are not
+claimed.
 
 ## Retrieve Bitbucket pull requests
 
@@ -559,12 +599,14 @@ and percent-escape spellings are rejected before any request.
 `last-modified` prints the server's last-modification object as raw JSON,
 including the `files` map, `latestCommit`, and unknown fields. Without `PATH` it
 reads the repository root; with `PATH` it reads that repository-relative path.
-When `--at` is omitted, the parameter is left out of the request. The Bitbucket
-5.10 reference contradicts itself here, so the server may use a default branch
-or reject the request (for example HTTP 400); pass `--at` explicitly. The meaning
-of `at` and the exact response fields can vary between Bitbucket versions, and
-this target version has not been verified live, so treat the returned commit as
-the evidence rather than assuming the ref you passed was the one used.
+When `--at` is omitted, the library resolves the repository's default branch and sends
+its `latestCommit` (a full 40-hex commit) as the explicit `at`: live testing showed
+this route answers HTTP 400 without a start commit even though the 5.10 reference
+suggests otherwise. A server defect was also observed: the path form for a path that
+names a file answers HTTP 500, so that case fails with a clear hint to use the
+repository-root form or a directory path. The meaning of `at` and the exact response
+fields can vary between Bitbucket versions, so treat the returned commit as the
+evidence rather than assuming the ref you passed was the one used.
 
 ## Scan repositories for a file extension
 
@@ -589,10 +631,14 @@ omitting `--project` keeps the all-visible-project walk unchanged.
 Output is a JSON array of `project`, `repository`, `files`, `matched`, and the
 first five matching paths in `sample`, sorted by `matched` descending and then
 by project/repository. JSON is always printed; `--json` is accepted for
-symmetry. The scan is all-or-nothing: any project, repository, file-page, page
-budget, transport, or validation failure aborts with no rows and no stdout. It
-is a bounded inventory of repository file listings, not a content search. It has
-not been verified against a real system or compared with BBK's extension scan.
+symmetry. A complete scan prints that array; a page-budget failure is not an error
+with no rows: the command prints
+an object with the rows read so far, `complete=false`, `repositories_scanned`, an
+optional `repositories_total`, and `reason`. Any other project, repository, file-page,
+transport, or validation failure aborts with no rows and no stdout. It is a bounded
+inventory of repository file listings, not a content search. Its partial and complete
+modes were exercised live on 2026-11-23; it has not been compared with BBK's extension
+scan.
 
 ## Retrieve Jira issues and comments
 
@@ -622,9 +668,13 @@ literal text. Links are never followed. Comments are retained in their original
 order and are never dropped. The same single issue read is used.
 
 `issue-comments` returns the visible comments as JSON, preserving body text and
-following Jira offsets even when the server caps a page. It prints no partial thread
-on pagination errors, duplicate IDs, or a failed request. The page budget defaults to
-100 and is set with `--max-pages`.
+following Jira offsets even when the server caps a page. `--limit` (1–1000) becomes
+the per-page `maxResults`, so a small limit narrows the server request instead of
+trimming a full read; when the limit stops before the server's total, the result
+becomes `{rows, truncated, total}` (and `--json` always prints that object) with a
+stderr note naming the shown and total counts. It prints no partial thread on
+pagination errors, duplicate IDs, or a failed request. The page budget defaults to 100
+and is set with `--max-pages`.
 
 `issue-worklogs` prints the server's current worklog page as raw JSON. It preserves
 `startAt`, `maxResults`, `total`, every row, and unknown fields. It is one server
@@ -794,8 +844,9 @@ content-type-keyed map or a flat object, and labels assume only a JSON object.
 version list: Confluence 6.6.0 documents only a history representation, not every
 version. `page-version` prints one explicit historical page version as raw JSON
 after validating the returned page ID and `version.number`; `VERSION` must be a
-positive integer. Historical status and version compatibility are not yet
-live-verified, so a server may reject the `status=historical`/`version` request.
+positive integer. A 2026-11-23 live run read one historical version on one
+self-hosted setup (its body may be empty there); another deployment may reject the
+`status=historical`/`version` request.
 
 `page-url` prints one browser URL for the page, using the configured base URL
 and deployment context path. It reads the page and prefers a safe
@@ -831,14 +882,14 @@ execution or full plugin safety.
 
 ## Not implemented
 
-Writes and transition execution, a raw REST passthrough, product-grouped
-subcommands, profiles/keyring, `.env` loading, response caches, an MCP server, CI,
-and published packages are not part of the current read-only tool. Full `bbk`
-parity, a doctor/health command, and automatic fallback inside `pr … diff`
-remain deferred; `jira-author-comments` remains bounded by its issue-update
-window and no-snapshot behavior, and `whoami` identity parity is not
-live-verified. Use an existing command or `bbk` for uncovered workflows and
-record the gap in the feedback template.
+Writes and transition execution, arbitrary or mutating REST calls, product-grouped
+subcommands, profiles/keyring, `.env` loading, response caches, an MCP server, CI, and
+published packages are not part of the current read-only tool; the only REST surface
+is the fixed `api-get`/`api-request` allowlist described above. Full `bbk` parity, a
+doctor/health command, and automatic fallback inside `pr … diff` remain deferred;
+`jira-author-comments` remains bounded by its issue-update window and no-snapshot
+behavior, and `whoami` identity parity is not live-verified. Use an existing command
+or `bbk` for uncovered workflows and record the gap in the feedback template.
 
 ## Testing
 
