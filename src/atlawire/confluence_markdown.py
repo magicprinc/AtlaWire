@@ -3,13 +3,17 @@
 Only the validated ``body.storage.value`` XHTML is converted. A link keeps its
 readable label and a destination: ``ri:page`` becomes ``confluence:<title>``
 (with ``#<anchor>`` when set), ``ri:attachment`` becomes ``attachment:<name>``
-and ``ri:url`` keeps the original URL. An ``ac:image`` becomes a Markdown image.
-Macro parameters are shown next to the macro name, so a parameter is never
-dropped; a macro without a dedicated rule shows a readable marker. Storage that
+and ``ri:url`` keeps the original URL; a plain XHTML ``<a href>`` keeps its
+destination (``http(s)``, a relative path or ``mailto:``) in an ordinary link.
+An ``ac:image`` becomes a Markdown image. Macro parameters are shown next to
+the macro name, so a parameter is never dropped; a parameter whose value is a
+nested ``ri:attachment`` shows the attachment filename instead of an empty
+value. A macro without a dedicated rule shows a readable marker. Storage that
 is too large or too deeply nested falls back to a literal fenced block.
 """
 
 import re
+from dataclasses import dataclass
 from typing import cast
 
 from bs4 import Tag
@@ -54,6 +58,15 @@ _DESTINATION_ESCAPES = {
 # ``#`` and ``?`` are literal text in the opaque ``confluence:`` and
 # ``attachment:`` schemes, so they are escaped there as well.
 _OPAQUE_ESCAPES = {**_DESTINATION_ESCAPES, "#": "%23", "?": "%3F"}
+
+
+@dataclass(frozen=True, slots=True)
+class _Parameter:
+    """One macro parameter: its name, readable value and whether it is a target."""
+
+    name: str
+    value: str
+    reference: bool = False
 
 
 class _ConfluenceMarkdownConverter(SafeMarkdownConverter):
@@ -132,6 +145,23 @@ class _ConfluenceMarkdownConverter(SafeMarkdownConverter):
                 return f"![{shown}]({_escaped_destination(value)})"
         return alt_text
 
+    def convert_a(self, el: object, text: str, parent_tags: set[str]) -> str:
+        """Keep the destination of a plain XHTML anchor as a Markdown link.
+
+        The shared helper drops every ``<a href>`` so fetched HTML cannot add
+        active references; storage-format pages still use ordinary anchors for
+        pasted links, relative paths and ``mailto:`` addresses, so this product
+        rule keeps the label together with its destination.
+        """
+        label = text.strip()
+        if not isinstance(el, Tag):
+            return text
+        href = _text_attribute(el, "href")
+        if not href:
+            return text
+        shown = label or _label(href)
+        return f"[{shown}]({_escaped_destination(href)})"
+
 
 def _text_attribute(tag: Tag, name: str) -> str:
     """Return one string attribute, treating missing or non-string data as absent."""
@@ -163,25 +193,40 @@ def _attachment_destination(filename: str) -> str:
     return "attachment:" + _escaped_destination(filename, opaque=True)
 
 
-def _macro_parameters(el: Tag) -> list[tuple[str, str]]:
+def _macro_parameters(el: Tag) -> list[_Parameter]:
     """Return parameters declared directly by this macro, in document order.
+
+    A parameter that holds a nested reference element (``ri:attachment``) has no
+    text of its own, so its filename is kept as the readable value and marked
+    as a reference; without that its record would show a bare ``name=``.
 
     Only direct children are read: a nested macro owns its parameters, and its
     own conversion renders them once instead of repeating them in both records.
     """
-    parameters: list[tuple[str, str]] = []
+    parameters: list[_Parameter] = []
     for parameter in el.find_all("ac:parameter", recursive=False):
         name = parameter.get("ac:name")
-        parameters.append((name if isinstance(name, str) else "", parameter.get_text()))
+        shown_name = name if isinstance(name, str) else ""
+        attachment = parameter.find("ri:attachment")
+        if attachment is not None:
+            filename = _text_attribute(attachment, "ri:filename")
+            if filename:
+                parameters.append(_Parameter(shown_name, filename, reference=True))
+                continue
+        parameters.append(_Parameter(shown_name, parameter.get_text()))
     return parameters
 
 
-def _parameter_details(parameters: list[tuple[str, str]]) -> str:
-    """Escape parameters into one visible ``name=value, ...`` list."""
+def _parameter_details(parameters: list[_Parameter]) -> str:
+    """Render parameters into one visible ``name=value`` list."""
     details: list[str] = []
-    for name, value in parameters:
-        shown_name = _label(name)
-        shown_value = _label(value)
+    for parameter in parameters:
+        shown_name = _label(parameter.name)
+        shown_value = (
+            _escaped_destination(parameter.value, opaque=True)
+            if parameter.reference
+            else _label(parameter.value)
+        )
         if shown_name:
             details.append(f"{shown_name}={shown_value}")
         elif shown_value:
@@ -199,13 +244,13 @@ def _macro_record(name: object, details: str, *, supported: bool) -> str:
 
 
 def _unrepresented_parameters(
-    parameters: list[tuple[str, str]],
-) -> list[tuple[str, str]]:
+    parameters: list[_Parameter],
+) -> list[_Parameter]:
     """Keep parameters that are not already visible in the macro rendering."""
     return [
-        (name, value)
-        for name, value in parameters
-        if one_line(name).lower() not in _CODE_PARAMETERS
+        parameter
+        for parameter in parameters
+        if one_line(parameter.name).lower() not in _CODE_PARAMETERS
     ]
 
 
@@ -231,18 +276,16 @@ def _code_fallback(text: str) -> str:
     return "\n\n" + _CODE_FALLBACK + "\n\n"
 
 
-def _code_info(parameters: list[tuple[str, str]]) -> str:
-    for name, value in parameters:
-        if one_line(name).lower() != "language":
+def _code_info(parameters: list[_Parameter]) -> str:
+    for parameter in parameters:
+        if one_line(parameter.name).lower() != "language":
             continue
-        label = one_line(value)
+        label = one_line(parameter.value)
         return label if _LANGUAGE.fullmatch(label) else ""
     return ""
 
 
-def _unsupported_macro(
-    name: object, parameters: list[tuple[str, str]], text: str
-) -> str:
+def _unsupported_macro(name: object, parameters: list[_Parameter], text: str) -> str:
     marker = _macro_record(name, _parameter_details(parameters), supported=False)
     body = text.strip()
     if body:

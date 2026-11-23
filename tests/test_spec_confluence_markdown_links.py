@@ -49,6 +49,19 @@ def test_url_link_keeps_original_destination():
     assert "[the site](https://example.com/a?b=1)" in markdown
 
 
+def test_plain_xhtml_anchor_keeps_http_relative_and_mailto_destinations():
+    storage = (
+        '<p>Read <a href="https://example.com/a?b=1&amp;c=2">the docs</a>, '
+        '<a href="/display/ARCH/Home">the space</a> and write to '
+        '<a href="mailto:team@example.com?subject=Hello">the team</a>.</p>'
+    )
+    markdown = _render(storage)
+
+    assert "[the docs](https://example.com/a?b=1&c=2)" in markdown
+    assert "[the space](/display/ARCH/Home)" in markdown
+    assert "[the team](mailto:team@example.com?subject=Hello)" in markdown
+
+
 def test_image_renders_attachment_and_url_destinations():
     storage = (
         '<p><ac:image ac:alt="Diagram">'
@@ -60,6 +73,23 @@ def test_image_renders_attachment_and_url_destinations():
 
     assert "![Diagram](attachment:diagram.png)" in markdown
     assert "![Logo](https://example.com/logo.png)" in markdown
+
+
+def test_macro_parameter_with_nested_attachment_keeps_filename():
+    storage = (
+        '<ac:structured-macro ac:name="view-file">'
+        '<ac:parameter ac:name="name">'
+        '<ri:attachment ri:filename="Разделение_функционала_драфт_v6.pdf" />'
+        "</ac:parameter>"
+        '<ac:parameter ac:name="page">123</ac:parameter>'
+        "</ac:structured-macro>"
+    )
+    markdown = _render(storage)
+
+    assert (
+        "[Unsupported macro: view-file | "
+        "name=Разделение_функционала_драфт_v6.pdf, page=123]" in markdown
+    )
 
 
 def test_macro_parameters_are_kept_next_to_the_macro_name():
@@ -100,6 +130,20 @@ def test_code_macro_keeps_language_and_other_parameters():
     assert "[Macro: code | title=Example]" in markdown
     assert "```python" in markdown
     assert "print(1)" in markdown
+
+
+def test_code_macro_language_stays_a_plain_fence_token():
+    storage = (
+        '<ac:structured-macro ac:name="code">'
+        '<ac:parameter ac:name="language">my_lang</ac:parameter>'
+        "<ac:plain-text-body><![CDATA[print(1)]]></ac:plain-text-body>"
+        "</ac:structured-macro>"
+    )
+    markdown = _render(storage)
+
+    # A fence info string is a language token, not visible text: escaping its
+    # punctuation would drop the language from the rendered block.
+    assert "```my_lang" in markdown
 
 
 def test_empty_title_renders_a_bare_heading_and_keeps_body():
