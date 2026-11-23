@@ -10,12 +10,15 @@ from urllib.parse import quote
 import requests
 
 from atlawire.http import (
+    _TRANSPORT_MESSAGE,
     AtlaWireError,
+    _check_status,
     bearer_session,
     get_json_array,
     get_json_object,
     get_text,
     normalize_base_url,
+    read_encoded_limited,
     reject_credential_echo,
 )
 
@@ -29,6 +32,11 @@ _COMMIT_ID = re.compile(r"[0-9A-Fa-f]{7,40}")
 _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
 _PAGE_SIZE = 100
+_ARCHIVE_FORMATS = frozenset({"zip", "tar", "tar.gz", "tgz"})
+# A transport bound on returned archive bytes, not a claim about expected
+# archive sizes; the body is never truncated.
+_ARCHIVE_LIMIT = 64 * 1024 * 1024
+_ARCHIVE_LIMIT_MESSAGE = "The repository archive exceeds the 64 MiB limit."
 _COMMIT_LIMIT_DEFAULT = 25
 _FIND_LIMIT_DEFAULT = 25
 _PULL_REQUEST_LIMIT_DEFAULT = 25
@@ -236,6 +244,64 @@ def list_repositories(
         return _read_pages(session, url, max_pages, project=_repository)
 
 
+def list_all_repositories(
+    base_url: str,
+    *,
+    token: str,
+    start: int = 0,
+    limit: int = _PAGE_SIZE,
+    max_pages: int = 100,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """List every visible repository on the instance in server order.
+
+    One GET reads the instance-wide ``/rest/api/1.0/repos`` collection.
+    ``start`` is the initial cursor and ``limit`` is the requested page size;
+    the next cursor is never computed from them. Every nonterminal page is
+    followed through its own opaque ``nextPageStart`` until the exact
+    ``isLastPage`` boolean, so a noncontiguous or short page is never mistaken
+    for the end. Rows are returned exactly as decoded, preserving unknown and
+    nested fields, and links carried by a row are never followed. ``max_pages``
+    bounds the traversal; reaching it raises instead of returning a partial
+    list.
+    """
+    _validate_page_limit(max_pages)
+    if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+        raise AtlaWireError("Expected a non-negative Bitbucket start index.")
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not 1 <= limit <= 1000
+    ):
+        raise AtlaWireError("The repository page size must be between 1 and 1000.")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{base}/rest/api/1.0/repos"
+    rows: list[dict[str, object]] = []
+    cursor = start
+    with bearer_session(token) as session:
+        for _ in range(max_pages):
+            page = get_json_object(
+                session, url, params={"start": cursor, "limit": limit}
+            )
+            values = page.get("values")
+            if not isinstance(values, list):
+                raise AtlaWireError("Expected a Bitbucket values array.")
+            _check_page_echo(page, start=cursor, rows=len(values))
+            for value in values:
+                if not isinstance(value, dict):
+                    raise AtlaWireError(
+                        "Expected a Bitbucket repository object."
+                    )
+                rows.append(value)
+            last = page.get("isLastPage")
+            if not isinstance(last, bool):
+                raise AtlaWireError("Expected a Bitbucket isLastPage boolean.")
+            if last:
+                return rows
+            cursor = _next_page_start(page, cursor)
+    raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+
+
 def find_repositories(
     base_url: str,
     name: str,
@@ -360,6 +426,76 @@ def get_repository_file(
             _raw_file_url(base, project, slug, segments),
             params={"at": revision},
         )
+
+
+def get_repository_archive(
+    base_url: str,
+    project_key: str,
+    repository_slug: str,
+    *,
+    token: str,
+    at: str | None = None,
+    format: str | None = None,
+    allow_http_loopback: bool = False,
+) -> bytes:
+    """Download one repository archive and return its exact bytes.
+
+    The fixed ``/rest/api/1.0/projects/{project}/repos/{slug}/archive`` route
+    is requested exactly once with ``Accept: */*``. A nonempty ``at`` selects
+    the revision and ``format`` selects the streamed archive format; the server
+    defaults to ``zip`` when no format is given. Both identities, ``at`` and
+    ``format`` are validated before any session exists.
+
+    The response is read as raw bytes under a 64 MiB decoded-size bound, with
+    no UTF-8 or content-type assumption, so a binary archive is returned
+    unchanged and is never truncated. A redirect, HTTP 206, an authorization
+    failure, any other non-2xx status, a transport failure, or an oversize body
+    raises a sanitized [AtlaWireError][atlawire.http.AtlaWireError] without a
+    partial body; diagnostics never contain the URL, path, body, or credential.
+    Nothing is written to local storage and response links are never followed.
+    """
+    if not isinstance(project_key, str) or not _PROJECT_KEY.fullmatch(project_key):
+        raise AtlaWireError("Expected a Bitbucket project key.")
+    if (
+        not isinstance(repository_slug, str)
+        or not _REPOSITORY_SLUG.fullmatch(repository_slug)
+        or repository_slug in {".", ".."}
+    ):
+        raise AtlaWireError("Expected a Bitbucket repository slug.")
+    params: dict[str, str] = {}
+    if at is not None:
+        params["at"] = _revision(at)
+    if format is not None:
+        params["format"] = _archive_format(format)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = (
+        f"{base}/rest/api/1.0/projects/{quote(project_key, safe='')}"
+        f"/repos/{quote(repository_slug, safe='')}/archive"
+    )
+    with bearer_session(token) as session:
+        try:
+            with session.get(
+                url,
+                params=params,
+                headers={"Accept": "*/*"},
+                timeout=(5, 30),
+                allow_redirects=False,
+                stream=True,
+            ) as response:
+                _check_status(response.status_code, method="GET")
+                return read_encoded_limited(
+                    response,
+                    limit=_ARCHIVE_LIMIT,
+                    message=_ARCHIVE_LIMIT_MESSAGE,
+                )
+        except requests.Timeout:
+            raise AtlaWireError(
+                "Request timed out.", category="transport", method="GET"
+            ) from None
+        except requests.RequestException:
+            raise AtlaWireError(
+                _TRANSPORT_MESSAGE, category="transport", method="GET"
+            ) from None
 
 
 def get_file_blame(
@@ -1624,6 +1760,15 @@ def _revision_params(at: str | None) -> dict[str, str]:
     if at is None or at == "":
         return {}
     return {"at": _revision(at)}
+
+
+def _archive_format(value: str) -> str:
+    """Return one documented archive format or reject it before any request."""
+    if not isinstance(value, str) or value not in _ARCHIVE_FORMATS:
+        raise AtlaWireError(
+            "The archive format must be zip, tar, tar.gz, or tgz."
+        )
+    return value
 
 
 def _directory_segments(path: str) -> tuple[str, ...]:

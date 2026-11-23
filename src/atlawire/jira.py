@@ -25,6 +25,7 @@ COMMENT_PAGES_MIN = 1
 COMMENT_PAGES_MAX = 1000
 COMMENT_PAGES_DEFAULT = 100
 _COMMENT_PAGE_SIZE = 50
+_SEARCH_ALL_PAGE_SIZE = 100
 USER_RESULTS_MIN = 1
 USER_RESULTS_MAX = 1000
 USER_RESULTS_DEFAULT = 50
@@ -394,6 +395,46 @@ def search_issues(
     url = f"{base}/rest/api/2/search"
     with bearer_session(token) as session:
         return _read_search(session, url, query, limit)
+
+
+def search_all_issues(
+    base_url: str,
+    jql: str,
+    *,
+    token: str,
+    fields: str | list[str] = "*all",
+    limit: int | None = None,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Return every matching issue object as decoded, or raise with no rows.
+
+    ``jql`` is sent verbatim. ``fields`` is either a string sent verbatim or a
+    list joined with commas in the given order; ``limit`` caps the number of
+    returned issues and ``None`` means no client-side cap.
+
+    The traversal asks from ``startAt=0`` and advances by the number of issues
+    actually read, never by the requested page size. The effective page size
+    comes from the ``maxResults`` echo: after a page reports a smaller value,
+    later requests ask for no more than that value, up to 100. Reading stops at
+    ``limit``, once ``startAt`` reaches the reported ``total``, or at an empty
+    page when the response carries no ``total``; an empty page before the
+    reported total fails instead of claiming a complete result. ``isLast`` is
+    not part of the documented Jira 8.22 search response and is ignored. Every
+    issue is returned unchanged, so unknown and nested fields are preserved; no
+    projection, deduplication, or extra request is performed.
+    """
+    if not isinstance(jql, str) or not jql.strip():
+        raise AtlaWireError("Expected a non-empty JQL query.")
+    selected = _all_search_fields(fields)
+    if limit is not None and (
+        not isinstance(limit, int) or isinstance(limit, bool) or limit < 1
+    ):
+        raise AtlaWireError("The issue limit must be a positive integer.")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{base}/rest/api/2/search"
+    with bearer_session(token) as session:
+        return _read_all_issues(session, url, jql, selected, limit)
+
 
 def titles(
     base_url: str,
@@ -952,6 +993,106 @@ def _search_page(
         if total is not None and total < start + len(issues):
             raise AtlaWireError("Inconsistent Jira search pagination metadata.")
     return issues, total
+
+
+def _all_search_fields(fields: str | list[str]) -> str:
+    """Return the ``fields`` query value, rejecting empty selections."""
+    if isinstance(fields, str):
+        if not fields.strip():
+            raise AtlaWireError("Expected non-empty Jira search fields.")
+        return fields
+    if not isinstance(fields, list) or not fields:
+        raise AtlaWireError("Expected Jira search fields as a non-empty list.")
+    for field in fields:
+        if not isinstance(field, str) or not field.strip():
+            raise AtlaWireError("Expected non-empty Jira search fields.")
+    return ",".join(fields)
+
+
+def _read_all_issues(
+    session: requests.Session,
+    url: str,
+    query: str,
+    fields: str,
+    limit: int | None,
+) -> list[dict[str, object]]:
+    """Page the JQL search and return every raw issue object in order."""
+    rows: list[dict[str, object]] = []
+    start = 0
+    page_size = _SEARCH_ALL_PAGE_SIZE
+    while True:
+        remaining = None if limit is None else limit - len(rows)
+        size = page_size if remaining is None else min(page_size, remaining)
+        page = get_json_object(
+            session,
+            url,
+            params={
+                "jql": query,
+                "fields": fields,
+                "startAt": start,
+                "maxResults": size,
+            },
+        )
+        issues, total, advertised = _all_issues_page(
+            page, start=start, requested=size
+        )
+        if advertised is not None:
+            page_size = min(advertised, _SEARCH_ALL_PAGE_SIZE)
+        if total is not None and start + len(issues) > total:
+            raise AtlaWireError("Inconsistent Jira search pagination metadata.")
+        rows.extend(issues)
+        if limit is not None and len(rows) >= limit:
+            return rows
+        if not issues:
+            if total is None:
+                return rows
+            _check_search_end(start, total)
+            return rows
+        if total is not None and start + len(issues) >= total:
+            return rows
+        start += len(issues)
+
+
+def _all_issues_page(
+    page: dict[str, object], *, start: int, requested: int
+) -> tuple[list[dict[str, object]], int | None, int | None]:
+    """Validate one page and return its issues, total, and page size."""
+    reported_start = page.get("startAt")
+    if reported_start is not None and (
+        not isinstance(reported_start, int)
+        or isinstance(reported_start, bool)
+        or reported_start != start
+    ):
+        raise AtlaWireError(
+            "Expected Jira search startAt to match the requested offset."
+        )
+    issues = page.get("issues")
+    if not isinstance(issues, list):
+        raise AtlaWireError("Expected a Jira search issues array.")
+    total = page.get("total")
+    if total is not None and (
+        not isinstance(total, int) or isinstance(total, bool) or total < 0
+    ):
+        raise AtlaWireError("Invalid Jira search total.")
+    advertised = page.get("maxResults")
+    if advertised is not None and (
+        not isinstance(advertised, int)
+        or isinstance(advertised, bool)
+        or advertised <= 0
+    ):
+        raise AtlaWireError("Invalid Jira search maxResults.")
+    if len(issues) > requested or (
+        advertised is not None and len(issues) > advertised
+    ):
+        raise AtlaWireError("Jira search returned more issues than requested.")
+    rows: list[dict[str, object]] = []
+    for issue in issues:
+        if not isinstance(issue, dict):
+            raise AtlaWireError(
+                "Expected Jira issue objects in search results."
+            )
+        rows.append(issue)
+    return rows, total, advertised
 
 
 def _search_text(value: str, label: str) -> str:
