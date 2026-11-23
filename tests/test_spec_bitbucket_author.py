@@ -102,7 +102,15 @@ def raw_commit(sha, author, message):
 
 
 def projected_commit(sha, author, message):
-    return {"hash": sha, "date": None, "author": author, "message": message}
+    return {
+        "hash": sha,
+        "date": None,
+        "timestamp": None,
+        "author": author,
+        "email": None,
+        "displayName": None,
+        "message": message,
+    }
 
 
 # 5.10 repository participant filter: username.N mandatory, role.N optional, plus

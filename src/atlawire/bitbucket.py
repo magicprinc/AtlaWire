@@ -196,9 +196,25 @@ class Branch(TypedDict):
 
 
 class Commit(TypedDict):
+    """Строка проекции коммита из ответа ``/commits``.
+
+    ``author``, ``email`` и ``displayName`` берутся из вложенного ``author``
+    (поля ``name``, ``emailAddress`` и ``displayName``) той же строки ответа,
+    поэтому отдельных запросов на коммит нет. Bitbucket Server 5.10 в схеме
+    ``/commits`` документирует у автора только ``name`` и ``emailAddress``,
+    поэтому ``displayName`` обычно ``None``; присланное значение сохраняется,
+    если сервер его всё-таки отдал. ``date`` — человекочитаемое UTC-время с
+    точностью до минуты (``YYYY-MM-DD HH:MM``), ``timestamp`` — исходный
+    ``authorTimestamp`` в миллисекундах epoch без округления; отсутствующее
+    поле даёт ``None`` в обоих.
+    """
+
     hash: str
     date: str | None
+    timestamp: int | None
     author: str | None
+    email: str | None
+    displayName: str | None
     message: str
 
 
@@ -1520,8 +1536,11 @@ def list_commits(
     missing rows on each page, follows the server's ``nextPageStart`` even
     after a short page, and returns as soon as ``limit`` rows are projected,
     so an unused next-page hint on the final page is never required. Every
-    projected row carries the raw commit message; only the TSV view normalizes
-    it.
+    projected row keeps the git author ``name``, the author ``emailAddress`` as
+    ``email``, the optional author ``displayName`` (``None`` when the server does
+    not send it) and the raw ``authorTimestamp`` milliseconds as ``timestamp``,
+    all from the same response row, so no per-commit request is made. The row
+    also carries the raw commit message; only the TSV view normalizes it.
     Признак полноты в списке не передаётся: его сообщает
     [list_commits_with_metadata][atlawire.bitbucket.list_commits_with_metadata].
     """
@@ -1575,6 +1594,13 @@ def list_commits_with_metadata(
     коммитом запрос с ``limit=100`` честно возвращает ``complete=False``, чтобы
     агент не считал 100 строк всей историей. ``totalCount`` в ответе 5.10
     отсутствует, поэтому состояние ограничивается этим признаком.
+
+    Каждая строка проекции несёт ``author`` (git-имя), ``email`` из
+    ``author.emailAddress``, ``displayName`` (``None``, если сервер его не
+    прислал: схема 5.10 для автора коммита документирует только ``name`` и
+    ``emailAddress``) и сырые миллисекунды ``authorTimestamp`` как ``timestamp``
+    рядом с человекочитаемым ``date``. Всё это — поля той же строки ответа, без
+    отдельных запросов на коммит.
 
     Любая ошибка страницы, битый курсор или превышение ``max_pages``
     поднимают [AtlaWireError][atlawire.http.AtlaWireError] без частичного
@@ -3856,37 +3882,72 @@ def _commit(value: object) -> Commit:
         message = ""
     elif not isinstance(message, str):
         raise AtlaWireError("Invalid fields in a Bitbucket commit.")
-    author = _optional_encodable(_commit_author(value.get("author")), "commit author")
+    author, email, display_name = _commit_author_identity(value.get("author"))
+    timestamp = _commit_timestamp(value.get("authorTimestamp"))
+    moment = _utc_timestamp(
+        timestamp, error="Invalid author timestamp in a Bitbucket commit."
+    )
     return Commit(
         hash=_require_encodable(identifier, "commit hash"),
-        date=_commit_date(value.get("authorTimestamp")),
-        author=author,
+        date=_commit_date(moment),
+        timestamp=timestamp,
+        author=_optional_encodable(author, "commit author"),
+        email=_optional_encodable(email, "commit email"),
+        displayName=_optional_encodable(display_name, "commit author display name"),
         message=_require_encodable(message, "commit message"),
     )
 
 
-def _commit_author(value: object) -> str | None:
-    """Return ``author.name`` when the optional object declares it."""
+def _commit_author_identity(
+    value: object,
+) -> tuple[str | None, str | None, str | None]:
+    """Return the optional ``name``, ``emailAddress`` and ``displayName``.
+
+    All three fields belong to the same ``author`` object of the commit row, so
+    the projection never needs a per-commit request. 5.10 documents only ``name``
+    and ``emailAddress`` for a commit author, hence ``displayName`` stays ``None``
+    unless the server actually sends it.
+    """
     if value is None:
-        return None
+        return None, None, None
     if not isinstance(value, dict):
         raise AtlaWireError("Invalid author in a Bitbucket commit.")
-    name = value.get("name")
-    if name is not None and not isinstance(name, str):
-        raise AtlaWireError("Invalid author in a Bitbucket commit.")
-    return name
-
-
-def _commit_date(value: object) -> str | None:
-    """Format optional epoch milliseconds as UTC ``YYYY-MM-DD HH:MM``.
-
-    Division and offsetting use integers only, so the instant is independent of
-    the platform timezone and never rounds through a float. Values outside the
-    representable calendar raise a sanitized error; pre-epoch values are valid.
-    """
-    moment = _utc_timestamp(
-        value, error="Invalid author timestamp in a Bitbucket commit."
+    return (
+        _optional_author_text(value.get("name")),
+        _optional_author_text(value.get("emailAddress")),
+        _optional_author_text(value.get("displayName")),
     )
+
+
+def _optional_author_text(value: object) -> str | None:
+    """Accept an optional author string of a commit row and reject other types."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise AtlaWireError("Invalid author in a Bitbucket commit.")
+    return value
+
+
+def _commit_timestamp(value: object) -> int | None:
+    """Keep the raw ``authorTimestamp`` epoch milliseconds of the same row.
+
+    The exact instant is passed through as the server sent it instead of being
+    rounded through the formatted ``date``; ``None`` stays ``None``, while any
+    other non-integer (including ``bool``) fails the projection.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise AtlaWireError("Invalid author timestamp in a Bitbucket commit.")
+    return value
+
+
+def _commit_date(moment: datetime | None) -> str | None:
+    """Format an optional UTC instant as ``YYYY-MM-DD HH:MM``.
+
+    The exact instant remains available as the raw ``timestamp`` milliseconds;
+    this human-readable view keeps the legacy minute precision.
+    """
     if moment is None:
         return None
     return (
