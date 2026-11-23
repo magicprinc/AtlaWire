@@ -7,6 +7,7 @@ overwritten.
 
 import hashlib
 import json
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
@@ -17,7 +18,12 @@ PNG = b"\x89PNG\r\n\x1a\n" + bytes(range(64))
 RAW = b"line one\nline two\x00binary\xff\n"
 
 
-def _handler(seen: list[Request], body: bytes, status: int = 200):
+def _handler(
+    seen: list[Request],
+    body: bytes,
+    status: int = 200,
+    before_send: Callable[[], None] | None = None,
+):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.0"
 
@@ -26,6 +32,8 @@ def _handler(seen: list[Request], body: bytes, status: int = 200):
 
         def do_GET(self) -> None:
             seen.append(request_record(self))
+            if before_send is not None:
+                before_send()
             send_bytes(self, status, body, content_type="application/octet-stream")
 
     return Handler
@@ -93,6 +101,53 @@ def test_binary_read_never_overwrites_an_existing_file(tmp_path: Path) -> None:
     assert json.loads(result.stdout)["error"]["code"] == "validation_error"
     assert destination.read_bytes() == b"keep me"
     assert seen == []
+
+
+def test_binary_read_does_not_replace_a_file_created_during_publication(
+    tmp_path: Path,
+) -> None:
+    # Absent during the CLI's early check, created while the body streams:
+    # publishing must refuse and leave the competitor's bytes untouched.
+    destination = tmp_path / "avatar.png"
+    seen: list[Request] = []
+    handler = _handler(
+        seen,
+        PNG,
+        before_send=lambda: destination.write_bytes(b"competing"),
+    )
+    with serving(handler) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        result = run_installed(
+            [
+                "read",
+                "jira.avatar.system",
+                "--params",
+                '{"type":"user"}',
+                "--out",
+                str(destination),
+                "--allow-http-loopback",
+            ],
+            saved_credentials(tmp_path, origin),
+        )
+
+    # A destination conflict is a local validation failure, as it already is
+    # for a file present before the request: one JSON error and no receipt.
+    assert result.returncode == 2
+    envelope = json.loads(result.stdout)
+    assert envelope["ok"] is False
+    assert envelope["error"]["code"] == "validation_error"
+    assert "already exists" in envelope["error"]["message"]
+    assert "data" not in envelope
+    assert destination.read_bytes() == b"competing"
+    assert list(tmp_path.glob("*.part")) == []
+    assert seen == [
+        (
+            "GET",
+            "/jira/rest/api/2/avatar/user/system",
+            {},
+            "Bearer synthetic-read-jira-3a3",
+        )
+    ]
 
 
 def test_binary_read_over_the_limit_leaves_no_file(tmp_path: Path) -> None:

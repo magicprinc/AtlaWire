@@ -1,11 +1,13 @@
 """Command-line entry point for AtlaWire."""
 
 import base64
+import hashlib
 import json
 import os
 import re
 import sys
 from io import TextIOWrapper
+from pathlib import Path
 from typing import cast
 
 import click
@@ -107,6 +109,11 @@ from atlawire.federated import (
     LIMIT_MIN as FEDERATED_LIMIT_MIN,
 )
 from atlawire.federated import ProductTarget, federated_search
+from atlawire.file_publication import (
+    create_temporary_file,
+    discard_temporary_file,
+    publish_new_file,
+)
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
@@ -1680,25 +1687,23 @@ def file_command(
 
 
 def _write_bytes(destination: str, payload: bytes) -> dict[str, object]:
-    """Write bytes atomically and return a receipt; never overwrite."""
-    import hashlib
-    from pathlib import Path as _Path
+    """Write bytes to a new file atomically and return a receipt; never overwrite.
 
-    target = _Path(destination)
+    A destination created between the caller's check and publication is
+    refused, not replaced, and no receipt is produced on failure.
+    """
+    target = Path(destination)
     if target.exists():
         raise AtlaWireError("The destination already exists.")
-    temporary = target.with_name(f"{target.name}.{os.getpid()}.part")
+    temporary = create_temporary_file(target)
     try:
         with temporary.open("wb") as stream:
             stream.write(payload)
-        os.replace(temporary, target)
+        publish_new_file(temporary, target)
     except OSError:
         raise AtlaWireError("Could not write the destination file.") from None
     finally:
-        try:
-            temporary.unlink()
-        except OSError:
-            pass
+        discard_temporary_file(temporary)
     return {
         "path": str(target),
         "bytes": len(payload),
@@ -1743,17 +1748,18 @@ def attachment_get_command(
     token_from_env: bool,
     allow_http_loopback: bool,
 ) -> None:
-    """Print one repository attachment as JSON with standard base64.
+    """Print one repository attachment as base64 JSON, or write it to --out.
 
     REPO is PROJECT/slug and ATTACHMENT_ID is one path segment. This sends one
-    authenticated read-only GET to the fixed configured origin, never writes a
-    local file, and never follows a redirect or response link. On success it
-    prints exactly {"base64": "..."} holding the complete body; on any
-    failure it prints nothing. --max-bytes bounds the decoded body and a larger
-    body is rejected, never truncated. --base64 is required so encoded output is
-    always explicit. The route is BBK-observed only: it is absent from the local
-    Bitbucket Server 5.10 reference, and plugin/server version support is
-    unverified.
+    authenticated read-only GET to the fixed configured origin and never
+    follows a redirect or response link. Pass exactly one of --base64 or --out.
+    --base64 prints {"base64": "..."} holding the complete body. --out writes
+    the bytes to a new file and prints a {path, bytes, sha256} receipt; it
+    refuses an existing destination, including one created during publication,
+    and leaves no temporary file or receipt on failure. --max-bytes bounds the
+    decoded body and a larger body is rejected, never truncated. The route is
+    BBK-observed only: it is absent from the local Bitbucket Server 5.10
+    reference, and plugin/server version support is unverified.
     """
     if as_base64 == (destination is not None):
         raise click.UsageError("Pass exactly one of --base64 or --out.")

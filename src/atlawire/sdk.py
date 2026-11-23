@@ -10,7 +10,6 @@ diagnostic excerpt.
 import hashlib
 import json
 import logging
-import os
 import re
 import time
 from collections.abc import Mapping
@@ -23,6 +22,11 @@ import requests
 from atlassian import Bitbucket, ConfluenceServer, Jira
 from atlassian.rest_client import AtlassianRestAPI
 
+from atlawire.file_publication import (
+    create_temporary_file,
+    discard_temporary_file,
+    publish_new_file,
+)
 from atlawire.http import AtlaWireError, normalize_base_url
 
 __all__ = [
@@ -379,9 +383,10 @@ def download_to_file(
 ) -> tuple[str | None, int, str]:
     """Stream one read-only response into a file and return its receipt.
 
-    The destination must not exist. Bytes are written to a sibling temporary
-    file and published with one replace only after a complete, bounded read;
-    on any failure the temporary file is removed and nothing is published.
+    The destination must not exist. Bytes are written to an exclusive sibling
+    temporary file and published atomically only after a complete, bounded
+    read; a destination created during publication is refused, never replaced.
+    On any failure the temporary file is removed and nothing is published.
     """
     target = Path(destination)
     if target.exists():
@@ -392,7 +397,8 @@ def download_to_file(
     client = _raw_client_for(
         product, base_url, token, allow_http_loopback=allow_http_loopback
     )
-    temporary = target.with_name(f"{target.name}.{os.getpid()}.part")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = create_temporary_file(target)
     try:
         response = _send(
             client,
@@ -422,7 +428,6 @@ def download_to_file(
                 )
             digest = hashlib.sha256()
             written = 0
-            temporary.parent.mkdir(parents=True, exist_ok=True)
             with temporary.open("wb") as stream:
                 for chunk in response.iter_content(chunk_size=_CHUNK):
                     written += len(chunk)
@@ -443,14 +448,11 @@ def download_to_file(
                     stream.write(chunk)
         finally:
             response.close()
-        os.replace(temporary, target)
+        publish_new_file(temporary, target)
         return response.headers.get("Content-Type"), written, digest.hexdigest()
     finally:
         client.close()
-        try:
-            temporary.unlink()
-        except OSError:
-            pass
+        discard_temporary_file(temporary)
 
 
 def _check_semantic_post(product: str, path: str) -> None:

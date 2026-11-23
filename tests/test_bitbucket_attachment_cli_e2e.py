@@ -845,11 +845,20 @@ def _run_attachment_out(
     credentials: Path,
     destination: Path,
     responses: Sequence[Response],
+    *,
+    before_send: Callable[[], None] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], list[Request]]:
-    """Run attachment-get with --out instead of the base64 contract."""
+    """Run attachment-get with --out instead of the base64 contract.
+
+    ``before_send`` runs inside the request handler after the CLI has opened
+    its destination check but before the body is delivered. It lets a test
+    create a competing file at the publication target deterministically.
+    """
     seen: list[Request] = []
 
     def on_get(handler: BaseHTTPRequestHandler) -> None:
+        if before_send is not None:
+            before_send()
         status, body, headers = responses[0]
         send_bytes(handler, status, body, **headers)
 
@@ -890,6 +899,29 @@ def test_attachment_out_writes_exact_bytes_and_a_receipt(tmp_path: Path) -> None
     assert receipt["sha256"] == __import__("hashlib").sha256(payload).hexdigest()
     assert seen == [attachment_request()]
     assert destination.with_name(destination.name + ".part").exists() is False
+
+
+def test_attachment_out_does_not_replace_a_file_created_during_publication(
+    tmp_path: Path,
+) -> None:
+    # The destination is absent when the CLI checks it. The loopback handler
+    # creates the competing file while the body is being delivered, so the
+    # publish step always sees a path it did not check. The original bytes
+    # must survive and no receipt or temporary file may be published.
+    destination = tmp_path / "attachment.bin"
+    result, seen = _run_attachment_out(
+        tmp_path / "missing-credentials.json",
+        destination,
+        [(200, b"new attachment", {"content_type": "application/octet-stream"})],
+        before_send=lambda: destination.write_bytes(b"competing"),
+    )
+
+    assert result.returncode == 1
+    assert "already exists" in result.stderr
+    assert result.stdout == ""
+    assert destination.read_bytes() == b"competing"
+    assert list(tmp_path.glob("*.part")) == []
+    assert seen == [attachment_request()]
 
 
 def test_attachment_out_refuses_an_existing_file(tmp_path: Path) -> None:
