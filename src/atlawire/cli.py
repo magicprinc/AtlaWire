@@ -81,6 +81,7 @@ from atlawire.bitbucket_search import (
 )
 from atlawire.catalog import build_command_catalog
 from atlawire.confluence import (
+    _SEARCH_PATH,
     _SPACE_CONTENT_PATH,
     _SPACE_PATH,
     ATTACHMENT_LIMIT_DEFAULT,
@@ -109,6 +110,7 @@ from atlawire.confluence import (
     list_children,
     list_space_content,
     list_spaces,
+    page_id,
     search_cql,
 )
 from atlawire.confluence_conversion import convert_content_body
@@ -140,6 +142,7 @@ from atlawire.http import (
 from atlawire.identity import whoami
 from atlawire.issue_markdown import render_issue_markdown
 from atlawire.jira import (
+    _SEARCH_FIELDS,
     COMMENT_PAGES_DEFAULT,
     COMMENT_PAGES_MAX,
     COMMENT_PAGES_MIN,
@@ -174,6 +177,7 @@ from atlawire.jira import (
     list_statuses,
     list_transitions,
     search_issues,
+    search_raw,
     search_users,
 )
 from atlawire.jira_comments_search import find_author_comments
@@ -200,7 +204,7 @@ from atlawire.repo_grep import (
     REGEX_TIMEOUT_DEFAULT,
     grep_repository,
 )
-from atlawire.repo_scan import scan_repository_extensions
+from atlawire.repo_scan import scan_repository_extensions_report
 from atlawire.sdk import SdkRequestError, get_json, request_json
 
 _TSV_CONTROLS = re.compile(
@@ -2865,7 +2869,10 @@ def tag_command(
 @click.option(
     "--at",
     default=None,
-    help="Commit ID or ref; omit to leave the at parameter out of the request.",
+    help=(
+        "Commit, branch, or tag; omitted resolves the repository default "
+        "branch and sends its latest full commit."
+    ),
 )
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
@@ -2882,9 +2889,11 @@ def last_modified_command(
 ) -> None:
     """Print last-modification metadata as raw JSON for a repo or path.
 
-    Without PATH the repository root is read. When --at is omitted, the at
-    parameter is not sent; server versions may use a default branch or reject
-    that request, so an explicit --at is preferred.
+    Without PATH the repository root is read. When --at is omitted, the
+    library resolves the repository default branch and sends its latest full
+    commit as the at parameter; pass --at to read another revision. An
+    unavailable default branch or a non-full commit ID fails before the
+    last-modified request.
     """
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
@@ -2956,15 +2965,19 @@ def scan_extension_command(
     file walk per repository reads its default branch. An optional --project
     restricts enumeration to that project and skips the visible-project
     listing. This can be expensive: at most --workers walks run concurrently,
-    and --max-pages bounds each listing call. Any project, repository,
-    file-page, budget, transport, or validation failure aborts the whole scan
-    with no rows and no stdout.
+    and --max-pages bounds each listing call. A complete scan prints a JSON
+    array of rows. A page-budget failure is not an error with no rows: the
+    command prints a JSON object with the rows read so far, ``complete=false``,
+    ``repositories_scanned``, an optional ``repositories_total``, and the
+    reader's message as ``reason``. Any other project, repository, file-page,
+    transport, or validation failure aborts the whole scan with no rows and no
+    stdout.
     """
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
     try:
-        rows = scan_repository_extensions(
+        report = scan_repository_extensions_report(
             base_url,
             extension,
             token=token,
@@ -2975,7 +2988,10 @@ def scan_extension_command(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
-    click.echo(json.dumps(rows))
+    if report["complete"]:
+        click.echo(json.dumps(report["rows"]))
+        return
+    click.echo(json.dumps(report))
 
 
 @cli.command()
@@ -3124,16 +3140,18 @@ def _read_raw_json(
     token: str,
     allow_http_loopback: bool,
     as_array: bool = False,
+    params: dict[str, str | int] | None = None,
 ) -> object:
     """Read one raw JSON response through the library's shared read transport.
 
     ``as_array`` applies the same object/array shape check as the projected
     function, so ``--raw`` cannot report a shape the projection would reject.
+    ``params`` is the optional query of an expansion read; ``None`` sends none.
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     reader = get_json_array if as_array else get_json_object
     with bearer_session(token) as session:
-        return reader(session, f"{base}{path}", params={})
+        return reader(session, f"{base}{path}", params={} if params is None else params)
 
 
 @cli.command()
@@ -3519,6 +3537,14 @@ def related_repos(
     help="Render Jira wiki markup as Markdown (implies --markdown).",
 )
 @click.option(
+    "--expand",
+    default=None,
+    help=(
+        "Jira expansion list sent verbatim as expand; replaces the default "
+        "renderedFields expansion."
+    ),
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def issue(
@@ -3527,16 +3553,34 @@ def issue(
     token_from_env: bool,
     markdown: bool,
     wiki: bool,
+    expand: str | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Get a Jira issue as JSON or Markdown by key or browse URL."""
+    """Get a Jira issue as JSON or Markdown by key or browse URL.
+
+    ``--expand`` replaces the default ``renderedFields`` expansion and is sent
+    verbatim as the expand query parameter; without it the issue is read with
+    rendered fields as before.
+    """
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
     try:
-        result = get_issue(
-            base_url, key_or_url, token=token, allow_http_loopback=allow_http_loopback
-        )
+        if expand is None:
+            result = get_issue(
+                base_url,
+                key_or_url,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+            )
+        else:
+            result = get_issue(
+                base_url,
+                key_or_url,
+                token=token,
+                expand=expand,
+                allow_http_loopback=allow_http_loopback,
+            )
         rendered = (
             render_issue_markdown(result, use_wiki=wiki) if markdown or wiki else None
         )
@@ -3561,6 +3605,12 @@ def issue(
     show_default=True,
 )
 @click.option(
+    "--limit",
+    type=click.IntRange(1, 1000),
+    default=None,
+    help="Print at most this many comments (1-1000); omitted prints the whole thread.",
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def issue_comments(
@@ -3568,9 +3618,15 @@ def issue_comments(
     base_url: str | None,
     token_from_env: bool,
     max_pages: int,
+    limit: int | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Print the full comment thread of a Jira issue as JSON."""
+    """Print the full comment thread of a Jira issue as JSON.
+
+    ``--limit`` caps the printed rows only; the thread is still read and
+    validated completely because the comment reader publishes a whole thread.
+    Omitting it prints every comment.
+    """
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
@@ -3584,6 +3640,8 @@ def issue_comments(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
+    if limit is not None:
+        rows = rows[:limit]
     click.echo(json.dumps(rows))
 
 
@@ -4075,6 +4133,22 @@ def issue_link(
     help=f"Maximum rows to return ({SEARCH_LIMIT_MIN}-{SEARCH_LIMIT_MAX}).",
 )
 @click.option(
+    "--fields",
+    default=None,
+    help=(
+        "Comma-separated Jira fields for a raw search request; implies raw "
+        "output and is sent verbatim as fields."
+    ),
+)
+@click.option(
+    "--expand",
+    default=None,
+    help=(
+        "Comma-separated Jira expansions for a raw search request; implies "
+        "raw output and is sent verbatim as expand."
+    ),
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def jql(
@@ -4083,14 +4157,38 @@ def jql(
     token_from_env: bool,
     as_json: bool,
     limit: int,
+    fields: str | None,
+    expand: str | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Search Jira with JQL and print short issue rows."""
+    """Search Jira with JQL and print short issue rows.
+
+    Without --fields/--expand one paginated search is projected to short rows
+    (TSV, or a JSON array with --json). Either option switches to one raw search
+    request: --limit becomes maxResults, --fields is sent verbatim when given
+    (the projection fields otherwise), --expand is sent verbatim, and the
+    unprojected JSON envelope is printed.
+    """
     if not query.strip():
         raise click.UsageError("Provide a non-empty JQL query.")
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
+    if fields is not None or expand is not None:
+        try:
+            envelope = search_raw(
+                base_url,
+                query,
+                token=token,
+                fields=_SEARCH_FIELDS if fields is None else fields,
+                limit=limit,
+                expand=expand,
+                allow_http_loopback=allow_http_loopback,
+            )
+        except AtlaWireError as exc:
+            raise click.ClickException(str(exc)) from None
+        click.echo(json.dumps(envelope))
+        return
     try:
         rows = search_issues(
             base_url,
@@ -4660,6 +4758,14 @@ def jira_author_comments(
     help=f"Maximum rows to return ({CQL_LIMIT_MIN}-{CQL_LIMIT_MAX}).",
 )
 @click.option(
+    "--expand",
+    default=None,
+    help=(
+        "Confluence expansion list for a raw search page; prints the raw "
+        "envelope instead of short rows."
+    ),
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def cql(
@@ -4668,14 +4774,36 @@ def cql(
     token_from_env: bool,
     as_json: bool,
     limit: int,
+    expand: str | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Search Confluence with CQL and print short content rows."""
+    """Search Confluence with CQL and print short content rows.
+
+    With --expand one raw search page is printed instead of the projected rows:
+    CQL, expand, ``start=0``, and limit are sent, and --limit must be at least 1
+    because the page is not paged locally. Without it the paginated row
+    projection is unchanged.
+    """
     if not query.strip():
         raise click.UsageError("Provide a non-empty CQL query.")
+    if expand is not None and limit == 0:
+        raise click.UsageError("--limit must be at least 1 when --expand is used.")
     base_url, token = _product_base_url_and_token(
         "confluence", base_url, token_from_env, allow_http_loopback
     )
+    if expand is not None:
+        try:
+            document = _read_raw_json(
+                base_url,
+                _SEARCH_PATH,
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+                params={"cql": query, "expand": expand, "start": 0, "limit": limit},
+            )
+        except AtlaWireError as exc:
+            raise click.ClickException(str(exc)) from None
+        click.echo(json.dumps(document))
+        return
     try:
         rows = search_cql(
             base_url,
@@ -4891,6 +5019,14 @@ def children(
 )
 @click.option("--markdown", is_flag=True, help="Print Markdown instead of JSON.")
 @click.option(
+    "--expand",
+    default=None,
+    help=(
+        "Confluence expansion list sent verbatim as expand; prints the raw "
+        "JSON page and cannot be combined with --markdown/--storage."
+    ),
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def page(
@@ -4899,14 +5035,37 @@ def page(
     token_from_env: bool,
     storage: bool,
     markdown: bool,
+    expand: str | None,
     allow_http_loopback: bool,
 ) -> None:
-    """Get a Confluence page as JSON, Markdown, or raw storage XHTML."""
+    """Get a Confluence page as JSON, Markdown, or raw storage XHTML.
+
+    ``--expand`` prints the raw, unprojected page document with exactly the
+    given expansion list, so it cannot be combined with --markdown or --storage,
+    which need the default body expansion. Without it the validated JSON,
+    Markdown, or storage output is unchanged.
+    """
     if markdown and storage:
         raise click.UsageError("Use --markdown or --storage/--html, not both.")
+    if expand is not None and (markdown or storage):
+        raise click.UsageError("Use --expand without --markdown or --storage.")
     base_url, token = _product_base_url_and_token(
         "confluence", base_url, token_from_env, allow_http_loopback
     )
+    if expand is not None:
+        requested_id = page_id(page_id_or_url)
+        try:
+            document = _read_raw_json(
+                base_url,
+                f"/rest/api/content/{requested_id}",
+                token=token,
+                allow_http_loopback=allow_http_loopback,
+                params={"expand": expand},
+            )
+        except AtlaWireError as exc:
+            raise click.ClickException(str(exc)) from None
+        click.echo(json.dumps(document))
+        return
     storage_text: str | None = None
     try:
         result = get_page(
@@ -5286,6 +5445,62 @@ cli.add_command(
         params=_WHOAMI.params,
         help="Check authentication for all three products (same probe as whoami).",
     )
+)
+
+
+def _register_alias(
+    name: str,
+    origin: click.Command,
+    *,
+    help_text: str,
+    fixed: dict[str, object] | None = None,
+) -> None:
+    """Register an extra invocation name that reuses an existing command.
+
+    The alias is a distinct click command over the origin's parameters and
+    callback, so ``--help`` and ``--catalog`` describe the alias while
+    validation, credentials, and requests keep a single implementation.
+    ``fixed`` pins argument values such as a pull request action.
+    """
+    pinned = {} if fixed is None else fixed
+    params = [param for param in origin.params if param.name not in pinned]
+    callback = origin.callback
+    if callback is None:
+        raise RuntimeError(f"Command {origin.name} has no callback.")
+
+    def delegated(**values: object) -> object:
+        return callback(**(values | pinned))
+
+    cli.add_command(
+        click.Command(name, params=params, callback=delegated, help=help_text)
+    )
+
+
+# Short agent-facing names for the same implementations. They stay ordinary
+# visible commands, so --help and --catalog list them like any other command.
+_register_alias(
+    "grep",
+    cli.commands["grep-repo"],
+    help_text="Search or list one repository snapshot (alias of grep-repo).",
+)
+_register_alias(
+    "scan",
+    cli.commands["scan-extension"],
+    help_text=(
+        "List repositories containing a file extension (alias of scan-extension)."
+    ),
+)
+_register_alias(
+    "pr-files",
+    cli.commands["pr"],
+    fixed={"action": "files"},
+    help_text="Print a pull request's changed files (alias of pr REPO ID files).",
+)
+_register_alias(
+    "pr-comments",
+    cli.commands["pr"],
+    fixed={"action": "comments"},
+    help_text="Print a pull request's comments (alias of pr REPO ID comments).",
 )
 
 

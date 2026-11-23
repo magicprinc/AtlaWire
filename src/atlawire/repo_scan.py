@@ -13,11 +13,17 @@ Work is bounded and owned. Every listing is one page walk capped by
 ``max_pages``; at most ``workers`` file walks run at once, and a new walk is
 submitted only when a slot frees. The all-visible request upper bound is
 ``max_pages * (1 + projects + repositories)``; a scoped ``project`` skips the
-project listing and is bounded by ``max_pages * (1 + repositories)``. The first
-worker failure drops the pending queue, cancels queued futures, waits for
-running futures, and then re-raises the original exception, so no partial rows
-are returned. A page or budget failure raised by the shared Bitbucket readers is
-treated the same way.
+project listing and is bounded by ``max_pages * (1 + repositories)``. A
+non-budget failure drops the pending queue, cancels queued futures, waits for
+running futures, and then re-raises the original exception, so
+[scan_repository_extensions][atlawire.repo_scan.scan_repository_extensions]
+returns no partial rows. A page-budget failure raised by a shared Bitbucket
+reader stops the walk early but keeps the rows already read:
+[scan_repository_extensions_report][atlawire.repo_scan.scan_repository_extensions_report]
+returns them with ``complete=False``, the number of repositories actually
+walked, a known or unknown repository total, and the reader's message as
+``reason``, so an exhausted default budget is visible instead of an error with
+no rows.
 """
 
 import re
@@ -48,6 +54,7 @@ _INVALID_EXTENSION = "The file extension must be non-empty text such as .py."
 _INVALID_WORKERS = "The worker count must be between 1 and 8."
 _INVALID_PAGE_LIMIT = "The page limit must be between 1 and 1000."
 _INVALID_PROJECT = "Expected a Bitbucket project key or ~user project."
+_PAGE_LIMIT_MESSAGE = "Bitbucket page limit reached; increase --max-pages."
 
 
 class ExtensionMatch(TypedDict):
@@ -58,6 +65,22 @@ class ExtensionMatch(TypedDict):
     files: int
     matched: int
     sample: list[str]
+
+
+class ExtensionScanReport(TypedDict):
+    """Rows read so far plus explicit evidence about the walk's completeness.
+
+    ``repositories_scanned`` counts file walks that finished, whether or not
+    they matched. ``repositories_total`` is the enumerated repository count and
+    is ``None`` when enumeration itself stopped on the page budget, so an
+    unknown total is never reported as a complete denominator.
+    """
+
+    rows: list[ExtensionMatch]
+    complete: bool
+    repositories_scanned: int
+    repositories_total: int | None
+    reason: str | None
 
 
 def scan_repository_extensions(
@@ -99,6 +122,45 @@ def scan_repository_extensions(
     validation failure propagates unchanged and returns no rows. The result
     never contains a response-link destination: request paths are rebuilt only
     from the supplied base URL and the validated ``project``/``slug`` fields.
+    Use :func:`scan_repository_extensions_report` when a page-budget cut must
+    publish the rows read before it instead of raising.
+    """
+    report = scan_repository_extensions_report(
+        base_url,
+        extension,
+        token=token,
+        workers=workers,
+        max_pages=max_pages,
+        allow_http_loopback=allow_http_loopback,
+        project=project,
+    )
+    if not report["complete"]:
+        raise AtlaWireError(
+            report["reason"] or "The repository inventory was incomplete."
+        )
+    return report["rows"]
+
+
+def scan_repository_extensions_report(
+    base_url: str,
+    extension: str,
+    *,
+    token: str,
+    workers: int = _DEFAULT_WORKERS,
+    max_pages: int = _DEFAULT_MAX_PAGES,
+    allow_http_loopback: bool = False,
+    project: str | None = None,
+) -> ExtensionScanReport:
+    """Return the extension inventory plus explicit completeness evidence.
+
+    Validation, enumeration, and matching match
+    :func:`scan_repository_extensions`, and every non-budget failure propagates
+    unchanged. A page-budget failure raised by the shared Bitbucket readers is
+    not propagated: enumeration or the file walks stop, the rows already read
+    are returned, ``complete`` is false, and ``reason`` carries the reader's
+    message. ``repositories_scanned`` counts finished file walks;
+    ``repositories_total`` is the enumerated repository count, or ``None`` when
+    enumeration itself stopped on the budget.
     """
     normalized = _normalize_extension(extension)
     _validate_workers(workers)
@@ -106,14 +168,14 @@ def scan_repository_extensions(
     _validate_project(project)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     _validate_token(token)
-    targets = _repository_targets(
+    targets, enumeration_reason = _repository_targets(
         base,
         token=token,
         max_pages=max_pages,
         allow_http_loopback=allow_http_loopback,
         project=project,
     )
-    return _scan_targets(
+    rows, scanned, walk_reason = _scan_targets(
         base,
         targets,
         extension=normalized,
@@ -121,6 +183,14 @@ def scan_repository_extensions(
         workers=workers,
         max_pages=max_pages,
         allow_http_loopback=allow_http_loopback,
+    )
+    reason = enumeration_reason if enumeration_reason is not None else walk_reason
+    return ExtensionScanReport(
+        rows=rows,
+        complete=reason is None,
+        repositories_scanned=scanned,
+        repositories_total=None if enumeration_reason is not None else len(targets),
+        reason=reason,
     )
 
 
@@ -185,40 +255,69 @@ def _repository_targets(
     max_pages: int,
     allow_http_loopback: bool,
     project: str | None,
-) -> list[tuple[str, str]]:
+) -> tuple[list[tuple[str, str]], str | None]:
     """Read every target repository before any file walk.
 
     A provided project is read directly through the repository adapter; the
     visible-project list is not requested, so unrelated projects cannot be
     enumerated. Without a scope every visible project is read in server order.
+
+    A page-budget failure from the shared readers is returned as the second
+    item and stops enumeration at the last completed listing, so already
+    enumerated targets stay usable; every other failure propagates unchanged.
     """
     if project is not None:
-        repositories = list_repositories(
+        try:
+            repositories = list_repositories(
+                base_url,
+                project,
+                token=token,
+                max_pages=max_pages,
+                allow_http_loopback=allow_http_loopback,
+            )
+        except AtlaWireError as exc:
+            if _is_page_limit_error(exc):
+                return [], str(exc)
+            raise
+        return [(project, repository["slug"]) for repository in repositories], None
+    targets: list[tuple[str, str]] = []
+    try:
+        projects = list_projects(
             base_url,
-            project,
             token=token,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
-        return [(project, repository["slug"]) for repository in repositories]
-    targets: list[tuple[str, str]] = []
-    projects = list_projects(
-        base_url,
-        token=token,
-        max_pages=max_pages,
-        allow_http_loopback=allow_http_loopback,
-    )
+    except AtlaWireError as exc:
+        if _is_page_limit_error(exc):
+            return [], str(exc)
+        raise
     for visible in projects:
         key = visible["key"]
-        repositories = list_repositories(
-            base_url,
-            key,
-            token=token,
-            max_pages=max_pages,
-            allow_http_loopback=allow_http_loopback,
-        )
+        try:
+            repositories = list_repositories(
+                base_url,
+                key,
+                token=token,
+                max_pages=max_pages,
+                allow_http_loopback=allow_http_loopback,
+            )
+        except AtlaWireError as exc:
+            if _is_page_limit_error(exc):
+                return targets, str(exc)
+            raise
         targets.extend((key, repository["slug"]) for repository in repositories)
-    return targets
+    return targets, None
+
+
+def _is_page_limit_error(exc: BaseException) -> bool:
+    """Tell the shared readers' page-budget stop from a real failure.
+
+    Only the fixed page-budget message becomes a partial report; transport,
+    validation, and server errors must keep propagating so a partial inventory
+    never hides them.
+    """
+    return isinstance(exc, AtlaWireError) and str(exc) == _PAGE_LIMIT_MESSAGE
 
 
 def _scan_targets(
@@ -230,18 +329,29 @@ def _scan_targets(
     workers: int,
     max_pages: int,
     allow_http_loopback: bool,
-) -> list[ExtensionMatch]:
-    """Run bounded file walks and publish either all rows or one failure."""
+) -> tuple[list[ExtensionMatch], int, str | None]:
+    """Run bounded file walks and report rows, finished walks, and a budget cut.
+
+    The rows are returned only when no failure was recorded; a page-budget stop
+    is reported as the third item while the rows already read stay published.
+    """
     if not targets:
-        return []
+        return [], 0, None
     pending = deque(targets)
     in_flight: dict[Future[ExtensionMatch | None], tuple[str, str]] = {}
     rows: list[ExtensionMatch] = []
+    scanned = 0
     failure: BaseException | None = None
+    page_limit: str | None = None
     pool = ThreadPoolExecutor(max_workers=workers)
     try:
         while pending or in_flight:
-            while failure is None and pending and len(in_flight) < workers:
+            while (
+                failure is None
+                and page_limit is None
+                and pending
+                and len(in_flight) < workers
+            ):
                 project, repository = pending.popleft()
                 future = pool.submit(
                     _scan_repository,
@@ -262,16 +372,27 @@ def _scan_targets(
                 try:
                     error = future.exception()
                 except CancelledError:
-                    # Expected only after our own cancellation; an unexpected
-                    # cancellation must fail instead of dropping a repository.
-                    error = AtlaWireError("The repository inventory was cancelled.")
+                    # A cancelled walk is expected only after our own page-budget
+                    # stop; without one it must fail instead of dropping a
+                    # repository silently.
+                    if page_limit is None:
+                        error = AtlaWireError("The repository inventory was cancelled.")
+                    else:
+                        continue
                 if error is not None:
-                    if failure is None:
+                    if _is_page_limit_error(error):
+                        if page_limit is None:
+                            page_limit = str(error)
+                            for other in in_flight:
+                                other.cancel()
+                            pending.clear()
+                    elif failure is None:
                         failure = error
                         for other in in_flight:
                             other.cancel()
                         pending.clear()
                     continue
+                scanned += 1
                 row = future.result()
                 if row is not None:
                     rows.append(row)
@@ -281,7 +402,7 @@ def _scan_targets(
         pool.shutdown(wait=True, cancel_futures=True)
     if failure is not None:
         raise failure
-    return sorted(rows, key=_sort_key)
+    return sorted(rows, key=_sort_key), scanned, page_limit
 
 
 def _scan_repository(
