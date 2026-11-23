@@ -49,6 +49,7 @@ _PULL_REQUEST_LIMIT_DEFAULT = 25
 _TAG_LIMIT_DEFAULT = 25
 _PULL_REQUEST_STATES = frozenset({"OPEN", "MERGED", "DECLINED", "ALL"})
 _PULL_REQUEST_ORDERS = frozenset({"NEWEST", "OLDEST"})
+_PULL_REQUEST_DIRECTIONS = frozenset({"INCOMING", "OUTGOING"})
 _TAG_ORDERS = frozenset({"ALPHABETICAL", "MODIFICATION"})
 _SOURCE_PATH_CHANGE_TYPES = frozenset({"MOVE", "COPY", "RENAME"})
 # Four times the shared 8 MiB JSON response budget in atlawire.http. This is a
@@ -1165,6 +1166,8 @@ def list_pull_requests(
     token: str,
     state: str = "OPEN",
     order: str | None = None,
+    author: str | None = None,
+    direction: str | None = None,
     limit: int = _PULL_REQUEST_LIMIT_DEFAULT,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
@@ -1174,12 +1177,19 @@ def list_pull_requests(
     ``repo`` is ``PROJECT/slug``. ``state`` must be exactly ``OPEN``,
     ``MERGED``, ``DECLINED`` or ``ALL`` and is sent on every page; an explicit
     ``order`` must be exactly ``NEWEST`` or ``OLDEST`` and is sent only when
-    given, while ``direction`` is never sent so the server default applies. The
-    fixed ``/pull-requests`` route is paged from ``start=0`` with no more than
-    the missing rows per request, following each page's exact
-    ``nextPageStart`` until ``limit`` rows are projected or the terminal page is
-    reached, so an unused next-page hint is never required. No client-side
-    filtering, reordering, metadata lookup, or link request is performed.
+    given. ``direction`` must be exactly ``INCOMING`` or ``OUTGOING`` and is
+    sent only when given, so otherwise the server default applies. ``author``
+    must be a nonempty Bitbucket participant username: 5.10 documents no
+    ``author`` parameter, but its participant filter selects by username, so
+    exactly ``username.1=<author>`` and ``role.1=AUTHOR`` are sent. Both
+    ``author`` and ``direction`` are genuine server-side filters;
+    ``participantStatus`` exists only on ``/dashboard/pull-requests``, is not
+    documented for this endpoint, and is never sent here. The fixed
+    ``/pull-requests`` route is paged from ``start=0`` with no more than the
+    missing rows per request, following each page's exact ``nextPageStart``
+    until ``limit`` rows are projected or the terminal page is reached, so an
+    unused next-page hint is never required. No client-side filtering,
+    reordering, metadata lookup, or link request is performed.
 
     Only ``id``, ``title``, ``state``, ``author``, ``from``, ``to`` and
     ``updated`` are projected; the author name comes from ``author.user.name``
@@ -1190,7 +1200,7 @@ def list_pull_requests(
     _validate_page_limit(max_pages)
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
         raise AtlaWireError("The pull request limit must be between 1 and 1000.")
-    params = _pull_request_params(state, order)
+    params = _pull_request_params(state, order, author, direction)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_repository_url(base, repo)}/pull-requests"
     with bearer_session(token) as session:
@@ -1466,6 +1476,7 @@ def list_commits(
     token: str,
     at: str | None = None,
     path: str | None = None,
+    author: str | None = None,
     limit: int = _COMMIT_LIMIT_DEFAULT,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
@@ -1474,11 +1485,17 @@ def list_commits(
 
     ``repo`` is ``PROJECT/slug``. A nonempty ``at`` is sent only as ``until``
     and a nonempty ``path`` only as ``path``; absent and empty filters are
-    omitted. The pager requests no more than the missing rows on each page,
-    follows the server's ``nextPageStart`` even after a short page, and returns
-    as soon as ``limit`` rows are projected, so an unused next-page hint on the
-    final page is never required. Every projected row carries the raw commit
-    message; only the TSV view normalizes it.
+    omitted. Bitbucket 5.10's ``/commits`` documents no author parameter, so
+    ``author`` (``None`` for no selection) selects on our side after each
+    fetched page is projected: only rows whose exact git ``author.name``
+    equals the given name are kept, and the pager keeps following pages until
+    ``limit`` matches are collected or the terminal page is reached. The
+    server never applies that filter. The pager requests no more than the
+    missing rows on each page, follows the server's ``nextPageStart`` even
+    after a short page, and returns as soon as ``limit`` rows are projected,
+    so an unused next-page hint on the final page is never required. Every
+    projected row carries the raw commit message; only the TSV view normalizes
+    it.
     Признак полноты в списке не передаётся: его сообщает
     [list_commits_with_metadata][atlawire.bitbucket.list_commits_with_metadata].
     """
@@ -1488,6 +1505,7 @@ def list_commits(
         token=token,
         at=at,
         path=path,
+        author=author,
         limit=limit,
         max_pages=max_pages,
         allow_http_loopback=allow_http_loopback,
@@ -1501,6 +1519,7 @@ def list_commits_with_metadata(
     token: str,
     at: str | None = None,
     path: str | None = None,
+    author: str | None = None,
     limit: int = _COMMIT_LIMIT_DEFAULT,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
@@ -1511,6 +1530,18 @@ def list_commits_with_metadata(
     ``at`` уходит только как ``until``, ``path`` — только как ``path``;
     каждый следующий курсор берётся из серверного ``nextPageStart``, а не
     вычисляется из ``start + size``.
+
+    Фильтра по автору серверный ``/commits`` в 5.10 не документирует: в
+    описании endpoint только ``followRenames``, ``ignoreMissing``, ``merges``,
+    ``path``, ``since``, ``until`` и ``withCounts``. Поэтому ``author`` —
+    фильтрация на нашей стороне: каждая уже полученная страница проецируется,
+    и остаются только строки с точным ``author.name`` (git-имя автора, а не
+    аккаунт Bitbucket). Сервер этот фильтр не применяет. Пагинатор идёт
+    дальше, пока не наберёт ``limit`` совпадений, пока не увидит терминальную
+    страницу или пока не исчерпает ``max_pages``, поэтому совпадения с дальних
+    страниц не теряются; ``complete=True`` означает, что вся история в
+    пределах ``max_pages`` просмотрена. Для редкого автора цена — чтение
+    истории, поэтому сужайте выборку ``at``/``path``.
 
     В отличие от голого списка, ``complete`` отделяет полную выборку от
     обрезанной лимитом: ``True`` только когда сервер отдал терминальную
@@ -1534,7 +1565,7 @@ def list_commits_with_metadata(
             session,
             f"{url}/commits",
             max_pages,
-            project=_commit,
+            project=_commit if author is None else _author_matcher(author),
             params=params,
             limit=limit,
         )
@@ -2236,6 +2267,31 @@ def _commit_params(at: str | None, path: str | None) -> dict[str, str]:
     return params
 
 
+def _author_matcher(author: str) -> Callable[[object], Commit | None]:
+    """Отобрать коммиты по точному git-имени автора на нашей стороне.
+
+    Сервер 5.10 не документирует фильтр по автору у ``/commits``, поэтому
+    ``None`` для несовпадения возвращается только после проекции строки:
+    ``_read_pages_result`` продолжает читать страницы до ``limit`` совпадений.
+    """
+    expected = _author_name(author)
+
+    def keep(value: object) -> Commit | None:
+        row = _commit(value)
+        return row if row["author"] == expected else None
+
+    return keep
+
+
+def _author_name(value: str) -> str:
+    """Проверить непустое точное имя автора до любого запроса."""
+    if not isinstance(value, str) or not value or _REVISION_UNSAFE.search(value):
+        raise AtlaWireError(
+            "Expected a nonempty author name without control characters."
+        )
+    return _require_encodable(value, "author name")
+
+
 def _changes_params(until: str, since: str | None) -> dict[str, str]:
     """Собрать документированные селекторы ``/changes`` до любого запроса."""
     params = {"until": _revision(until)}
@@ -2585,8 +2641,10 @@ def _comment_id(value: str | int) -> int:
     return identifier
 
 
-def _pull_request_params(state: str, order: str | None) -> dict[str, str]:
-    """Validate the fixed filters and omit an unspecified order."""
+def _pull_request_params(
+    state: str, order: str | None, author: str | None, direction: str | None
+) -> dict[str, str]:
+    """Validate the fixed server-side filters before any request is made."""
     if not isinstance(state, str) or state not in _PULL_REQUEST_STATES:
         raise AtlaWireError(
             "The pull request state must be OPEN, MERGED, DECLINED, or ALL."
@@ -2598,6 +2656,16 @@ def _pull_request_params(state: str, order: str | None) -> dict[str, str]:
     params = {"state": state}
     if order is not None:
         params["order"] = order
+    if author is not None:
+        # 5.10 participant filter: username.N is mandatory, role.N optional.
+        params["username.1"] = _author_name(author)
+        params["role.1"] = "AUTHOR"
+    if direction is not None:
+        if not isinstance(direction, str) or direction not in _PULL_REQUEST_DIRECTIONS:
+            raise AtlaWireError(
+                "The pull request direction must be INCOMING or OUTGOING."
+            )
+        params["direction"] = direction
     return params
 
 
