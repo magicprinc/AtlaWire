@@ -81,7 +81,11 @@ def assert_calls(server, expected):
         server.calls, expected, strict=True
     ):
         parsed = urlsplit(call.target)
-        assert (call.method, parsed.path, parse_qs(parsed.query)) == (
+        assert (
+            call.method,
+            parsed.path,
+            parse_qs(parsed.query, keep_blank_values=True),
+        ) == (
             method,
             path,
             query,
@@ -269,6 +273,95 @@ def test_search_all_issues_stops_on_empty_page_without_total(server):
     )
 
 
+def test_search_all_issues_stops_at_page_budget(server):
+    httpd, base = server
+    # A server that never proves the end of the traversal must not drive an
+    # unbounded request series; the budget raises instead of returning rows.
+    load(httpd, 200, search_page(0, [ISSUE_ONE], 9, max_results=1))
+    load(httpd, 200, search_page(1, [ISSUE_TWO], 9, max_results=1))
+    with pytest.raises(AtlaWireError, match="page limit"):
+        jira.search_all_issues(
+            base, JQL, token=TOKEN, max_pages=2, allow_http_loopback=True
+        )
+    assert_calls(
+        httpd,
+        [
+            (
+                "GET",
+                "/rest/api/2/search",
+                {
+                    "jql": [JQL],
+                    "fields": ["*all"],
+                    "startAt": ["0"],
+                    "maxResults": ["100"],
+                },
+                JSON,
+            ),
+            (
+                "GET",
+                "/rest/api/2/search",
+                {
+                    "jql": [JQL],
+                    "fields": ["*all"],
+                    "startAt": ["1"],
+                    "maxResults": ["1"],
+                },
+                JSON,
+            ),
+        ],
+    )
+
+
+def test_search_all_issues_rejects_empty_page_before_total(server):
+    httpd, base = server
+    load(httpd, 200, search_page(0, [ISSUE_ONE], 3, max_results=2))
+    load(httpd, 200, search_page(1, [], 3, max_results=2))
+    with pytest.raises(AtlaWireError, match="empty page"):
+        jira.search_all_issues(base, JQL, token=TOKEN, allow_http_loopback=True)
+    assert_calls(
+        httpd,
+        [
+            (
+                "GET",
+                "/rest/api/2/search",
+                {
+                    "jql": [JQL],
+                    "fields": ["*all"],
+                    "startAt": ["0"],
+                    "maxResults": ["100"],
+                },
+                JSON,
+            ),
+            (
+                "GET",
+                "/rest/api/2/search",
+                {
+                    "jql": [JQL],
+                    "fields": ["*all"],
+                    "startAt": ["1"],
+                    "maxResults": ["2"],
+                },
+                JSON,
+            ),
+        ],
+    )
+
+
+@pytest.mark.parametrize("max_pages", [0, -1, True, 1.5])
+def test_search_all_issues_rejects_invalid_page_budget(server, max_pages):
+    httpd, base = server
+    with pytest.raises(AtlaWireError, match="page limit"):
+        jira.search_all_issues(
+            base,
+            JQL,
+            token=TOKEN,
+            max_pages=max_pages,
+            allow_http_loopback=True,
+        )
+    assert httpd.calls == []
+    assert httpd.unexpected == []
+
+
 def test_search_all_issues_http_error_is_sanitized(server):
     httpd, base = server
     load(httpd, 403, {"errors": [{"message": SECRET + TOKEN}]})
@@ -353,6 +446,46 @@ def test_list_all_repositories_http_error_is_sanitized(server):
     assert len(httpd.calls) == 1
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"values": [REPO_ONE]},
+        repos_page([REPO_ONE], last="false"),
+        repos_page([REPO_ONE], last=0),
+    ],
+)
+def test_list_all_repositories_rejects_invalid_is_last_page(server, payload):
+    httpd, base = server
+    load(httpd, 200, payload)
+    with pytest.raises(AtlaWireError, match="isLastPage"):
+        bitbucket.list_all_repositories(base, token=TOKEN, allow_http_loopback=True)
+    assert_calls(
+        httpd,
+        [("GET", REPOS_PATH, {"start": ["0"], "limit": ["100"]}, JSON)],
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        repos_page([REPO_ONE], last=False),
+        repos_page([REPO_ONE], last=False, next_start=0),
+        repos_page([REPO_ONE], last=False, next_start=-3),
+        repos_page([REPO_ONE], last=False, next_start="7"),
+        repos_page([REPO_ONE], last=False, next_start=True),
+    ],
+)
+def test_list_all_repositories_rejects_invalid_next_page_start(server, payload):
+    httpd, base = server
+    load(httpd, 200, payload)
+    with pytest.raises(AtlaWireError, match="nextPageStart"):
+        bitbucket.list_all_repositories(base, token=TOKEN, allow_http_loopback=True)
+    assert_calls(
+        httpd,
+        [("GET", REPOS_PATH, {"start": ["0"], "limit": ["100"]}, JSON)],
+    )
+
+
 ARCHIVE = b"PK\x03\x04\x00\x01\xff\xfe binary\x80payload"
 ARCHIVE_PATH = "/rest/api/1.0/projects/PRJ/repos/repo/archive"
 
@@ -386,6 +519,10 @@ def test_get_repository_archive_returns_exact_binary(server, kwargs, query):
         ("../etc", "repo", {}),
         ("PRJ", "..", {}),
         ("PRJ", "repo", {"at": ""}),
+        ("PRJ", "repo", {"max_bytes": 0}),
+        ("PRJ", "repo", {"max_bytes": -1}),
+        ("PRJ", "repo", {"max_bytes": True}),
+        ("PRJ", "repo", {"max_bytes": 1.5}),
     ],
 )
 def test_get_repository_archive_rejects_invalid_arguments(
@@ -414,3 +551,76 @@ def test_get_repository_archive_http_error_is_sanitized(server):
         )
     assert_sanitized(caught.value, 500)
     assert len(httpd.calls) == 1
+
+
+def test_get_repository_archive_rejects_partial_content(server):
+    httpd, base = server
+    load(httpd, 206, ARCHIVE, "application/zip")
+    with pytest.raises(AtlaWireError) as caught:
+        bitbucket.get_repository_archive(
+            base, "PRJ", "repo", token=TOKEN, allow_http_loopback=True
+        )
+    assert_sanitized(caught.value, 206)
+    assert len(httpd.calls) == 1
+
+
+@pytest.mark.parametrize("status", [301, 302, 307, 308])
+def test_get_repository_archive_rejects_redirects(server, status):
+    httpd, base = server
+    load(httpd, status, b"", "text/html")
+    with pytest.raises(AtlaWireError) as caught:
+        bitbucket.get_repository_archive(
+            base, "PRJ", "repo", token=TOKEN, allow_http_loopback=True
+        )
+    assert_sanitized(caught.value, status)
+    assert len(httpd.calls) == 1
+
+
+def test_get_repository_archive_rejects_oversize_body(server):
+    httpd, base = server
+    load(httpd, 200, ARCHIVE, "application/zip")
+    with pytest.raises(AtlaWireError, match="byte limit") as caught:
+        bitbucket.get_repository_archive(
+            base,
+            "PRJ",
+            "repo",
+            token=TOKEN,
+            max_bytes=len(ARCHIVE) - 1,
+            allow_http_loopback=True,
+        )
+    assert caught.value.category == "upstream"
+    assert len(httpd.calls) == 1
+
+
+def test_get_repository_archive_accepts_body_at_the_byte_limit(server):
+    httpd, base = server
+    load(httpd, 200, ARCHIVE, "application/zip")
+    assert (
+        bitbucket.get_repository_archive(
+            base,
+            "PRJ",
+            "repo",
+            token=TOKEN,
+            max_bytes=len(ARCHIVE),
+            allow_http_loopback=True,
+        )
+        == ARCHIVE
+    )
+    assert_calls(httpd, [("GET", ARCHIVE_PATH, {}, "*/*")])
+
+
+def test_get_repository_archive_allows_explicitly_unbounded_read(server):
+    httpd, base = server
+    load(httpd, 200, ARCHIVE, "application/zip")
+    assert (
+        bitbucket.get_repository_archive(
+            base,
+            "PRJ",
+            "repo",
+            token=TOKEN,
+            max_bytes=None,
+            allow_http_loopback=True,
+        )
+        == ARCHIVE
+    )
+    assert_calls(httpd, [("GET", ARCHIVE_PATH, {}, "*/*")])

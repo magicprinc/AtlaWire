@@ -13,10 +13,11 @@ from atlawire.http import (
     _TRANSPORT_MESSAGE,
     AtlaWireError,
     _check_status,
+    _decode_utf8_text,
     bearer_session,
     get_json_array,
     get_json_object,
-    get_text,
+    get_json_object_allow_no_content,
     normalize_base_url,
     read_encoded_limited,
     reject_credential_echo,
@@ -33,10 +34,15 @@ _PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
 _PAGE_SIZE = 100
 _ARCHIVE_FORMATS = frozenset({"zip", "tar", "tar.gz", "tgz"})
-# A transport bound on returned archive bytes, not a claim about expected
-# archive sizes; the body is never truncated.
-_ARCHIVE_LIMIT = 64 * 1024 * 1024
-_ARCHIVE_LIMIT_MESSAGE = "The repository archive exceeds the 64 MiB limit."
+# Default transport bound on archive bytes returned as one in-memory value, not
+# a claim about expected archive sizes; the body is never truncated.
+_ARCHIVE_LIMIT_DEFAULT = 64 * 1024 * 1024
+# The shared reader requires an integer limit; None opts out of the byte cap.
+_ARCHIVE_LIMIT_UNBOUNDED = 2**63 - 1
+# Decoded-size bound for one raw text file, matching the shared text limit in
+# atlawire.http; the raw-file reader below keeps that bound.
+_TEXT_LIMIT = 1024 * 1024
+_TEXT_LIMIT_MESSAGE = "The text response exceeds the 1 MiB limit."
 _COMMIT_LIMIT_DEFAULT = 25
 _FIND_LIMIT_DEFAULT = 25
 _PULL_REQUEST_LIMIT_DEFAULT = 25
@@ -203,6 +209,48 @@ class BlameLine(TypedDict):
     email: str | None
     date: str | None
     commit: str | None
+
+
+class ProjectDetail(TypedDict):
+    key: str
+    name: str | None
+    description: str | None
+    public: bool | None
+    type: str | None
+
+
+class RepositoryDetail(TypedDict):
+    slug: str
+    name: str | None
+    state: str | None
+    public: bool | None
+    defaultBranch: str | None
+
+
+class BranchDetail(TypedDict):
+    id: str
+    displayId: str | None
+    latestCommit: str | None
+    isDefault: bool | None
+
+
+class CommitComment(TypedDict):
+    id: int
+    author: str | None
+    text: str
+    createdDate: int | None
+
+
+class ParticipantRow(TypedDict):
+    name: str | None
+    displayName: str | None
+    role: str | None
+
+
+class RepositoryLink(TypedDict):
+    slug: str
+    project: str | None
+    state: str | None
 
 
 def list_projects(
@@ -412,19 +460,26 @@ def get_repository_file(
     ``repo`` is ``PROJECT/slug`` and ``path`` is a relative Git path with safe
     segments. The revision defaults to ``master`` and is sent only as the
     ``at`` query parameter. The call makes one streamed raw request with
-    ``Accept: text/plain``; content is limited and validated by
-    [get_text][atlawire.http.get_text], so an oversize, non-text, or non-UTF-8
-    response raises without returning partial text.
+    ``Accept: text/plain``; this server refuses the raw route without it. The
+    route serves the stored bytes with a media type derived from the file, so
+    ``.java`` and ``.gradle`` arrive as ``text/plain`` while ``.md`` arrives as
+    ``text/markdown``. The reader therefore follows the reference client
+    (``atlassian-python-api`` ``get_content_of_file`` with
+    ``not_json_response``): a body whose media type is not JSON is the file
+    text. Size, UTF-8, control-character, and credential-echo rules stay the
+    shared ones, so an oversize or binary response raises without returning
+    partial text, while a JSON document is treated as an error response.
     """
     revision = _revision(at)
     segments = _file_segments(path)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
     with bearer_session(token) as session:
-        return get_text(
+        return _read_raw_file_text(
             session,
             _raw_file_url(base, project, slug, segments),
             params={"at": revision},
+            token=token,
         )
 
 
@@ -436,6 +491,7 @@ def get_repository_archive(
     token: str,
     at: str | None = None,
     format: str | None = None,
+    max_bytes: int | None = _ARCHIVE_LIMIT_DEFAULT,
     allow_http_loopback: bool = False,
 ) -> bytes:
     """Download one repository archive and return its exact bytes.
@@ -443,16 +499,23 @@ def get_repository_archive(
     The fixed ``/rest/api/1.0/projects/{project}/repos/{slug}/archive`` route
     is requested exactly once with ``Accept: */*``. A nonempty ``at`` selects
     the revision and ``format`` selects the streamed archive format; the server
-    defaults to ``zip`` when no format is given. Both identities, ``at`` and
-    ``format`` are validated before any session exists.
+    defaults to ``zip`` when no format is given. The project and repository
+    identities, ``at``, ``format``, and ``max_bytes`` are validated before any
+    session exists.
 
-    The response is read as raw bytes under a 64 MiB decoded-size bound, with
-    no UTF-8 or content-type assumption, so a binary archive is returned
-    unchanged and is never truncated. A redirect, HTTP 206, an authorization
-    failure, any other non-2xx status, a transport failure, or an oversize body
-    raises a sanitized [AtlaWireError][atlawire.http.AtlaWireError] without a
-    partial body; diagnostics never contain the URL, path, body, or credential.
-    Nothing is written to local storage and response links are never followed.
+    The whole archive is returned as one ``bytes`` value, so the decoded-size
+    bound exists to keep a single call's memory use bounded and predictable; it
+    is a transport guard, not a claim about expected archive sizes. The bound is
+    ``max_bytes``: it defaults to 64 MiB and a caller may raise it or pass
+    ``None`` to disable it, but neither removes the buffering. Archives that may
+    exceed available memory must be fetched with a streaming client instead of
+    this function. The response is read without a UTF-8 or content-type
+    assumption, so a binary archive is returned unchanged and is never
+    truncated. A redirect, HTTP 206, an authorization failure, any other non-2xx
+    status, a transport failure, or an oversize body raises a sanitized
+    [AtlaWireError][atlawire.http.AtlaWireError] without a partial body;
+    diagnostics never contain the URL, path, body, or credential. Nothing is
+    written to local storage and response links are never followed.
     """
     if not isinstance(project_key, str) or not _PROJECT_KEY.fullmatch(project_key):
         raise AtlaWireError("Expected a Bitbucket project key.")
@@ -467,6 +530,12 @@ def get_repository_archive(
         params["at"] = _revision(at)
     if format is not None:
         params["format"] = _archive_format(format)
+    if max_bytes is not None and (
+        not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 1
+    ):
+        raise AtlaWireError(
+            "The archive byte limit must be a positive integer or None."
+        )
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = (
         f"{base}/rest/api/1.0/projects/{quote(project_key, safe='')}"
@@ -483,10 +552,20 @@ def get_repository_archive(
                 stream=True,
             ) as response:
                 _check_status(response.status_code, method="GET")
+                if max_bytes is None:
+                    limit = _ARCHIVE_LIMIT_UNBOUNDED
+                    message = "The repository archive exceeds the byte limit."
+                else:
+                    limit = max_bytes
+                    message = (
+                        "The repository archive exceeds the "
+                        f"{max_bytes}-byte limit; raise max_bytes or "
+                        "use a streaming client."
+                    )
                 return read_encoded_limited(
                     response,
-                    limit=_ARCHIVE_LIMIT,
-                    message=_ARCHIVE_LIMIT_MESSAGE,
+                    limit=limit,
+                    message=message,
                 )
         except requests.Timeout:
             raise AtlaWireError(
@@ -637,9 +716,30 @@ def get_last_modified(
     selected path suffix when present. The decoded object is returned
     unchanged, so the ``files`` map, ``latestCommit``, and unknown nested fields
     are preserved, and response links are never followed.
+
+    Bitbucket Server 5.10 documents ``at`` as the route's only query parameter
+    and states in its documented 400 that "when streaming modifications, an
+    explicit starting commit must be supplied". A path read therefore requires
+    an explicit nonempty ``at`` and is rejected before any request when it is
+    missing; the repository-root form still omits ``at`` and lets the server
+    start from the default branch tip.
+
+    Live read-only observation (2026-11-23): the path form with an explicit full
+    merge commit and the documented ``?at=`` query answered HTTP 500, while the
+    same path/commit read through the ``/raw`` route and the root form at the
+    same commit both answered 200. The 5.10 reference lists only 200, 400, 401,
+    and 404 for this route, so the 500 is not a documented request-shape defect;
+    it is recorded as a server-side limitation and the documented request is not
+    changed to work around it.
     """
     suffix = _last_modified_suffix(path)
     params = _revision_params(at)
+    if suffix and not params:
+        raise AtlaWireError(
+            "Expected an explicit at commit for the last-modified path form.",
+            category="validation",
+            method="GET",
+        )
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
     with bearer_session(token) as session:
@@ -665,6 +765,9 @@ def get_pull_request_file(
     response links are never used. Side and path are validated before any
     request; malformed selected metadata fails after the pull request request
     but before the raw request.
+
+    The selected file is read with the same non-JSON media-type rule as
+    [get_repository_file][atlawire.bitbucket.get_repository_file].
     """
     selected_side = _file_side(side)
     segments = _file_segments(path)
@@ -675,10 +778,11 @@ def get_pull_request_file(
         value = get_json_object(session, url, params={})
         _validate_pull_request(value, identifier)
         project, slug, commit = _selected_file_ref(value, selected_side)
-        return get_text(
+        return _read_raw_file_text(
             session,
             _raw_file_url(base, project, slug, segments),
             params={"at": commit},
+            token=token,
         )
 
 
@@ -1444,6 +1548,330 @@ def get_commit_diff_text(
     return text
 
 
+def get_project(
+    base_url: str,
+    project_key: str,
+    *,
+    token: str,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> ProjectDetail | dict[str, object]:
+    """Вернуть один проект Bitbucket Server 5.10.
+
+    ``project_key`` проверяется до создания сессии и кодируется как один сегмент
+    пути. Ровно один GET уходит на ``/rest/api/1.0/projects/{projectKey}`` без query;
+    ссылки из ответа не читаются.
+
+    По умолчанию возвращается плоская проекция [ProjectDetail][atlawire.bitbucket.ProjectDetail]
+    с полями ``key``, ``name``, ``description``, ``public`` и ``type``. Поле, которого
+    нет в ответе, проецируется как ``None``; ``key`` обязателен и должен быть ключом
+    проекта. ``raw=True`` возвращает декодированный объект сервера без проекции,
+    поэтому сохраняются ``id``, ``links`` и любые неизвестные поля.
+
+    Неуспешный HTTP-статус, транспортная ошибка или битая форма ответа поднимают
+    [AtlaWireError][atlawire.http.AtlaWireError] с обезличенной диагностикой: ни
+    URL, ни тело ответа, ни токен в неё не попадают.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _project_url(base, project_key)
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+    if raw:
+        return value
+    return _project_detail(value)
+
+
+def get_repository(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    *,
+    token: str,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> RepositoryDetail | dict[str, object]:
+    """Вернуть один репозиторий Bitbucket Server 5.10.
+
+    ``project_key`` и ``slug`` проверяются до создания сессии: слэш, ``.`` и ``..``
+    отклоняются, каждый сегмент кодируется ровно один раз. Ровно один GET уходит на
+    ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}`` без query.
+
+    По умолчанию возвращается плоская проекция
+    [RepositoryDetail][atlawire.bitbucket.RepositoryDetail] с полями ``slug``, ``name``,
+    ``state``, ``public`` и ``defaultBranch``. Сервер 5.10 не включает ``defaultBranch``
+    в объект репозитория (см. живое наблюдение в
+    [get_default_branch][atlawire.bitbucket.get_default_branch]), поэтому это поле
+    обычно ``None``; отсутствующие необязательные поля тоже проецируются как ``None``.
+    ``raw=True`` возвращает декодированный объект сервера без проекции, включая
+    ``project``, ``links`` и неизвестные поля.
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = _scoped_repository_url(base, project_key, slug)
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+    if raw:
+        return value
+    return _repository_detail(value)
+
+
+def get_default_branch(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    *,
+    token: str,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> BranchDetail | dict[str, object] | None:
+    """Вернуть ветку по умолчанию одного репозитория Bitbucket Server 5.10.
+
+    Ровно один GET уходит на ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches/default``
+    без query. Документированный ответ 204 (пустой репозиторий без ветки по
+    умолчанию) возвращается как ``None``, а не как ошибка; любой другой не-200
+    статус поднимает [AtlaWireError][atlawire.http.AtlaWireError].
+
+    По умолчанию возвращается плоская проекция
+    [BranchDetail][atlawire.bitbucket.BranchDetail] с полями ``id``, ``displayId``,
+    ``latestCommit`` и ``isDefault``; отсутствующее необязательное поле становится
+    ``None``. ``raw=True`` возвращает декодированный объект сервера без проекции
+    (например, с ``type`` и ``latestChangeset``).
+    """
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_scoped_repository_url(base, project_key, slug)}/branches/default"
+    with bearer_session(token) as session:
+        value = get_json_object_allow_no_content(session, url, params={})
+    if value is None:
+        return None
+    if raw:
+        return value
+    return _branch_detail(value)
+
+
+def get_repository_changes(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    until: str,
+    *,
+    token: str,
+    since: str | None = None,
+    limit: int | None = None,
+    max_pages: int = 100,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> list[ChangedFile] | list[dict[str, object]]:
+    """Перечислить изменения между двумя состояниями репозитория.
+
+    Маршрут ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/changes``
+    сравнивает ``until`` с ``since``; без ``since`` сервер сравнивает с первым
+    родителем ``until``. ``until`` обязателен (его отсутствие — документированный
+    400) и вместе с ``since`` принимает ID коммита или ref; оба значения
+    проверяются до создания сессии и уходят только как query-параметры.
+
+    ``limit`` ограничивает число строк-изменений (``None`` — без клиентского
+    предела, 1-1000 иначе). Страницы читаются строго по серверным ``isLastPage``
+    и ``nextPageStart``; курсор не вычисляется из ``start + size``, поэтому
+    непрозрачный курсор и короткая страница обрабатываются как у остальных
+    paged-функций модуля. Битый курсор, отсутствующий ``isLastPage``, ошибка,
+    транспортный сбой или исчерпанный ``max_pages`` поднимают
+    [AtlaWireError][atlawire.http.AtlaWireError] без частичного списка.
+
+    Строки по умолчанию проецируются в [ChangedFile][atlawire.bitbucket.ChangedFile]
+    (``path``, ``type``, ``node``): 5.10 отдаёт здесь изменённые файлы, а не refs.
+    ``raw=True`` возвращает строки сервера без проекции.
+    """
+    _validate_page_limit(max_pages)
+    params = _changes_params(until, since)
+    floor = _row_limit(limit, "change")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_scoped_repository_url(base, project_key, slug)}/changes"
+    with bearer_session(token) as session:
+        if raw:
+            return _read_pages(
+                session, url, max_pages, project=_dict_row, params=params, limit=floor
+            )
+        return _read_pages(
+            session, url, max_pages, project=_changed_file, params=params, limit=floor
+        )
+
+
+def list_commit_comments(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    commit_id: str,
+    *,
+    token: str,
+    path: str | None = None,
+    limit: int | None = None,
+    max_pages: int = 100,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> list[CommitComment] | list[dict[str, object]]:
+    """Перечислить комментарии одного коммита.
+
+    ``commit_id`` — 7-40 шестнадцатеричных символов, проверяются до запроса. Путь
+    ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments``
+    документирует ``path`` как необязательный фильтр, но живой сервер 5.10
+    отвечает 400 «The path query parameter is required when retrieving comments.»,
+    поэтому на этом сервере ``path`` фактически обязателен: заданный безопасный
+    относительный путь уходит как ``path``, отсутствующий не отправляется. Кривой
+    `path` отклоняется до создания сессии.
+
+    ``limit`` ограничивает число строк (``None`` — без клиентского предела,
+    1-1000 иначе); страницы читаются по ``isLastPage``/``nextPageStart``, а не по
+    арифметике ``start + limit``. По умолчанию строки проецируются в
+    [CommitComment][atlawire.bitbucket.CommitComment] с плоскими полями ``id``,
+    ``author``, ``text``, ``createdDate``; ``raw=True`` возвращает строки сервера
+    без проекции (включая вложенные ответы и неизвестные поля).
+    """
+    _validate_page_limit(max_pages)
+    commit = _commit_id(commit_id)
+    floor = _row_limit(limit, "comment")
+    params: dict[str, str] = {}
+    selected_path = _comment_path(path)
+    if selected_path is not None:
+        params["path"] = selected_path
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_scoped_repository_url(base, project_key, slug)}/commits/{commit}/comments"
+    with bearer_session(token) as session:
+        if raw:
+            return _read_pages(
+                session, url, max_pages, project=_dict_row, params=params, limit=floor
+            )
+        return _read_pages(
+            session, url, max_pages, project=_commit_comment, params=params, limit=floor
+        )
+
+
+def get_commit_comment(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    commit_id: str,
+    comment_id: str | int,
+    *,
+    token: str,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> CommitComment | dict[str, object]:
+    """Вернуть один комментарий коммита.
+
+    ``commit_id`` (7-40 hex) и ``comment_id`` (положительный ID) проверяются до
+    запроса. Ровно один GET уходит на
+    ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments/{commentId}``
+    без query; ответ обязан нести тот же ``id``, иначе поднимается
+    [AtlaWireError][atlawire.http.AtlaWireError] (защита от чужого ресурса).
+
+    По умолчанию возвращается проекция [CommitComment][atlawire.bitbucket.CommitComment];
+    отсутствующие необязательные ``author``/``createdDate`` — ``None``.
+    ``raw=True`` возвращает декодированный объект сервера без проекции.
+    """
+    commit = _commit_id(commit_id)
+    identifier = _comment_id(comment_id)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = (
+        f"{_scoped_repository_url(base, project_key, slug)}"
+        f"/commits/{commit}/comments/{identifier}"
+    )
+    with bearer_session(token) as session:
+        value = get_json_object(session, url, params={})
+    returned = value.get("id")
+    if (
+        not isinstance(returned, int)
+        or isinstance(returned, bool)
+        or returned != identifier
+    ):
+        raise AtlaWireError("Bitbucket returned a different comment.")
+    if raw:
+        return value
+    return _commit_comment(value)
+
+
+def list_repository_participants(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    *,
+    token: str,
+    max_pages: int = 100,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> list[ParticipantRow] | list[dict[str, object]]:
+    """Перечислить участников pull request'ов репозитория.
+
+    Страницы ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/participants``
+    читаются до терминальной страницы по ``isLastPage``/``nextPageStart``; фильтры
+    ``direction``, ``filter`` и ``role`` не отправляются. Пустой ответ — это пустой
+    список, а не ошибка.
+
+    5.10 документирует строки как пользователей (``name``, ``displayName`` и т.д.) и
+    не кладёт в ответ ``role``, поэтому по умолчанию плоская проекция
+    [ParticipantRow][atlawire.bitbucket.ParticipantRow] содержит ``role=None``;
+    ``role`` заполняется только если сервер реально вернул его в строке (например,
+    обёртку участника PR). ``raw=True`` возвращает строки сервера без проекции.
+    """
+    _validate_page_limit(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_scoped_repository_url(base, project_key, slug)}/participants"
+    with bearer_session(token) as session:
+        if raw:
+            return _read_pages(session, url, max_pages, project=_dict_row)
+        return _read_pages(session, url, max_pages, project=_participant_row)
+
+
+def list_repository_forks(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    *,
+    token: str,
+    max_pages: int = 100,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> list[RepositoryLink] | list[dict[str, object]]:
+    """Перечислить непосредственные форки репозитория.
+
+    ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/forks`` пагинируется
+    по ``isLastPage``/``nextPageStart``; возвращаются только прямые форки, без
+    «внуков» (так документирован маршрут). Пустой ответ — пустой список.
+
+    Строки по умолчанию проецируются в [RepositoryLink][atlawire.bitbucket.RepositoryLink]
+    (``slug``, ``project``, ``state``), где ``project`` — плоский ключ проекта
+    (``PRJ`` или ``~user``), а не вложенный объект. ``raw=True`` возвращает строки
+    сервера без проекции.
+    """
+    _validate_page_limit(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_scoped_repository_url(base, project_key, slug)}/forks"
+    return _read_repository_links(url, token, max_pages, raw)
+
+
+def get_related_repositories(
+    base_url: str,
+    project_key: str,
+    slug: str,
+    *,
+    token: str,
+    max_pages: int = 100,
+    raw: bool = False,
+    allow_http_loopback: bool = False,
+) -> list[RepositoryLink] | list[dict[str, object]]:
+    """Перечислить репозитории, связанные с данным по иерархии.
+
+    ``/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/related`` пагинируется
+    по ``isLastPage``/``nextPageStart``. Несмотря на имя, функция возвращает список
+    строк, как и [list_repository_forks][atlawire.bitbucket.list_repository_forks],
+    и проецирует их в тот же плоский [RepositoryLink][atlawire.bitbucket.RepositoryLink]
+    (``slug``, ``project``, ``state``). ``raw=True`` возвращает строки сервера без
+    проекции; пустой ответ — пустой список.
+    """
+    _validate_page_limit(max_pages)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{_scoped_repository_url(base, project_key, slug)}/related"
+    return _read_repository_links(url, token, max_pages, raw)
+
+
 def _read_commit_file_diff(
     session: requests.Session,
     url: str,
@@ -1480,6 +1908,34 @@ def _repository_url(base: str, repo: str) -> str:
     )
 
 
+def _project_url(base: str, project_key: str) -> str:
+    """Вернуть проверенный URL проекта под уже нормализованным base."""
+    if not isinstance(project_key, str) or not _PROJECT_KEY.fullmatch(project_key):
+        raise AtlaWireError("Expected a Bitbucket project key.")
+    return f"{base}/rest/api/1.0/projects/{quote(project_key, safe='')}"
+
+
+def _scoped_repository_url(base: str, project_key: str, slug: str) -> str:
+    """Вернуть проверенный URL репозитория по отдельным project key и slug."""
+    if (
+        not isinstance(slug, str)
+        or not _REPOSITORY_SLUG.fullmatch(slug)
+        or slug in {".", ".."}
+    ):
+        raise AtlaWireError("Expected a Bitbucket repository slug.")
+    return f"{_project_url(base, project_key)}/repos/{quote(slug, safe='')}"
+
+
+def _read_repository_links(
+    url: str, token: str, max_pages: int, raw: bool
+) -> list[RepositoryLink] | list[dict[str, object]]:
+    """Прочитать paged-список форков или связанных репозиториев."""
+    with bearer_session(token) as session:
+        if raw:
+            return _read_pages(session, url, max_pages, project=_dict_row)
+        return _read_pages(session, url, max_pages, project=_repository_link)
+
+
 def _validate_page_limit(max_pages: int) -> None:
     if (
         not isinstance(max_pages, int)
@@ -1499,6 +1955,15 @@ def _repository_needle(name: str) -> str:
 def _validate_row_limit(limit: int) -> None:
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
         raise AtlaWireError("The repository limit must be between 1 and 1000.")
+
+
+def _row_limit(limit: int | None, label: str) -> int | None:
+    """Принять None или положительный предел строк, понятный общему pager'у."""
+    if limit is None:
+        return None
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+        raise AtlaWireError(f"The {label} limit must be between 1 and 1000.")
+    return limit
 
 
 def _find_in_projects(
@@ -1628,6 +2093,14 @@ def _commit_params(at: str | None, path: str | None) -> dict[str, str]:
     return params
 
 
+def _changes_params(until: str, since: str | None) -> dict[str, str]:
+    """Собрать документированные селекторы ``/changes`` до любого запроса."""
+    params = {"until": _revision(until)}
+    if since is not None and since != "":
+        params["since"] = _revision(since)
+    return params
+
+
 def _commit_id(value: str) -> str:
     """Accept only a 7-40 character ASCII hexadecimal commit ID."""
     if not isinstance(value, str) or not _COMMIT_ID.fullmatch(value):
@@ -1748,6 +2221,13 @@ def _file_segments(path: str) -> tuple[str, ...]:
     return tuple(segments)
 
 
+def _comment_path(path: str | None) -> str | None:
+    """Проверить необязательный путь комментария и вернуть его без изменений."""
+    if path is None or path == "":
+        return None
+    return "/".join(_file_segments(path))
+
+
 def _revision(value: str) -> str:
     """Validate a non-empty, control-free revision sent only as ``at``."""
     if not isinstance(value, str) or not value or _REVISION_UNSAFE.search(value):
@@ -1836,6 +2316,68 @@ def _raw_file_url(base: str, project: str, slug: str, segments: tuple[str, ...])
     )
 
 
+def _read_raw_file_text(
+    session: requests.Session, url: str, *, params: Mapping[str, str], token: str
+) -> str:
+    """Read one raw repository file as exact UTF-8 text.
+
+    Mirrors [get_text][atlawire.http.get_text] for the request policy: one
+    streamed GET with ``Accept: text/plain`` (this server refuses the raw route
+    without it), no redirect, the shared 5 s connect and 30 s read timeouts,
+    the 1 MiB decoded-size bound, strict UTF-8, the control-character guard, and
+    the credential-echo rejection.
+
+    Only the media-type decision differs: the raw route derives the media type
+    from the stored file (``text/plain`` for ``.java``, ``text/markdown`` for
+    ``.md``, and so on), so the reference client's rule is used instead of a
+    ``text/plain`` whitelist -- a JSON media type is an error document and every
+    other body is file text (``atlassian-python-api`` ``get_content_of_file``
+    with ``not_json_response``). A binary body still fails the strict UTF-8 or
+    control-character guard without returning partial text.
+    """
+    try:
+        with session.get(
+            url,
+            params=params,
+            headers={"Accept": "text/plain"},
+            timeout=(5, 30),
+            allow_redirects=False,
+            stream=True,
+        ) as response:
+            _check_status(response.status_code, method="GET")
+            _check_raw_file_media_type(response.headers.get("Content-Type"))
+            payload = read_encoded_limited(
+                response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
+            )
+    except requests.Timeout:
+        raise AtlaWireError(
+            "Request timed out.", category="transport", method="GET"
+        ) from None
+    except requests.RequestException:
+        raise AtlaWireError(
+            _TRANSPORT_MESSAGE, category="transport", method="GET"
+        ) from None
+    text = _decode_utf8_text(payload)
+    reject_credential_echo(text, tokens=(token,))
+    return text
+
+
+def _check_raw_file_media_type(value: str | None) -> None:
+    """Reject a JSON error document and accept any other raw-file body as text.
+
+    Bitbucket chooses the raw-file media type from the stored file, so a
+    readable ``README.md`` arrives as ``text/markdown``; the earlier
+    ``text/plain``-only check rejected it. The reference client treats the body
+    as content unless it is a JSON document (``not_json_response``), which is the
+    rule kept here.
+    """
+    media_type = (value or "").split(";", 1)[0].strip().lower()
+    if media_type == "application/json" or media_type.endswith("+json"):
+        raise AtlaWireError(
+            "Expected a text response, not JSON.", category="upstream"
+        )
+
+
 def _selected_file_ref(value: dict[str, object], side: str) -> tuple[str, str, str]:
     """Return the selected ref's validated project, slug, and full commit."""
     invalid = "Invalid pull request file metadata."
@@ -1873,6 +2415,24 @@ def _pull_request_id(value: str | int) -> int:
         # Length is checked before conversion so huge digit strings cannot stall
         # or hit the interpreter's integer-string conversion limit.
         if len(value) > 19 or not re.fullmatch(r"[1-9][0-9]*", value):
+            raise AtlaWireError(invalid)
+        identifier = int(value)
+    else:
+        raise AtlaWireError(invalid)
+    if not 1 <= identifier <= _PULL_REQUEST_ID_MAX:
+        raise AtlaWireError(invalid)
+    return identifier
+
+
+def _comment_id(value: str | int) -> int:
+    """Вернуть положительный ID комментария или отклонить его до запроса."""
+    invalid = "Expected a comment ID as a positive integer."
+    if isinstance(value, bool):
+        raise AtlaWireError(invalid)
+    if isinstance(value, int):
+        identifier = value
+    elif isinstance(value, str):
+        if not re.fullmatch(r"[1-9][0-9]{0,18}", value):
             raise AtlaWireError(invalid)
         identifier = int(value)
     else:
@@ -2532,6 +3092,13 @@ def _tag_row(value: object) -> dict[str, object]:
     return value
 
 
+def _dict_row(value: object) -> dict[str, object]:
+    """Вернуть строку ответа без проекции, требуя JSON-объект."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a JSON object.")
+    return value
+
+
 def _project(value: object) -> Project:
     if not isinstance(value, dict):
         raise AtlaWireError("Expected a Bitbucket project object.")
@@ -2594,6 +3161,159 @@ def _repository(value: object) -> Repository:
     ):
         raise AtlaWireError("Invalid fields in a Bitbucket repository.")
     return Repository(slug=slug, name=name, state=state, public=public)
+
+
+def _project_detail(value: object) -> ProjectDetail:
+    """Спроецировать проект в плоскую строку, отсутствующее поле — None."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket project object.")
+    key = value.get("key")
+    name = value.get("name")
+    description = value.get("description")
+    public = value.get("public")
+    kind = value.get("type")
+    if not isinstance(key, str) or not _PROJECT_KEY.fullmatch(key):
+        raise AtlaWireError("Invalid fields in a Bitbucket project.")
+    if (
+        (name is not None and not isinstance(name, str))
+        or (description is not None and not isinstance(description, str))
+        or (public is not None and not isinstance(public, bool))
+        or (kind is not None and not isinstance(kind, str))
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket project.")
+    return ProjectDetail(
+        key=_require_encodable(key, "project key"),
+        name=_optional_encodable(name, "project name"),
+        description=_optional_encodable(description, "project description"),
+        public=public,
+        type=_optional_encodable(kind, "project type"),
+    )
+
+
+def _repository_detail(value: object) -> RepositoryDetail:
+    """Спроецировать репозиторий; 5.10 не отдаёт defaultBranch — тогда None."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket repository object.")
+    slug = value.get("slug")
+    name = value.get("name")
+    state = value.get("state")
+    public = value.get("public")
+    default_branch = value.get("defaultBranch")
+    if not isinstance(slug, str) or not slug:
+        raise AtlaWireError("Invalid fields in a Bitbucket repository.")
+    if (
+        (name is not None and not isinstance(name, str))
+        or (state is not None and not isinstance(state, str))
+        or (public is not None and not isinstance(public, bool))
+        or (default_branch is not None and not isinstance(default_branch, str))
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket repository.")
+    return RepositoryDetail(
+        slug=_require_encodable(slug, "repository slug"),
+        name=_optional_encodable(name, "repository name"),
+        state=_optional_encodable(state, "repository state"),
+        public=public,
+        defaultBranch=_optional_encodable(default_branch, "default branch"),
+    )
+
+
+def _branch_detail(value: object) -> BranchDetail:
+    """Спроецировать ветку по умолчанию в плоскую строку."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket branch object.")
+    identifier = value.get("id")
+    display = value.get("displayId")
+    commit = value.get("latestCommit")
+    default = value.get("isDefault")
+    if not isinstance(identifier, str) or not identifier:
+        raise AtlaWireError("Invalid fields in a Bitbucket branch.")
+    if (
+        (display is not None and not isinstance(display, str))
+        or (commit is not None and not isinstance(commit, str))
+        or (default is not None and not isinstance(default, bool))
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket branch.")
+    return BranchDetail(
+        id=_require_encodable(identifier, "branch ID"),
+        displayId=_optional_encodable(display, "branch display name"),
+        latestCommit=_optional_encodable(commit, "branch commit"),
+        isDefault=default,
+    )
+
+
+def _commit_comment(value: object) -> CommitComment:
+    """Спроецировать комментарий коммита в плоскую строку."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket comment object.")
+    identifier = value.get("id")
+    text = value.get("text")
+    if (
+        not isinstance(identifier, int)
+        or isinstance(identifier, bool)
+        or identifier <= 0
+    ):
+        raise AtlaWireError("Invalid id in a Bitbucket comment.")
+    if text is None:
+        text = ""
+    elif not isinstance(text, str):
+        raise AtlaWireError("Invalid text in a Bitbucket comment.")
+    return CommitComment(
+        id=identifier,
+        author=_optional_encodable(
+            _comment_author(value.get("author")), "comment author"
+        ),
+        text=_require_encodable(text, "comment text"),
+        createdDate=_comment_created(value),
+    )
+
+
+def _participant_row(value: object) -> ParticipantRow:
+    """Спроецировать участника; 5.10 отдаёт пользователя без role — тогда None."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket participant object.")
+    user = value.get("user")
+    person = value if user is None else user
+    if not isinstance(person, dict):
+        raise AtlaWireError("Invalid fields in a Bitbucket participant.")
+    name = person.get("name")
+    display_name = person.get("displayName")
+    role = value.get("role")
+    if (
+        (name is not None and not isinstance(name, str))
+        or (display_name is not None and not isinstance(display_name, str))
+        or (role is not None and not isinstance(role, str))
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket participant.")
+    return ParticipantRow(
+        name=_optional_encodable(name, "participant name"),
+        displayName=_optional_encodable(display_name, "participant display name"),
+        role=_optional_encodable(role, "participant role"),
+    )
+
+
+def _repository_link(value: object) -> RepositoryLink:
+    """Спроецировать форк или связанный репозиторий в плоскую строку."""
+    if not isinstance(value, dict):
+        raise AtlaWireError("Expected a Bitbucket repository object.")
+    slug = value.get("slug")
+    project = value.get("project")
+    state = value.get("state")
+    key: object = None
+    if project is not None:
+        if not isinstance(project, dict):
+            raise AtlaWireError("Invalid fields in a Bitbucket repository.")
+        key = project.get("key")
+        if not isinstance(key, str) or not _PROJECT_KEY.fullmatch(key):
+            raise AtlaWireError("Invalid fields in a Bitbucket repository.")
+    if not isinstance(slug, str) or not slug:
+        raise AtlaWireError("Invalid fields in a Bitbucket repository.")
+    if state is not None and not isinstance(state, str):
+        raise AtlaWireError("Invalid fields in a Bitbucket repository.")
+    return RepositoryLink(
+        slug=_require_encodable(slug, "repository slug"),
+        project=_optional_encodable(key, "repository project"),
+        state=_optional_encodable(state, "repository state"),
+    )
 
 
 def _pull_request(value: object) -> PullRequest:
