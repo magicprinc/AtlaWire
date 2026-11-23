@@ -9,7 +9,8 @@ The contracts covered here:
 
 * ``jql --fields/--expand``, ``issue --expand``, ``cql --expand``, ``page
   --expand`` and ``issue-comments --limit`` reach the request or the printed
-  rows without changing the default invocation.
+  rows, and a truncated comment thread is reported, without changing the
+  default invocation.
 * ``pr-files``, ``pr-comments``, ``grep`` and ``scan`` execute the same
   callback and print the same result as their canonical commands, and stay
   visible in ``--help`` and ``--catalog``.
@@ -271,41 +272,81 @@ def test_page_expand_prints_the_raw_page_and_rejects_row_views(server) -> None:
     assert server.calls == []
 
 
-def test_issue_comments_limit_caps_the_printed_rows(server) -> None:
-    """--limit shortens the printed thread and the default prints every row."""
-    comments = [
-        {
-            "id": str(number),
-            "author": {"name": "ada"},
-            "body": f"comment {number}",
-            "created": "2026-11-01T10:00:00.000+0300",
-        }
-        for number in (1, 2, 3)
-    ]
-    server.routes = {
-        JIRA_COMMENTS: {
-            "startAt": 0,
-            "maxResults": 50,
-            "total": 3,
-            "comments": comments,
-        }
+def _comment_page(count: int, max_results: int) -> dict[str, object]:
+    """Build one comments page with ``count`` rows and the echoed page size."""
+    return {
+        "startAt": 0,
+        "maxResults": max_results,
+        "total": count,
+        "comments": [
+            {
+                "id": str(number),
+                "author": {"name": "ada"},
+                "body": f"comment {number}",
+                "created": "2026-11-01T10:00:00.000+0300",
+            }
+            for number in range(1, count + 1)
+        ],
     }
+
+
+def test_issue_comments_limit_reaches_the_request_and_marks_truncation(server) -> None:
+    """--limit becomes maxResults, and a shorter page is visibly incomplete."""
+    server.routes = {JIRA_COMMENTS: _comment_page(2, 2) | {"total": 10}}
 
     limited = _invoke(server, ("issue-comments", "DEMO-42", "--limit", "2"), "jira")
 
     assert limited.exit_code == 0, limited.stderr
     printed = json.loads(limited.stdout)
-    assert [row["id"] for row in printed] == ["1", "2"]
-    assert _only_call(server)[2] == {
-        "startAt": ["0"],
-        "maxResults": ["50"],
-    }
+    assert printed["truncated"] is True
+    assert printed["total"] == 10
+    assert [row["id"] for row in printed["rows"]] == ["1", "2"]
+    assert "# showing 2 of 10 comment(s)" in limited.stderr
+    assert _only_call(server)[2] == {"startAt": ["0"], "maxResults": ["2"]}
+
+    server.calls.clear()
+    envelope = _invoke(
+        server, ("issue-comments", "DEMO-42", "--limit", "2", "--json"), "jira"
+    )
+
+    assert envelope.exit_code == 0, envelope.stderr
+    assert envelope.stderr == ""
+    assert json.loads(envelope.stdout) == printed
+    assert _only_call(server)[2] == {"startAt": ["0"], "maxResults": ["2"]}
+
+
+def test_issue_comments_complete_reads_keep_the_default_array(server) -> None:
+    """A limit above the thread size and the default print every row as before."""
+    server.routes = {JIRA_COMMENTS: _comment_page(10, 50)}
+
+    capped = _invoke(server, ("issue-comments", "DEMO-42", "--limit", "100"), "jira")
+
+    assert capped.exit_code == 0, capped.stderr
+    assert capped.stderr == ""
+    rows = json.loads(capped.stdout)
+    assert isinstance(rows, list)
+    assert [row["id"] for row in rows] == [str(number) for number in range(1, 11)]
+    assert _only_call(server)[2] == {"startAt": ["0"], "maxResults": ["50"]}
 
     server.calls.clear()
     default = _invoke(server, ("issue-comments", "DEMO-42"), "jira")
 
     assert default.exit_code == 0, default.stderr
-    assert [row["id"] for row in json.loads(default.stdout)] == ["1", "2", "3"]
+    assert default.stderr == ""
+    assert json.loads(default.stdout) == rows
+    assert _only_call(server)[2] == {"startAt": ["0"], "maxResults": ["50"]}
+
+    server.calls.clear()
+    metadata = _invoke(server, ("issue-comments", "DEMO-42", "--json"), "jira")
+
+    assert metadata.exit_code == 0, metadata.stderr
+    assert metadata.stdout != default.stdout
+    assert json.loads(metadata.stdout) == {
+        "rows": rows,
+        "truncated": False,
+        "total": 10,
+    }
+    assert _only_call(server)[2] == {"startAt": ["0"], "maxResults": ["50"]}
 
 
 def test_last_modified_help_documents_default_branch_resolution() -> None:

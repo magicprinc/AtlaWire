@@ -165,7 +165,7 @@ from atlawire.jira import (
     get_issue_watchers,
     get_issue_worklog,
     get_issue_worklogs,
-    list_issue_comments,
+    list_issue_comments_with_metadata,
     list_issue_remote_links,
     list_issue_subtasks,
     list_issue_types,
@@ -3608,7 +3608,13 @@ def issue(
     "--limit",
     type=click.IntRange(1, 1000),
     default=None,
-    help="Print at most this many comments (1-1000); omitted prints the whole thread.",
+    help=("Read at most this many comments (1-1000); omitted reads the whole thread."),
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print rows plus truncation metadata as one JSON object.",
 )
 @click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
@@ -3619,30 +3625,43 @@ def issue_comments(
     token_from_env: bool,
     max_pages: int,
     limit: int | None,
+    as_json: bool,
     allow_http_loopback: bool,
 ) -> None:
-    """Print the full comment thread of a Jira issue as JSON.
+    """Print the comment thread of a Jira issue as JSON.
 
-    ``--limit`` caps the printed rows only; the thread is still read and
-    validated completely because the comment reader publishes a whole thread.
-    Omitting it prints every comment.
+    ``--limit`` goes to the comment reader and becomes the per-page
+    ``maxResults``, so a small limit narrows the server request instead of
+    trimming rows after a full read. When the limit stops before the server's
+    total, the result is truncated: the default output becomes an object with
+    ``rows``, ``truncated`` and ``total`` and a short note on stderr names the
+    shown and total counts. ``--json`` always prints that metadata object.
+    Omitting --limit prints every comment as a bare JSON array.
     """
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
     try:
-        rows = list_issue_comments(
+        thread = list_issue_comments_with_metadata(
             base_url,
             key_or_url,
             token=token,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
-    if limit is not None:
-        rows = rows[:limit]
-    click.echo(json.dumps(rows))
+    if as_json or thread["truncated"]:
+        click.echo(json.dumps(thread))
+    else:
+        click.echo(json.dumps(thread["rows"]))
+    if thread["truncated"] and not as_json:
+        click.echo(
+            f"# showing {len(thread['rows'])} of {thread['total']} comment(s); "
+            "the thread is truncated.",
+            err=True,
+        )
 
 
 @cli.command("issue-remote-links")
