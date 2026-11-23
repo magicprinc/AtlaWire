@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import unquote
 
 import requests
 from atlassian import Bitbucket, ConfluenceServer, Jira
@@ -33,6 +34,7 @@ from atlawire.http import (
     AtlaWireError,
     _NoRedirectSession,
     normalize_base_url,
+    reject_credential_echo,
 )
 
 __all__ = [
@@ -82,7 +84,7 @@ _CLIENTS = {
 }
 
 
-def _supported_product(product: str) -> str | None:
+def _supported_product(product: object) -> str | None:
     """Return the product name only when it is one of the fixed supported names.
 
     Pre-request errors run before ``_raw_client_for`` validates the product, so
@@ -471,7 +473,7 @@ def request_json_with_status(
         product, base_url, token, allow_http_loopback=allow_http_loopback
     )
     try:
-        return _attempt_loop(
+        status, payload = _attempt_loop(
             client,
             normalized,
             path,
@@ -482,6 +484,9 @@ def request_json_with_status(
         )
     finally:
         client.close()
+    if payload is not None:
+        reject_credential_echo(payload, tokens=(token,))
+    return status, payload
 
 
 def download_to_file(
@@ -1073,6 +1078,24 @@ def _error(
     )
 
 
+def _fully_unquoted(path: str) -> str:
+    """Decode every percent-encoding layer until the spelling stops changing.
+
+    ``requests`` normalises a URL with ``requote_uri``, which leaves unreserved
+    bytes (letters, digits, ``-._~``) literal. ``%61dmin`` therefore reaches the
+    server as ``admin`` and encoded ``..`` as a traversal segment. Decoding to a
+    fixed point before the route checks mirrors that normalisation for every
+    layer, including double encoding. Each changing pass shortens the string, so
+    the loop terminates within the original path length.
+    """
+    decoded = path
+    while True:
+        next_value = unquote(decoded)
+        if next_value == decoded:
+            return decoded
+        decoded = next_value
+
+
 def _validate_path(path: str, *, product: str | None = None) -> None:
     if (
         not isinstance(path, str)
@@ -1080,15 +1103,20 @@ def _validate_path(path: str, *, product: str | None = None) -> None:
         or len(path) > _MAX_PATH
         or "//" in path
         or _UNSAFE_PATH.search(path)
-        or any(part in {".", ".."} for part in path.split("/"))
     ):
         raise AtlaWireError(
             "Expected a safe standard REST path.",
             category="validation",
             product=_supported_product(product),
         )
-    segments = [part for part in path.split("/") if part]
-    if any(segment in _ADMIN_SEGMENTS for segment in segments):
+    decoded_segments = _fully_unquoted(path).split("/")
+    if any(segment in {".", ".."} for segment in decoded_segments):
+        raise AtlaWireError(
+            "Expected a safe standard REST path.",
+            category="validation",
+            product=_supported_product(product),
+        )
+    if any(segment in _ADMIN_SEGMENTS for segment in decoded_segments):
         raise AtlaWireError(
             "Administrative REST paths are not supported.",
             category="validation",
