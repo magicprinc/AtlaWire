@@ -395,6 +395,64 @@ def search_issues(
     with bearer_session(token) as session:
         return _read_search(session, url, query, limit)
 
+def titles(
+    base_url: str,
+    keys: list[str],
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, str]:
+    """Map each requested issue key to its Jira summary in input order.
+
+    Parity with ``bbk.jira.titles`` without its SQLite cache: the unique keys
+    are split into input-ordered batches of 50, and each batch costs one
+    ``key in (...)`` JQL read with ``fields=summary`` and ``maxResults`` equal
+    to the batch size, so a long key list never overflows the request URL.
+    Keys are validated before a session is created, so an empty request sends
+    nothing and an invalid key never reaches the network. Issues the search
+    does not return, such as deleted or hidden ones, are omitted instead of
+    becoming empty titles.
+    """
+    if not isinstance(keys, list):
+        raise AtlaWireError("Expected the Jira issue keys as a list.")
+    for key in keys:
+        if not _valid_issue_key(key):
+            raise AtlaWireError("Expected a Jira issue key.")
+    unique = list(dict.fromkeys(keys))
+    if not unique:
+        return {}
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    url = f"{base}/rest/api/2/search"
+    found: dict[str, str] = {}
+    with bearer_session(token) as session:
+        # One JQL read per batch of 50; a longer IN list would overflow the URL.
+        for start in range(0, len(unique), 50):
+            batch = unique[start:start + 50]
+            envelope = get_json_object(
+                session,
+                url,
+                params={
+                    "jql": "key in (" + ",".join(batch) + ")",
+                    "fields": "summary",
+                    "maxResults": len(batch),
+                },
+            )
+            issues = envelope.get("issues")
+            if not isinstance(issues, list):
+                raise AtlaWireError("Expected a Jira search issues array.")
+            for issue in issues:
+                if not isinstance(issue, dict):
+                    raise AtlaWireError("Expected Jira issue objects in search results.")
+                key = issue.get("key")
+                if not _valid_issue_key(key):
+                    raise AtlaWireError("Expected valid Jira issue keys in search results.")
+                fields = issue.get("fields")
+                summary = fields.get("summary") if isinstance(fields, dict) else None
+                if not isinstance(summary, str):
+                    raise AtlaWireError("Expected Jira issue summaries in search results.")
+                found[key] = summary
+    return {key: found[key] for key in unique if key in found}
+
 
 def _check_status_name(status: str) -> None:
     """Reject characters that a quoted JQL literal cannot represent safely.
