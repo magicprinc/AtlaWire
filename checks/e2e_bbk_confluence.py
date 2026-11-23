@@ -37,6 +37,7 @@ Known AtlaWire coverage gaps are documented instead of asserted as passes:
   product-keyed error mapping, empty when every product answered.
 """
 
+import html
 import os
 import re
 from collections.abc import Callable, Sequence
@@ -67,10 +68,27 @@ SPACE_SCAN_LIMIT = 8
 PAGE_SCAN_LIMIT = 5
 CANDIDATE_PAGES = 6
 CHILD_LIMIT = 10
+MARKDOWN_SCAN_LIMIT = 12
 FIND_LIMIT = 2
 STOP_STATUSES = frozenset({401, 403, 429})
 MATCH_EVIDENCE = frozenset({"highlight", "context-only", "none"})
 _TERM_WORD = re.compile(r"[0-9A-Za-z\u0401\u0451\u0410-\u044f]{4,}")
+# Storage structures whose preservation the Markdown check asserts. Plain XHTML
+# anchors, Confluence link/image targets and macro parameters must survive.
+_A_HREF = re.compile(r'<a\s[^>]*href="([^"]+)"')
+_AC_LINK = re.compile(r"<ac:link\b.*?</ac:link>", re.DOTALL)
+_AC_IMAGE = re.compile(r"<ac:image\b.*?</ac:image>", re.DOTALL)
+_AC_MACRO = re.compile(
+    r'<ac:structured-macro\b[^>]*ac:name="([^"]*)"(.*?)</ac:structured-macro>',
+    re.DOTALL,
+)
+_AC_PARAMETER = re.compile(
+    r'<ac:parameter ac:name="([^"]*)">(.*?)</ac:parameter>', re.DOTALL
+)
+_RI_FILENAME = re.compile(r'ri:filename="([^"]+)"')
+_RI_URL = re.compile(r'ri:url\b[^>]*ri:value="([^"]+)"')
+_PLAIN_PARAMETER = re.compile(r"[A-Za-z0-9.\-]{1,60}")
+_CODE_MACROS = frozenset({"code", "noformat"})
 
 
 def _enabled() -> bool:
@@ -259,6 +277,107 @@ def _page_identity(page: dict[str, object]) -> str:
     return "" if isinstance(identifier, bool) else str(identifier)
 
 
+# Percent-encoding a Markdown destination needs; derived from the Markdown
+# syntax, not from the renderer under test.
+_DESTINATION_ESCAPES = {
+    "\\": "%5C",
+    "(": "%28",
+    ")": "%29",
+    "<": "%3C",
+    ">": "%3E",
+    "[": "%5B",
+    "]": "%5D",
+    "`": "%60",
+    "|": "%7C",
+    " ": "%20",
+}
+_OPAQUE_ESCAPES = {**_DESTINATION_ESCAPES, "#": "%23", "?": "%3F"}
+
+
+def _destination_forms(value: str) -> tuple[str, ...]:
+    """Return literal, entity-decoded and Markdown-encoded destination forms.
+
+    Storage XHTML escapes ``&`` as ``&amp;``; the renderer sees the decoded
+    attribute, so both spellings are legitimate expectations.
+    """
+    forms: list[str] = []
+    for candidate in (value, html.unescape(value)):
+        plain = "".join(_DESTINATION_ESCAPES.get(char, char) for char in candidate)
+        opaque = "".join(_OPAQUE_ESCAPES.get(char, char) for char in candidate)
+        forms.extend((candidate, plain, opaque))
+    return tuple(forms)
+
+
+def _kept(value: str, markdown: str) -> bool:
+    """Return whether the Markdown kept one form of a declared destination."""
+    return any(form in markdown for form in _destination_forms(value))
+
+
+def _storage_value(page: dict[str, object]) -> str:
+    """Return the storage XHTML already validated by ``_assert_page``."""
+    body = page.get("body")
+    storage = body.get("storage") if isinstance(body, dict) else None
+    value = storage.get("value") if isinstance(storage, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def _markdown_misses(
+    page: dict[str, object], markdown: str
+) -> tuple[list[str], dict[str, int]]:
+    """Return dropped-structure labels and how many structures were exercised.
+
+    Expected values come from the page's own storage XHTML, so a renderer that
+    silently drops a link, an image or a macro parameter is rejected.
+    """
+    storage = _storage_value(page)
+    seen = {"link": 0, "image": 0, "macro": 0}
+    misses: list[str] = []
+    for href in _A_HREF.findall(storage):
+        if not href or href.startswith("#"):
+            continue
+        seen["link"] += 1
+        if not _kept(href, markdown):
+            misses.append("XHTML link")
+    for block in _AC_LINK.findall(storage):
+        for filename in _RI_FILENAME.findall(block):
+            seen["link"] += 1
+            if not _kept(filename, markdown):
+                misses.append("attachment link")
+        for url in _RI_URL.findall(block):
+            seen["link"] += 1
+            if not _kept(url, markdown):
+                misses.append("URL link")
+    for block in _AC_IMAGE.findall(storage):
+        for filename in _RI_FILENAME.findall(block):
+            seen["image"] += 1
+            if not _kept(filename, markdown):
+                misses.append("image")
+        for url in _RI_URL.findall(block):
+            seen["image"] += 1
+            if not _kept(url, markdown):
+                misses.append("image")
+    for name, body in _AC_MACRO.findall(storage):
+        seen["macro"] += 1
+        normalized = name.strip().lower()
+        if normalized in _CODE_MACROS:
+            if "```" not in markdown:
+                misses.append("code macro")
+        elif name and name not in markdown:
+            misses.append("macro name")
+        for _parameter, value in _AC_PARAMETER.findall(body):
+            for filename in _RI_FILENAME.findall(value):
+                if not _kept(filename, markdown):
+                    misses.append("macro parameter attachment")
+            plain = re.sub(r"<[^>]+>", "", value).strip()
+            if (
+                plain
+                and _PLAIN_PARAMETER.fullmatch(plain)
+                and not _kept(plain, markdown)
+            ):
+                misses.append("macro parameter")
+    return misses, seen
+
+
 @pytest.fixture(scope="module")
 def discovered(targets: dict[str, ProductTarget]) -> LivePage:
     """Find one real page with children using only narrow, bounded reads."""
@@ -346,6 +465,11 @@ def test_confluence_cql_returns_bbk_rows(
         limit=PAGE_SCAN_LIMIT,
     )
     _assert_content_rows(rows)
+    for row in rows:
+        _require(
+            row["space"] == discovered.space_key,
+            "every CQL row of a space query must carry that space key",
+        )
     identifiers = {str(row["id"]) for row in rows}
     _require(
         discovered.page_id in identifiers,
@@ -371,28 +495,74 @@ def test_confluence_page_storage_matches_bbk(
     )
 
 
-def test_confluence_page_markdown_is_non_empty(
-    discovered: LivePage,
+def test_confluence_page_markdown_keeps_structures(
+    targets: dict[str, ProductTarget], discovered: LivePage
 ) -> None:
-    markdown = render_page_markdown(discovered.page)
-    _require(
-        isinstance(markdown, str) and bool(markdown.strip()),
-        "page Markdown must be non-empty text",
+    """Markdown must keep every link, image and macro the storage declares."""
+    confluence = targets["confluence"]
+    pages = [discovered.page]
+    rows = _live_call(
+        "Confluence CQL",
+        search_cql,
+        confluence.base_url,
+        f'space = "{discovered.space_key}" and type = page',
+        token=confluence.token,
+        limit=MARKDOWN_SCAN_LIMIT,
     )
-    title = str(discovered.page["title"])
-    first_line = markdown.splitlines()[0] if markdown else ""
-    _require(
-        first_line.startswith("# ") and bool(first_line[2:].strip()),
-        "page Markdown must open with a non-empty title heading",
-    )
-    # Markdown escaping may alter punctuation in the title, so only a readable
-    # word (letters and digits, never escaped) is required in the heading.
-    token = _TERM_WORD.search(title)
-    if token is not None:
-        _require(
-            token.group(0) in first_line,
-            "the title heading must keep readable text from the page title",
+    _assert_content_rows(rows)
+    for row in rows:
+        if str(row["id"]) == discovered.page_id:
+            continue
+        page = _live_call(
+            "Confluence page",
+            get_page,
+            confluence.base_url,
+            row["id"],
+            token=confluence.token,
         )
+        _assert_page(page)
+        pages.append(page)
+
+    dropped: dict[str, int] = {}
+    seen: dict[str, int] = {}
+    broken_pages = 0
+    for page in pages:
+        markdown = render_page_markdown(page)
+        _require(
+            isinstance(markdown, str) and bool(markdown.strip()),
+            "page Markdown must be non-empty text",
+        )
+        title = str(page["title"])
+        first_line = markdown.splitlines()[0] if markdown else ""
+        _require(
+            first_line.startswith("# ") and bool(first_line[2:].strip()),
+            "page Markdown must open with a non-empty title heading",
+        )
+        # Markdown escaping may alter punctuation in the title, so only a
+        # readable word (letters and digits, never escaped) is required here.
+        title_token = _TERM_WORD.search(title)
+        if title_token is not None:
+            _require(
+                title_token.group(0) in first_line,
+                "the title heading must keep readable text from the page title",
+            )
+        misses, structures = _markdown_misses(page, markdown)
+        if misses:
+            broken_pages += 1
+            for kind in misses:
+                dropped[kind] = dropped.get(kind, 0) + 1
+        for kind, count in structures.items():
+            seen[kind] = seen.get(kind, 0) + count
+    _require(
+        all(seen.get(kind) for kind in ("link", "image", "macro")),
+        "Markdown preservation fixtures were not exercised: "
+        f"{dict(sorted(seen.items()))}",
+    )
+    _require(
+        not dropped,
+        "page Markdown dropped declared structures: "
+        f"{dict(sorted(dropped.items()))} on {broken_pages}/{len(pages)} pages",
+    )
 
 
 def test_confluence_children_match_bbk(
@@ -489,8 +659,10 @@ def _search_term(discovered: LivePage) -> str:
     return discovered.space_key
 
 
-def _assert_row_terms(row: dict[str, object], channel: str) -> None:
-    """Check a merged row keeps the non-empty terms that found it."""
+def _assert_row_terms(
+    row: dict[str, object], channel: str, searched: Sequence[str]
+) -> None:
+    """Check a merged row keeps the searched term that found it."""
     terms = row["terms"]
     _require(
         isinstance(terms, list)
@@ -498,9 +670,14 @@ def _assert_row_terms(row: dict[str, object], channel: str) -> None:
         and all(isinstance(term, str) and term for term in terms),
         f"federated {channel} row terms must be non-empty text",
     )
+    _require(
+        isinstance(terms, list)
+        and any(term in searched for term in terms if isinstance(term, str)),
+        f"federated {channel} row terms must include a searched term",
+    )
 
 
-def _assert_federated_rows(result: dict[str, object]) -> None:
+def _assert_federated_rows(result: dict[str, object], searched: Sequence[str]) -> None:
     confluence_rows = result["confluence"]
     _require(
         isinstance(confluence_rows, list), "federated confluence rows must be a list"
@@ -512,7 +689,7 @@ def _assert_federated_rows(result: dict[str, object]) -> None:
             "federated confluence row fields differ from AtlaWire contract",
         )
         if isinstance(row, dict):
-            _assert_row_terms(row, "Confluence")
+            _assert_row_terms(row, "Confluence", searched)
             identifier = row["id"]
             _require(
                 not isinstance(identifier, bool)
@@ -552,7 +729,7 @@ def _assert_federated_rows(result: dict[str, object]) -> None:
                 isinstance(row["summary"], str),
                 "federated Jira row summary must be text",
             )
-            _assert_row_terms(row, "Jira")
+            _assert_row_terms(row, "Jira", searched)
 
     bitbucket_rows = result["bitbucket"]
     _require(
@@ -592,7 +769,7 @@ def _assert_federated_rows(result: dict[str, object]) -> None:
                 row["matchEvidence"] in MATCH_EVIDENCE,
                 "federated Bitbucket matchEvidence must be a known evidence value",
             )
-            _assert_row_terms(row, "Bitbucket")
+            _assert_row_terms(row, "Bitbucket", searched)
 
 
 def test_federated_find_counts_and_errors(
@@ -696,7 +873,7 @@ def test_federated_find_counts_and_errors(
         "federated limitations must be non-empty text items",
     )
 
-    _assert_federated_rows(result)
+    _assert_federated_rows(result, (term,))
     merged = sum(result["counts"].values()) if isinstance(counts, dict) else 0
     if merged == 0:
         pytest.skip("inconclusive: the derived term produced no merged rows")
