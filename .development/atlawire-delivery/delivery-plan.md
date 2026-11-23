@@ -58,6 +58,13 @@ inventory and any exclusions. Ask for the approved isolated wheel target and
 fixture-scoped live run only when the respective gates are ready. Existing
 credentials are not a reason to use the real provider for an offline probe.
 
+**First handoff:** a commit that fixes the publish-time overwrite in both
+download paths, with a failing-before/passing-after regression. The model can
+start it now using [slice A](audit-follow-up.md#work-order-for-the-implementer).
+Do not pause for another whole-project audit. A useful installed CLI
+**review candidate** is the next milestone; do not promise a full release date
+until the required inventory is frozen and the live owner inputs are known.
+
 **Implementation decision:** Canonical commands and Python methods use the
 existing operation registry and a single private `atlassian-python-api`
 adapter. The initial installed slice uses `jira.project.get`,
@@ -475,9 +482,9 @@ or unsupported remains a gap. A 403 is not proof the endpoint is
 administrative. Do not let uncertainty in a few rows block implementation of
 the rest; do not erase those rows from the completion report.
 
-`%scope-30`: The integrator reconciles the existing mappings into one
-committed machine-readable **release inventory**, outside the runtime
-package. Freeze the target product/edition/reference versions and each row's
+`%scope-30`: The integrator reconciles the existing mappings into a tracked
+`rest-inventory.json` beside this plan, outside the runtime package. Freeze
+the target product/edition/reference versions and each row's
 method, normalized route, stable ID, response kind, disposition and source
 anchor. Required rows define the completion denominator; excluded and
 unresolved rows must include a reason and evidence. Do not derive the list
@@ -602,10 +609,10 @@ and a fake-subprocess parity test are not fresh live evidence.
 
 | Order | Owner and work | Exit check |
 | --- | --- | --- |
-| **1. Stop false success and data loss** | Begin with one commit: no-overwrite publication for both download paths (`audit-follow-up.md`, slice A). Next close SDK body/status failures, gzip, JSON and retry defects in small commits (slice B). Repair the three known harness failures without relaxing permission checks. Log the baseline before editing. | Each critical test fails on the current behavior and passes unchanged after its fix; affected modules pass. Stop and report a blocker if the primitive cannot publish safely on the target filesystem. Do not change transports or namespaces in this phase. |
-| **2. Make one complete agent path work** | Repair env URL selection and canonical JSON parse/action errors. Agree the public CLI shape and the read-only Python migration; never expose the old facade's second registry or raw SDK session. Use the existing three lookup IDs, one paged route, one fixed fallback, one semantic POST and one binary read. Keep the fast path on the pinned private adapter. | From a clean installed **review candidate**, run help → catalog/describe → advertised argv → result/report. Compare one Python call and wrapper to the same CLI operation. Prove credentials are paired and local refusals do not do I/O. This is the first user-visible delivery checkpoint. |
+| **1. Stop false success and data loss** | Begin with one commit: no-overwrite publication for both download paths (`audit-follow-up.md`, slice A). Next close SDK body/status failures, gzip, JSON and retry defects inside the existing transport modules in small commits (slice B). Repair the three known harness failures without relaxing permission checks. Log the baseline before editing. | Each critical test fails on the current behavior and passes unchanged after its fix; affected modules pass. Stop and report a blocker if the primitive cannot publish safely on the target filesystem. Do not replace the transport, add a backend, or change namespaces. |
+| **2. Make one complete agent path work** | Repair env URL selection and canonical JSON parse/action errors now; these fixes do not require selecting new public syntax. Keep the approved grouped design unless the owner changes it. Confirm the Python migration before modifying public exports; never export the prototype's second registry or raw SDK session. Use the three lookup IDs, one paged route, one fixed fallback, `jira.search.post`, and one binary read. | From a clean installed **review candidate**, run help → catalog/describe → advertised argv → result/report. Prove credential pairing and zero-I/O local refusals. Compare one Python call and wrapper to the same CLI operation once that migration is approved. Missing approval leaves the Python gate open, not the CLI fixes blocked. |
 | **3. Reconcile and finish REST by product** | Start classification in parallel with step 1 if authorized; implement route batches only on the stable step-2 path. Put the required versioned inventory and reproducible generator inputs under version control. Use presence of important params, statuses, continuation and media as the gap list. Use existing valid implementations before adding metadata or fallbacks. An integrator owns shared dispatch and manifest merge; product workers must not independently change them. | Every required route has one canonical ID, a runnable call, an independent installed fixture and a disposition against documented/deployed scope. Prefer a reusable test harness with independently authored data, not hundreds of copied CLI tests. Gaps and denied classifications stay visible. |
-| **4. Close owner setup and BBK workflows** | Use the existing private provider and manual browser + hidden paste, with confirmed product-relevant auth. Close known `find` gaps and verify each required BBK workflow against its existing behavior, including mixed results and documented differences. Correct stale README/quickstart/coverage claims from evidence. | Non-interactive/unsupported setup fails without exposed input; failed replacement preserves the store. `find` keeps successful terms/products with explicit errors; budget exhaustion is distinct. Every required BBK row has a check and outcome. |
+| **4. Close owner setup and BBK workflows** | Use the existing private provider and manual browser + hidden paste, with confirmed product-relevant auth. Add the required bounded, best-effort diagnostics. Close known `find` gaps and verify each required BBK workflow against its existing behavior, including mixed results and documented differences. Correct stale README/quickstart/coverage claims from evidence. | Non-interactive/unsupported setup fails without exposed input; failed replacement preserves the store. Logging failure leaves results unchanged and no sensitive fields enter logs. `find` keeps successful terms/products with explicit errors; budget exhaustion is distinct. Every required BBK row has a check and outcome. |
 | **5. Freeze, verify and hand off** | Run all [release gates](test-plan.md#5-release-gates-and-handoff) on the exact code and final wheel. Have a fresh reviewer challenge code and tests; isolated execution only with owner approval. Ask the owner to run the fixture-scoped live selection on that same wheel. | Provide the artifact hash, commands, counts, exits, versions, missing IDs, known limits and sanitized live results. No unresolved safety finding, in-scope missing operation, or missing decisive evidence in a release. Otherwise label it **review candidate**. Do not retire BBK or publish as part of this work. |
 
 **Instructions to the model taking this over:** Read this section and the
@@ -614,12 +621,14 @@ instead of commissioning another general audit. Fix one behavior at a time;
 keep the existing SDK and established tests. Run focused checks per commit;
 run the full suite and wheel gates on the integrated candidate, not after
 every small edit. Commit only the completed slice with a descriptive message.
-Record each checkpoint in the existing local `progress.md`: commit, command,
-outcome, next open row. Do not restart completed work after a context switch.
-Delegate test execution and disjoint fixture inventories if the owner asks;
-do not give several workers ownership of the same dispatcher or credential
-boundary. A blocker report names the failing test/operation, evidence and
-specific decision needed; it does not propose another redesign.
+Record each checkpoint in
+`.planning/2026-11-22-read-only-rest-and-bbk-parity/progress.md`: commit,
+command, outcome and next open row. Do not restart completed work after a
+context switch. While the integrator handles shared fixes, Flash workers can
+reconcile separate product references or BBK workflows read-only; one writer
+per file in each implementation wave. Keep integration and gate runs with the
+primary model. A blocker report names the failing test/operation, evidence
+and specific decision needed; it does not propose another redesign.
 
 Per-operation tests should share a harness, not an oracle. The harness can
 read the manifest to enumerate IDs, but expected paths, encoded parameters and

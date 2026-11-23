@@ -1,5 +1,8 @@
 # HANDOFF — AtlaWire, research readiness
 
+Historical snapshot only. For current scope, next work, and release gates,
+start with the [AtlaWire delivery plan](atlawire-delivery/delivery-plan.md#start-here-implement-do-not-re-plan).
+
 Передача сессии другому harness. Состояние на 2026-11-21, HEAD `ff5379c`,
 ветка `main` синхронизирована с `origin/main`, рабочее дерево чистое.
 

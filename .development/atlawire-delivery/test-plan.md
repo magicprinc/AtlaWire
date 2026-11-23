@@ -56,37 +56,13 @@ or create a project `.venv`, or use `uv run` or `uv sync`. Keep `uv.lock` for
 dependency version evidence; checking the lock does not require syncing an
 environment.
 
-Retire the old ignored `D:/REPO/github/AtlaWire/.venv` only with owner approval:
-
-1. Check that no tracked file, shell, IDE run configuration, launcher, or
-   active process depends on its interpreter. Point any authorized
-   AtlaWire-specific settings to `C:/Python315/python.exe` first.
-2. Verify the installed runtime and test package requirements from
-   `pyproject.toml` without installing or upgrading anything. On 2026-11-23
-   the shared Python satisfied all **4 runtime** and **7 dev** requirements,
-   including the SDK pin. The old environment did not contain the pinned SDK.
-   `hatchling==1.33.0` was absent from both: resolve the wheel build requirement
-   separately when building the artifact, not by recreating `.venv`. Before
-   renaming anything, record the global interpreter identity and baseline
-   results for offline help/version and focused loopback tests, with the
-   command, working directory, exit and counts.
-3. Rename just that verified directory into an unused ignored
-   `.planning/` path so recovery is possible. Repeat the global interpreter
-   identity check, offline launcher/module smoke and focused loopback tests.
-   Compare with the pre-rename baseline; an existing functional failure must
-   not be counted as an environment regression. If the switch breaks execution,
-   stop and keep the backup until the cause is understood.
-4. After those checks and explicit approval for deletion, delete only the
-   named backup. Recheck that the project `.venv` was not recreated and
-   `git status` shows no unrelated changes. Do not alter global packages.
-
-A clean-wheel test is still required: it means loading the exact artifact
-from an owner-approved separate install directory outside the checkout while
-using the same base interpreter, not reinstalling the global dependencies
-or creating a project virtual environment. Obtain approval for any build-time
-installation or network access separately. The missing build backend blocks
-wheel verification if no approved build route is available; it does not make
-the old `.venv` useful, because it is absent there too.
+The owner has already removed `.venv`; do not repeat cleanup. Hatchling
+1.33.0 is available in the Python 3.15 user site. The existing `pyproject.toml`
+built `atlawire-0.1.0.dev0-py3-none-any.whl` offline and the archive's launcher
+metadata and packaged manifest were checked. This was a **build check**,
+not proof that the final CLI was installed or exercised from that wheel.
+Use the same base interpreter and a separate approved install target for
+the clean-wheel gate; do not change the existing installation to run it.
 
 ### What counts as a useful test
 
@@ -229,6 +205,12 @@ behavior instead of inventing a failing bug test.
   single-page request-count test from retry cases. After all paths assert
   that production code closes the response/session **before** fixture
   cleanup. A closed test server by itself is not that evidence.
+- Existing in-process SDK loopback cases are useful but not installed
+  behavior. Add installed CLI controls for retry recovery and early
+  oversized-body rejection, once per shared path rather than per route.
+  Release the held-open handler in `finally` before server shutdown, and
+  use a bounded child timeout that covers the chosen fixture. Teardown
+  timeout or a handler error does not count as detecting a client defect.
 - Run the CLI against a private scratch log directory with a small test
   rotation threshold, then induce a log-write failure. Check both active and
   rotated logs for safe event fields and absence of sensitive fields. Two
@@ -289,7 +271,14 @@ invitation to run tests against a live destructive path.
 
 ## 5. Release gates and handoff
 
-1. **Focused green.** From `D:/REPO/github/AtlaWire` in the isolated offline
+1. **Focused green.** Start with [audit slice A](audit-follow-up.md#work-order-for-the-implementer):
+   both file-output paths must preserve a destination created during
+   publication and emit no receipt. Run this regression before changing
+   production and unchanged after the fix, along with
+   `tests/test_binary_read_cli_e2e.py` and `tests/test_bitbucket_attachment_cli_e2e.py`.
+   Keep the known gzip failure named separately until its own repair; do not
+   hide it or require unrelated fixes before committing the publish change.
+   For the broader slice, from `D:/REPO/github/AtlaWire` in the isolated offline
    environment run:
    ```text
    C:/Python315/python.exe -B -m pytest -p no:cacheprovider -q tests/test_jira_reference_unit.py tests/test_jira_reference_cli_e2e.py
@@ -306,25 +295,41 @@ invitation to run tests against a live destructive path.
    audit with its network access approved. Report failures instead of
    suppressing them. Reconcile the full functional matrix and the required
    inventory against advertised IDs and independently verified test cases.
-   **Pass threshold:** every required ID is implemented, advertised and passes
-   its installed-CLI loopback case, and every shipped workflow is covered at
-   its real entry point. No unresolved in-scope classification, unexpected
-   skip, or unsupported required operation counts as done. Exclusions and
-   additive reads are reported separately.
+   Run the full source suite with CLI children pinned to the candidate. That
+   is the integrated code gate; it does not replace installed-wheel evidence.
+   No unresolved in-scope classification, unexpected skip, or unsupported
+   required operation counts as done. Report exclusions separately.
 3. **Clean wheel proof.** Run `uv lock --check` without regenerating the lock
    as part of the check. Confirm the lock includes the same SDK pin as the
-   project metadata. Build a versioned wheel with approved Python 3.15 tooling.
-   Run the release-equivalent
-   checks on one final wheel hash; if it changes, rerun its bound checks.
-   In an approved isolated
-   install target outside the checkout, prove exact wheel hash, package
-   metadata, imported module location and console launcher. Run section A
-   there plus the slice from section 2 over actual loopback transport.
-   A passing editable install or `CliRunner` alone is not this evidence.
+   project metadata. Build a versioned wheel with the installed backend:
+   ```text
+   C:/Python315/python.exe -B -m pip --isolated wheel --no-index --no-deps --no-build-isolation --wheel-dir <new-ignored-output-dir> .
+   ```
+   Use one wheel hash for release-equivalent checks; if it changes, rerun the
+   checks bound to it. Install into an approved isolated target; run from
+   outside the checkout. Before cases run, verify the actual CLI child and
+   Python import resolve to that target rather than the editable install.
+   `tests/_loopback.py` currently finds the launcher on `PATH` and inherits
+   the parent environment; the source suite also adds `src` to its Python
+   path. Pin the target explicitly, fail the gate if the launcher is missing,
+   disable source injection, and pass only the approved OS/import settings
+   plus synthetic fixture values to offline children. Reuse existing helpers
+   rather than rewrite each test. Do not infer wheel identity from parent
+   `sys.executable`, a matching version or `CliRunner`.
+   **Review-candidate gate:** run section A and the section 2 slice.
+   **Final gate:** also run each required ID's installed-loopback fixture and
+   the shipped workflows at their real entry points; don't repeat every
+   source-only unit test on the wheel.
 4. **Real-server proof (`%gates-37`).** The owner runs the updated fixture-scoped live
    read-only runner for the same installed artifact using the saved
    credentials. Record the observed server versions and a sanitized outcome
-   per run. Before the run, name the representative IDs and expected
+   per run. The current nine-check runner is a baseline, not final
+   evidence: its fixed module launch can select the editable install and
+   it does not exercise all canonical paths. Prepare the final fixture list
+   and prove the exact artifact launch **offline** before supplying real
+   credentials. Keep the allowlist; use a fixed, verified artifact target,
+   not an arbitrary executable or inherited `PYTHONPATH`. Before the run,
+   name the representative IDs and expected
    shapes/identities. **Pass threshold:** cover each product, plus materially
    different product-specific adapter or response paths, including a real
    page continuation, semantic POST and binary where applicable. Reuse one
