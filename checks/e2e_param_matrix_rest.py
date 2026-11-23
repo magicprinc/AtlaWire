@@ -653,7 +653,11 @@ def _conf_version(kind: str) -> Callable[[Ctx], str]:
         storage = _mapping(
             _mapping(document.get("body"), "body").get("storage"), "storage"
         )
-        value = _text(storage.get("value"), "storage.value")
+        value = storage.get("value")
+        if not isinstance(value, str):
+            raise Divergence("storage.value not a string")
+        if kind != "first" and not value:
+            raise Divergence(f"storage.value empty for version {version}")
         return f"v={version} -> number={returned} status={document.get('status')} storage={len(value)}"
 
     return run
@@ -1368,6 +1372,47 @@ def _scan(project: str | None, workers: int) -> Callable[[Ctx], str]:
     return run
 
 
+def _scan_report(max_pages: int) -> Callable[[Ctx], str]:
+    """A page-budget cut must publish counters and the rows read so far."""
+
+    def run(ctx: Ctx) -> str:
+        base, token = ctx.bitbucket.base_url, ctx.bitbucket.token
+        report = repo_scan.scan_repository_extensions_report(
+            base,
+            "java",
+            token=token,
+            max_pages=max_pages,
+        )
+        if report.get("complete") is not False:
+            raise Divergence("partial scan reported complete")
+        scanned = _int(report.get("repositories_scanned"), "repositories_scanned")
+        total = _int(report.get("repositories_total"), "repositories_total")
+        if not 0 <= scanned < total:
+            raise Divergence(f"scanned {scanned} not below total {total}")
+        reason = _text(report.get("reason"), "reason")
+        if "page limit" not in reason.lower():
+            raise Divergence(f"reason is not a page-budget stop: {reason[:80]}")
+        rows = _objects(report.get("rows"), "rows")
+        if not rows:
+            raise Divergence("partial scan kept no rows although walks finished")
+        for row in rows:
+            files = _int(row.get("files"), "files")
+            matched = _int(row.get("matched"), "matched")
+            if not 0 <= matched <= files:
+                raise Divergence("matched > files")
+            sample = row.get("sample")
+            if not isinstance(sample, list) or not sample:
+                raise Divergence("no sample paths")
+            if not all(str(path).endswith(".java") for path in sample):
+                raise Divergence("sample has a non-java path")
+        return (
+            f"complete=False scanned={scanned} < total={total}, rows={len(rows)}, "
+            "reason=page limit"
+        )
+
+    return run
+
+
 # ---------------------------------------------------------------------------
 # Plan, runner and CLI
 # ---------------------------------------------------------------------------
@@ -1689,10 +1734,10 @@ def build_plan(project: str) -> tuple[Check, ...]:
             _grep(None, False, False, 5),
         ),
         Check(
-            "repo_scan.scan_repository_extensions",
-            "extension=java",
+            "repo_scan.scan_repository_extensions_report",
+            "extension=java max_pages=1 (partial)",
             "coverage",
-            _scan(None, 8),
+            _scan_report(1),
         ),
         Check(
             "repo_scan.scan_repository_extensions",

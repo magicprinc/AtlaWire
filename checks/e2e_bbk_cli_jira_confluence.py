@@ -4,7 +4,10 @@ Repeats, through the installed ``atlawire`` command, the operations that BBK
 agents and scripts actually use against the real deployment: JQL search, one
 issue read, its comments, statuses, transitions, the caller identity, a narrow
 user search, CQL search, one page read plus its Markdown rendering, its child
-pages, a space listing, a federated ``find``, and the ``selftest`` probe.
+pages, a space listing, a federated ``find``, and the ``selftest`` probe. The
+value-changing options are each checked with one real combination: jql
+--fields/--expand, issue --expand, issue-comments --limit, cql --expand and
+page --expand must change the observed response, not only the exit code.
 
 Run explicitly, against the real server named by the saved BBK credentials::
 
@@ -201,12 +204,15 @@ def _record(
     fact: str,
     machine_json: bool | None,
     expected_exit: int = 0,
-    forced_ok: bool = False,
+    forced_ok: bool | None = None,
 ) -> Observation:
-    """Append one reported row and honour the shared stop policy."""
-    ok = forced_ok or (
-        observation.exit_code == expected_exit and not observation.timed_out
-    )
+    """Append one reported row and honour the shared stop policy.
+
+    ``forced_ok=None`` keeps the exit-code-only verdict. A boolean enforces the
+    step's semantic assertion, so exit 0 alone cannot pass a wrong answer.
+    """
+    exit_ok = observation.exit_code == expected_exit and not observation.timed_out
+    ok = exit_ok if forced_ok is None else exit_ok and forced_ok
     state.steps.append(
         Step(
             label=label,
@@ -278,6 +284,80 @@ def _jql(cli: Cli, state: RunState) -> None:
         machine_json=ok_json,
         forced_ok=ok_json and count > 0,
     )
+    projected_keys = sorted(value[0]) if ok_json and isinstance(value, list) and value else []
+    if state.stopped_by is not None:
+        return
+    fields_args = (
+        "jql",
+        JQL_QUERY,
+        "--limit",
+        str(JQL_LIMIT),
+        "--fields",
+        "summary",
+        "--json",
+    )
+    fields_obs = cli.run(fields_args)
+    ok_fields, fields_doc = _json_value(fields_obs.stdout)
+    field_issues = fields_doc.get("issues") if isinstance(fields_doc, dict) else None
+    field_issue_rows = field_issues if isinstance(field_issues, list) else []
+    first_field_keys = (
+        sorted(field_issue_rows[0].get("fields") or {})
+        if field_issue_rows and isinstance(field_issue_rows[0], dict)
+        else []
+    )
+    fewer_fields = (
+        first_field_keys == ["summary"]
+        and bool(projected_keys)
+        and len(first_field_keys) < len(projected_keys)
+    )
+    _record(
+        cli,
+        state,
+        "jql --fields summary",
+        fields_args,
+        fields_obs,
+        fact=(
+            f"raw envelope: issues={len(field_issue_rows)}, поля первой задачи="
+            f"{first_field_keys} против проекции {projected_keys} (меньше={fewer_fields})"
+        ),
+        machine_json=ok_fields,
+        forced_ok=ok_fields and bool(field_issue_rows) and fewer_fields,
+    )
+    if state.stopped_by is not None:
+        return
+    expand_args = (
+        "jql",
+        JQL_QUERY,
+        "--limit",
+        "1",
+        "--expand",
+        "renderedFields",
+        "--json",
+    )
+    expand_obs = cli.run(expand_args)
+    ok_expand, expand_doc = _json_value(expand_obs.stdout)
+    expand_issues = expand_doc.get("issues") if isinstance(expand_doc, dict) else None
+    expand_rows = expand_issues if isinstance(expand_issues, list) else []
+    rendered_present = bool(expand_rows) and all(
+        isinstance(issue, dict) and isinstance(issue.get("renderedFields"), dict)
+        for issue in expand_rows
+    )
+    _record(
+        cli,
+        state,
+        "jql --expand renderedFields",
+        expand_args,
+        expand_obs,
+        fact=(
+            f"raw envelope: issues={len(expand_rows)}, renderedFields у каждой="
+            f"{rendered_present}; в проекции renderedFields нет="
+            f"{'renderedFields' not in projected_keys}"
+        ),
+        machine_json=ok_expand,
+        forced_ok=ok_expand
+        and rendered_present
+        and "renderedFields" not in projected_keys,
+    )
 
 
 def _issue(cli: Cli, state: RunState) -> None:
@@ -328,6 +408,99 @@ def _issue(cli: Cli, state: RunState) -> None:
         fact=f"JSON array {count} comments, first keys={shape}",
         machine_json=ok_comments,
         forced_ok=ok_comments,
+    )
+    full_rows = (
+        comments_value if ok_comments and isinstance(comments_value, list) else None
+    )
+    if state.stopped_by is not None:
+        return
+    expand_args = ("issue", key, "--expand", "changelog")
+    expand_obs = cli.run(expand_args)
+    ok_changelog, changelog_doc = _json_value(expand_obs.stdout)
+    histories = (
+        (changelog_doc.get("changelog") or {}).get("histories")
+        if ok_changelog and isinstance(changelog_doc, dict)
+        else None
+    )
+    history_rows = histories if isinstance(histories, list) else []
+    default_changelog = isinstance(value, dict) and "changelog" in value
+    _record(
+        cli,
+        state,
+        "issue --expand changelog",
+        expand_args,
+        expand_obs,
+        fact=(
+            f"raw JSON: changelog присутствует={isinstance(histories, list)}, "
+            f"histories={len(history_rows)}; у дефолтного issue changelog={default_changelog}"
+        ),
+        machine_json=ok_changelog,
+        forced_ok=ok_changelog
+        and isinstance(changelog_doc, dict)
+        and isinstance(histories, list)
+        and bool(history_rows)
+        and not default_changelog,
+    )
+    if state.stopped_by is not None:
+        return
+    limit_args = ("issue-comments", key, "--limit", "1")
+    limit_obs = cli.run(limit_args)
+    ok_limit, limited = _json_value(limit_obs.stdout)
+    limited_rows: list[object] = []
+    truncated: object = None
+    reported_total: object = None
+    if ok_limit and isinstance(limited, dict):
+        rows_value = limited.get("rows")
+        limited_rows = rows_value if isinstance(rows_value, list) else []
+        truncated = limited.get("truncated")
+        reported_total = limited.get("total")
+    elif ok_limit and isinstance(limited, list):
+        limited_rows = limited
+    full_count = len(full_rows) if full_rows is not None else -1
+    same_first = (
+        bool(limited_rows)
+        and bool(full_rows)
+        and isinstance(limited_rows[0], dict)
+        and isinstance(full_rows[0], dict)
+        and limited_rows[0].get("id") == full_rows[0].get("id")
+    )
+    note_shown = "# showing 1 of" in limit_obs.stderr
+    if full_count > 1:
+        # --limit becomes the server maxResults; a cut thread must be visible.
+        capped = (
+            ok_limit
+            and truncated is True
+            and reported_total == full_count
+            and len(limited_rows) == 1
+            and same_first
+            and note_shown
+        )
+        fact = (
+            f"JSON-объект rows={len(limited_rows)}, truncated={truncated}, "
+            f"total={reported_total} из полного треда {full_count}; "
+            f"stderr-заметка={note_shown}; первый совпал={same_first}"
+        )
+    else:
+        expected = min(full_count, 1) if full_count >= 0 else -1
+        capped = (
+            ok_limit
+            and len(limited_rows) == expected
+            and not note_shown
+            and not limit_obs.stderr.strip()
+        )
+        fact = (
+            f"тред {full_count} <= limit: JSON-массив {len(limited_rows)} row(s), "
+            "truncation-объект не нужен, stderr пуст"
+        )
+    _record(
+        cli,
+        state,
+        "issue-comments --limit 1",
+        limit_args,
+        limit_obs,
+        fact=fact,
+        machine_json=ok_limit,
+        forced_ok=capped,
     )
 
 
@@ -452,6 +625,50 @@ def _confluence(cli: Cli, state: RunState) -> None:
         machine_json=False,
         forced_ok=bool(rows) and claim == len(rows),
     )
+    if state.stopped_by is not None:
+        return
+    cql_expand_args = (
+        "cql",
+        CQL_QUERY,
+        "--limit",
+        str(CQL_LIMIT),
+        "--expand",
+        "content.body.storage",
+    )
+    cql_expand_obs = cli.run(cql_expand_args)
+    ok_cql_expand, cql_expand_doc = _json_value(cql_expand_obs.stdout)
+    cql_results = (
+        cql_expand_doc.get("results") if isinstance(cql_expand_doc, dict) else None
+    )
+    result_rows = cql_results if isinstance(cql_results, list) else []
+    storage_lengths: list[int] = []
+    for result in result_rows:
+        content = result.get("content") if isinstance(result, dict) else None
+        body = content.get("body") if isinstance(content, dict) else None
+        storage = body.get("storage") if isinstance(body, dict) else None
+        stored = storage.get("value") if isinstance(storage, dict) else None
+        storage_lengths.append(len(stored) if isinstance(stored, str) else -1)
+    body_present = bool(storage_lengths) and all(
+        length > 0 for length in storage_lengths
+    )
+    projection_has_body = any(str(column).lower() == "body" for column in header)
+    _record(
+        cli,
+        state,
+        "cql --expand content.body.storage",
+        cql_expand_args,
+        cql_expand_obs,
+        fact=(
+            f"raw envelope: results={len(result_rows)}, body.storage.value длины="
+            f"{storage_lengths}; в проекции столбцы={header} без body="
+            f"{not projection_has_body}"
+        ),
+        machine_json=ok_cql_expand,
+        forced_ok=ok_cql_expand
+        and bool(result_rows)
+        and body_present
+        and not projection_has_body,
+    )
 
     if state.stopped_by is not None or not state.page_id:
         _skip(state, cli, "page", ("page", "<id>"), "no page id from cql")
@@ -488,6 +705,47 @@ def _confluence(cli: Cli, state: RunState) -> None:
         forced_ok=page_ok
         and isinstance(page_value, dict)
         and bool(page_value.get("id")),
+    )
+    if state.stopped_by is not None:
+        return
+    page_expand_args = ("page", page_id, "--expand", "version")
+    page_expand_obs = cli.run(page_expand_args)
+    ok_page_expand, page_expand_doc = _json_value(page_expand_obs.stdout)
+    default_version = (
+        (page_value.get("version") or {}).get("number")
+        if isinstance(page_value, dict)
+        else None
+    )
+    default_body = (
+        isinstance(page_value.get("body"), dict)
+        and bool(((page_value.get("body") or {}).get("storage") or {}).get("value"))
+        if isinstance(page_value, dict)
+        else False
+    )
+    expanded_version = (
+        (page_expand_doc.get("version") or {}).get("number")
+        if isinstance(page_expand_doc, dict)
+        else None
+    )
+    expand_has_body = isinstance(page_expand_doc, dict) and "body" in page_expand_doc
+    _record(
+        cli,
+        state,
+        "page --expand version",
+        page_expand_args,
+        page_expand_obs,
+        fact=(
+            f"raw page: version.number={expanded_version}, body отсутствует="
+            f"{not expand_has_body}; дефолтный page: version={default_version}, "
+            f"body.storage непустой={default_body}"
+        ),
+        machine_json=ok_page_expand,
+        forced_ok=ok_page_expand
+        and isinstance(page_expand_doc, dict)
+        and default_version is not None
+        and expanded_version == default_version
+        and not expand_has_body
+        and default_body,
     )
 
     markdown_args = ("page", page_id, "--markdown")
@@ -570,6 +828,7 @@ def _absent_command(cli: Cli, state: RunState) -> None:
         ),
         machine_json=None,
         expected_exit=ABSENT_COMMAND_EXIT,
+        forced_ok=absent,
     )
 
 

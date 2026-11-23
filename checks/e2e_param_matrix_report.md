@@ -1,12 +1,10 @@
-# AtlaWire E2E live (git.platform-s.com), 2026-11-23, только чтение; гейты ATLAWIRE_E2E_LIVE/_BBK_BITBUCKET/_BBK_JIRA/_PARAM_MATRIX_LIVE + --live. Обновлены checks/e2e_bbk_cli_bitbucket.py (last-modified: без --at проверяется резолв default-ветки до latestCommit, root+--at, каталог+--at=200, файл → понятная ошибка без сырого HTTP 500; grep-repo status/complete/message; file text/plain+text/markdown), checks/e2e_bbk_bitbucket.py (grep status/message), checks/e2e_param_matrix.py и checks/e2e_param_matrix_rest.py (metadata-варианты *_with_metadata: truncated/total/complete, дефолт grep 120 с, default-branch резолв). src/ и tests/ не менялись, коммитов нет.
+# AtlaWire E2E live (git.platform-s.com), 2026-11-23, только чтение; прогон на 88784ea («Drive comment limit from CLI and show truncation», включает алиасы и флаги 1e1d9f3). Обновлены checks/e2e_bbk_cli_bitbucket.py (`last-modified --help` описывает резолв default-ветки; алиасы pr-files/pr-comments/grep/scan сверяются по JSON с оригиналом; scan-extension: полный скан = массив, без --project при --max-pages 1 — объект complete=false, scanned=6 < total=553, rows=5, reason=page limit), checks/e2e_bbk_cli_jira_confluence.py (jql --fields/--expand, issue --expand, issue-comments --limit, cql --expand content.body.storage, page --expand version — проверяется изменение ответа, а не только exit 0; --limit теперь maxResults, обрезанный тред отдаёт объект rows/truncated/total + заметку в stderr), checks/e2e_param_matrix.py (эти же CLI-комбинации GAP→PASS; устаревший GAP library-limit issue-comments → PASS), checks/e2e_param_matrix_rest.py (scan_repository_extensions_report: complete=false/scanned<total/rows; version=1 исторической страницы может иметь пустой body — ложное ожидание исправлено). Правки только в checks/, коммитов нет; src/ и tests/ этой задачей не менялись.
 | файл | гейт | exit | результат |
 |---|---|---|---|
-| e2e_bbk_cli_bitbucket.py | — | 0 | 30/30 наблюдений |
-| e2e_bbk_bitbucket.py | ATLAWIRE_E2E_BBK_BITBUCKET=1 | 0 | 24 passed, 0 failed |
-| e2e_bbk_jira.py | ATLAWIRE_E2E_BBK_JIRA=1 | 0 | 13 passed, 0 failed |
-| e2e_bbk_confluence.py | ATLAWIRE_E2E_LIVE=1 | 0 | 7 passed, 0 failed |
-| e2e_bbk_cli_jira_confluence.py | ATLAWIRE_E2E_LIVE=1 | 0 | 16/16 шагов |
-| e2e_param_matrix.py | ATLAWIRE_PARAM_MATRIX_LIVE=1 | 0 | 80 строк: PASS=62 CAP=9 GAP=9 DEFECT=0 |
-| e2e_param_matrix_rest.py | --live | 1 | 86 строк: 1 failed |
-| e2e_semantic_live.py | ATLAWIRE_E2E_LIVE=1 | 1 | MATCH=12 VACUOUS=1 |
-**Дефекты (не подгонялись):** repo_scan.scan_repository_extensions без project упирается в page limit за 20.8 с («Bitbucket page limit reached»), т.е. «скан всех проектов» недостижим при дефолтном бюджете — не связано с недавними изменениями, проверка оставлена как есть; CLI help/docstring `last-modified` в src/atlawire/cli.py всё ещё утверждает «at не отправляется» — устаревшее описание при новом поведении. **Не проверено:** семантика окна `jql updated >= -1d` (за 1 и 7 суток нет обновлённых задач — VACUOUS), CLI-attachments, 401/403/429 сценарии, production-масштаб.
+| checks/e2e_bbk_cli_bitbucket.py | — | 0 | 32/32 наблюдений |
+| checks/e2e_bbk_cli_jira_confluence.py | ATLAWIRE_E2E_LIVE=1 | 0 | 22/22 шагов, failed=0 |
+| checks/e2e_param_matrix.py | ATLAWIRE_PARAM_MATRIX_LIVE=1 | 0 | 81 строка: PASS=70 CAP=8 GAP=3 DEFECT=0 |
+| checks/e2e_param_matrix_rest.py | --live | 0 | 86 строк: 0 failed |
+| checks/e2e_bbk_bitbucket.py (потребитель scan-extension) | ATLAWIRE_E2E_BBK_BITBUCKET=1 | 0 | 24 passed |
+**Дефекты продукта:** в затронутом объёме не выявлено; CAP/GAP — известные ограничения (поиск/дети отдают голый список без признака обрезки; у search_issues нет fields; у prs нет role; у библиотечной get_page expand фиксирован). Вне зоны записи остался латентно устаревший fallback в checks/e2e_bbk_bitbucket.py, ждущий ошибку page limit (на этом сервере не срабатывает).
+**Не проверено:** 401/403/429, production-масштаб, алиасы через --catalog/--describe; checks/e2e_bbk_jira.py, checks/e2e_bbk_confluence.py, checks/e2e_semantic_live.py не перезапускались.

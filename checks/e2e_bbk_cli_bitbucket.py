@@ -51,16 +51,76 @@ _FILE = "src/main/java/com/devinotele/addressbook/api/controller/ContactControll
 _FILE_DIR = "src/main/java/com/devinotele/addressbook/api/controller"
 _TIMEOUT_SECONDS = 180
 _GREP_GLOB = "src/main/java/**/ContactController.java"
-_GREP_GLOB = "src/main/java/**/ContactController.java"
 _PR_STATES = frozenset({"OPEN", "MERGED", "DECLINED"})
 _SHA = re.compile(r"[0-9a-f]{40}")
-# Команды, отсутствующие в CLI как отдельные имена: операция доступна иначе.
-_ABSENT_AS_STANDALONE = {
-    "pr-files": "pr REPO ID files",
-    "pr-comments": "pr REPO ID comments",
-    "grep": "grep-repo",
-    "scan": "scan-extension",
-}
+# Алиасы: то же чтение под коротким именем. Проверяется, что алиас работает и
+# отдаёт ровно тот же JSON, что и оригинальная команда.
+_ALIAS_CASES: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        ("pr-files", _REPO, _PR_ID, "--json"),
+        ("pr", _REPO, _PR_ID, "files", "--json"),
+    ),
+    (
+        ("pr-comments", _REPO, _PR_ID, "--json"),
+        ("pr", _REPO, _PR_ID, "comments", "--json"),
+    ),
+    (
+        (
+            "grep",
+            _REPO,
+            "class ContactController",
+            "--glob",
+            _GREP_GLOB,
+            "--ref",
+            _MERGE_SHA,
+            "--json",
+        ),
+        (
+            "grep-repo",
+            _REPO,
+            "class ContactController",
+            "--glob",
+            _GREP_GLOB,
+            "--ref",
+            _MERGE_SHA,
+            "--json",
+        ),
+    ),
+    (
+        ("scan", "--project", _PROJECT, "--ext", ".java", "--workers", "4", "--json"),
+        (
+            "scan-extension",
+            "--project",
+            _PROJECT,
+            "--ext",
+            ".java",
+            "--workers",
+            "4",
+            "--json",
+        ),
+    ),
+)
+_ALIAS_NAMES = frozenset(alias[0][0] for alias in _ALIAS_CASES)
+_SCAN_PARTIAL_ARGV = [
+    "scan-extension",
+    "--ext",
+    ".java",
+    "--max-pages",
+    "1",
+    "--workers",
+    "8",
+    "--json",
+]
+_SCAN_FULL_ARGV = [
+    "scan-extension",
+    "--project",
+    _PROJECT,
+    "--ext",
+    ".java",
+    "--workers",
+    "4",
+    "--json",
+]
 _ALLOWED_FIRST = frozenset(
     {
         "projects",
@@ -137,7 +197,7 @@ def _guard(argv: list[str]) -> None:
     """Refuse anything outside the fixed read-only surface before it runs."""
     if not argv:
         raise SystemExit("empty command refused")
-    if argv[0] not in _ALLOWED_FIRST and argv[0] not in _ABSENT_AS_STANDALONE:
+    if argv[0] not in _ALLOWED_FIRST and argv[0] not in _ALIAS_NAMES:
         raise SystemExit(f"command outside the read allowlist refused: {argv[0]}")
     low = " ".join(argv).lower()
     for word in _WRITE_WORDS:
@@ -600,40 +660,178 @@ def _last_modified_path(
     )
 
 
+def _json_or_none(completed: subprocess.CompletedProcess[bytes]) -> Any:
+    """Return decoded JSON or None without raising on a non-JSON payload."""
+    try:
+        return json.loads(completed.stdout)
+    except ValueError:
+        return None
+
+
 def _scan_rows(completed: subprocess.CompletedProcess[bytes], _sec: str) -> Fact:
-    rows = _rows(completed)
-    repos = [str(row.get("repository")) for row in rows if isinstance(row, dict)]
+    """A complete project-scoped scan is one JSON array of validated rows."""
+    value = _json_or_none(completed)
+    if not isinstance(value, list):
+        return _observe(
+            _SCAN_FULL_ARGV,
+            f"полный скан без страничного обрезания ожидался массивом, "
+            f"получено {type(value).__name__}: exit={completed.returncode}",
+            False,
+            completed,
+        )
+    repos: list[str] = []
+    valid = bool(value)
+    for row in value:
+        if not isinstance(row, dict):
+            valid = False
+            continue
+        project = row.get("project")
+        repository = row.get("repository")
+        files = row.get("files")
+        matched = row.get("matched")
+        sample = row.get("sample")
+        if project != _PROJECT or not isinstance(repository, str) or not repository:
+            valid = False
+        if (
+            isinstance(files, bool)
+            or not isinstance(files, int)
+            or files <= 0
+            or isinstance(matched, bool)
+            or not isinstance(matched, int)
+            or not 0 <= matched <= files
+        ):
+            valid = False
+        if (
+            not isinstance(sample, list)
+            or not sample
+            or not all(
+                isinstance(path, str) and path.endswith(".java") for path in sample
+            )
+        ):
+            valid = False
+        repos.append(str(repository))
     return _observe(
-        [
-            "scan-extension",
-            "--project",
-            _PROJECT,
-            "--ext",
-            ".java",
-            "--workers",
-            "4",
-            "--json",
-        ],
-        f"{len(rows)} репозиториев проекта {_PROJECT} с .java; {repos[:3]}",
-        _ok(completed) and bool(rows),
+        _SCAN_FULL_ARGV,
+        f"массив: {len(value)} репозиториев проекта {_PROJECT} с .java, "
+        f"поля/sample валидны={valid}; {repos[:3]}",
+        _ok(completed) and valid,
         completed,
     )
 
 
-def _absent(name: str) -> Any:
-    def check(completed: subprocess.CompletedProcess[bytes], _sec: str) -> Fact:
-        lines = completed.stderr.decode(errors="replace").strip().splitlines()
-        error = next((line for line in lines if "No such command" in line), "")
-        replacement = _ABSENT_AS_STANDALONE[name]
+def _scan_partial(completed: subprocess.CompletedProcess[bytes], _sec: str) -> Fact:
+    """An exhausted page budget is a partial object, not an error with no rows."""
+    value = _json_or_none(completed)
+    if not isinstance(value, dict):
         return _observe(
-            [name, "--help"],
-            f"exit=2 «{error[:100]}» -> вместо неё: {replacement}",
-            completed.returncode == 2 and bool(error),
+            _SCAN_PARTIAL_ARGV,
+            f"неполный скан ожидался объектом с complete/счётчиками, "
+            f"получено {type(value).__name__}: exit={completed.returncode}",
+            False,
+            completed,
+        )
+    rows = value.get("rows")
+    complete = value.get("complete")
+    scanned = value.get("repositories_scanned")
+    total = value.get("repositories_total")
+    reason = value.get("reason")
+    counts_ok = (
+        isinstance(scanned, int)
+        and not isinstance(scanned, bool)
+        and isinstance(total, int)
+        and not isinstance(total, bool)
+        and 0 <= scanned < total
+    )
+    reason_ok = isinstance(reason, str) and "page limit" in reason.lower()
+    row_list = rows if isinstance(rows, list) else []
+    rows_ok = bool(row_list)
+    for row in row_list:
+        if (
+            not isinstance(row, dict)
+            or not str(row.get("project") or "")
+            or not str(row.get("repository") or "")
+        ):
+            rows_ok = False
+            continue
+        files = row.get("files")
+        matched = row.get("matched")
+        sample = row.get("sample")
+        if (
+            isinstance(files, bool)
+            or not isinstance(files, int)
+            or isinstance(matched, bool)
+            or not isinstance(matched, int)
+            or not 0 <= matched <= files
+        ):
+            rows_ok = False
+        if not isinstance(sample, list) or not all(
+            isinstance(path, str) and path.endswith(".java") for path in sample
+        ):
+            rows_ok = False
+    matched_ok = complete is False and counts_ok and reason_ok and rows_ok
+    return _observe(
+        _SCAN_PARTIAL_ARGV,
+        f"объект: complete={complete}, scanned={scanned} < total={total}, "
+        f"rows={len(row_list)} (валидны={rows_ok}), reason={reason!r}",
+        _ok(completed) and matched_ok,
+        completed,
+    )
+
+
+def _alias_matches(alias_argv: list[str], original_argv: list[str]) -> Any:
+    """Compare one alias invocation with its canonical command on real JSON."""
+
+    def check(completed: subprocess.CompletedProcess[bytes], _sec: str) -> Fact:
+        original, _ = _invoke(original_argv)
+        alias_value = _json_or_none(completed)
+        original_value = _json_or_none(original)
+        same = (
+            completed.returncode == 0
+            and original.returncode == 0
+            and alias_value is not None
+            and alias_value == original_value
+        )
+        if isinstance(alias_value, list):
+            count: object = len(alias_value)
+        elif isinstance(alias_value, dict) and isinstance(alias_value.get("hits"), list):
+            count = len(alias_value["hits"])
+        else:
+            count = "?"
+        return _observe(
+            alias_argv,
+            f"exit=0, JSON совпал с «{' '.join(original_argv)}»={same}, "
+            f"элементов/хитов={count}, байт={len(completed.stdout)}",
+            _ok(completed) and same,
             completed,
         )
 
     return check
 
+
+def _last_modified_help(
+    completed: subprocess.CompletedProcess[bytes], _sec: str
+) -> Fact:
+    """The help must describe default-branch resolution, not the old omission text."""
+    text = " ".join(completed.stdout.decode(errors="replace").lower().split())
+    describes = (
+        "default branch" in text
+        and "latest" in text
+        and "commit" in text
+        and "not sent" not in text
+    )
+    return _observe(
+        ["last-modified", "--help"],
+        f"exit=0, help описывает резолв default-ветки и её latest-коммита={describes}; "
+        f"устаревшего «at не отправляется»={'нет' if describes else 'ЕСТЬ'}",
+        completed.returncode == 0 and describes,
+        completed,
+    )
+
+
+_ALIAS_STEPS: tuple[tuple[list[str], Any], ...] = tuple(
+    (list(alias_argv), _alias_matches(list(alias_argv), list(original_argv)))
+    for alias_argv, original_argv in _ALIAS_CASES
+)
 
 # (argv-заготовка для отображения, checker) в порядке прогона.
 _STEPS: tuple[tuple[list[str], Any], ...] = (
@@ -677,23 +875,10 @@ _STEPS: tuple[tuple[list[str], Any], ...] = (
     (["last-modified", _REPO, "--at", _MERGE_SHA], _last_modified_root_at),
     (["last-modified", _REPO, _FILE_DIR, "--at", _MERGE_SHA], _last_modified_dir),
     (["last-modified", _REPO, _FILE, "--at", _MERGE_SHA], _last_modified_path),
-    (
-        [
-            "scan-extension",
-            "--project",
-            _PROJECT,
-            "--ext",
-            ".java",
-            "--workers",
-            "4",
-            "--json",
-        ],
-        _scan_rows,
-    ),
-    (["pr-files", "--help"], _absent("pr-files")),
-    (["pr-comments", "--help"], _absent("pr-comments")),
-    (["grep", "--help"], _absent("grep")),
-    (["scan", "--help"], _absent("scan")),
+    (_SCAN_FULL_ARGV, _scan_rows),
+    (_SCAN_PARTIAL_ARGV, _scan_partial),
+    (["last-modified", "--help"], _last_modified_help),
+    *_ALIAS_STEPS,
 )
 
 _LIMITS = (
@@ -704,12 +889,21 @@ _LIMITS = (
         "каталог+--at -> 200; файл в path -> понятная ошибка, сырой HTTP 500 не отдаётся"
     ),
     "commit-changes merge-коммита: пустой список при непустом diff (семантика сервера)",
-    "пагинация: при нехватке --max-pages CLI падает exit=1 и не отдаёт частичный stdout",
+    "files: при нехватке --max-pages CLI падает exit=1 и не отдаёт частичный stdout",
+    (
+        "scan-extension без --project: исчерпание page budget даёт объект complete=false с "
+        "repositories_scanned < repositories_total, прочитанными rows и reason, а не ошибку без строк"
+    ),
+    (
+        "алиасы pr-files/pr-comments/grep/scan отдают тот же JSON, что pr ... files/comments, "
+        "grep-repo и scan-extension"
+    ),
 )
 
 _UNCHECKED = (
     "attachments: нет read-команды, выдающей attachment id (attachment-get есть, ID неоткуда взять)",
     "pr diff / pr file / pr-review / my-prs / find-repos / branch / tags: вне запрошенного набора",
+    "алиасы: проверено совпадение JSON с оригиналом; --catalog/--describe отдельно не сверялись",
     "многопользовательские 401/403/429 сценарии не воспроизводились (живой валидный токен)",
     "POST-чтения (api-request) и любые записи намеренно не запускались",
 )
