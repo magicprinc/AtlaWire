@@ -11,7 +11,7 @@ prove general search quality, scalability, provider cost, or AtlaWire compatibil
 Neither tested crawler passed its bounded-crawl contract.
 
 AtlaWire's existing priorities and unresolved contracts are in [TODO.md](../../TODO.md);
-the [Atlassian CLI comparison](2026-11-20_ATLASSIAN_CLI_RESEARCH.md) recommends parity,
+the [Atlassian CLI comparison](../2026-11-20_ATLASSIAN_CLI_RESEARCH.md) recommends parity,
 completeness, secure instance binding, and safe writes before new interfaces.
 
 A sanitized temporary ChatGPT consultation used GPT-6, High thinking effort. It

@@ -4,7 +4,7 @@
 user installation. This review is read-only; it does not authorize live requests,
 writes, dependency changes, publication or Git history changes.
 
-**Related material:** [implementation handoff](2026-11-20_IMPLEMENTATION_HANDOFF.md),
+**Related material:** [current handoff](../HANDOFF.md),
 [web-study application](2026-11-20_WEB_STUDY_APPLICATION.md),
 [parity baseline](2026-11-20_BBK_PARITY_BASELINE.md), and [TODO.md](../../TODO.md).
 

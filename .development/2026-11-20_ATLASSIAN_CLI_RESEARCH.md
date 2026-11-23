@@ -2,7 +2,7 @@
 
 DeepSeek V4.1 Flash HIGH reviewed all six public sources on 2026-11-20. This is a
 documentation comparison, not installation or live compatibility testing. The decisions
-that affect AtlaWire are tracked in [TODO.md](../../TODO.md).
+that affect AtlaWire are tracked in [TODO.md](../TODO.md).
 
 | Source | Documented audience | Useful idea for AtlaWire |
 | --- | --- | --- |

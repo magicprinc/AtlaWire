@@ -219,12 +219,12 @@ HTTP-вызовы + `atlassian-python-api` для канонических/ма�
    9 нерешённых**. Документировано: Jira 109, Confluence 36, Bitbucket 66; в
    рантайм-реестре Jira 109, Confluence 36, **Bitbucket 57** — то есть
    девять маршрутов Bitbucket известны, но не реализованы. Разбор — в
-   `.development/inventory/rest-inventory-draft.md` и `mapping-bitbucket.json`.
+   `.development/rest-inventory-draft.md` и `.development/bitbucket/mapping-bitbucket.json`.
 6. **Матрица.** `.development/full_api_matrix.md` — снимок `ff5379c`; после
-   роста реестра она врёт. Генератор теперь лежит в репозитории:
-   `.development/inventory/gen_matrix.py` (внешних входов нет — данные внутри),
-   поэтому его нужно пересобрать от `operations.py`; регенерация как есть
-   свежесть не доказывает.
+   роста реестра она врёт. Генератор `gen_matrix.py` удалён при чистке 24.11
+   вместе с остальным `.planning/`; у него не было внешних входов (данные внутри)
+   и регенерации от `operations.py` он никогда не умел. Нужно либо пересобрать
+   данные от рантайм-реестра, либо заменить генератор реестр-ориентированным.
 7. **CI и гигиена.** `gitleaks` с allowlist для двух синтетических фикстур;
    описание репозитория на GitHub всё ещё обещает «complete API access», хотя
    это read-only клиент.
@@ -424,8 +424,9 @@ JSON одной строкой. Пишите в файл и грепайте.
 но считайте заново: код `bbk` с тех пор не менялся, а AtlaWire — да.
 
 **Где смотреть манифест и инвентарь.** `src/atlawire/manifest.json` — проекция
-`operations.py`; генератор матрицы и исходные маппинги теперь в
-`.development/inventory/`. Регенерация манифеста на аудите совпала с файлом байт в
+`operations.py`; исходные маппинги лежат рядом с документацией продукта:
+`.development/{jira,confluence,bitbucket}/mapping-*.json`, сводка —
+`.development/rest-inventory-draft.md`. Регенерация манифеста на аудите совпала с файлом байт в
 байт, но соответствие документации она не проверяет: маппинг и реестр выведены
 из одного источника (§6.5). История удалённого `.planning/` — в
 [PLANS-CHANGELOG.md](PLANS-CHANGELOG.md).

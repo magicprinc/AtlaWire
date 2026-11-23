@@ -200,8 +200,7 @@ workflow is exercised on the target and explicitly migrated.
 - [ ] Make a disposition table for every current `bbk` CLI command, library workflow, and test
       file. Record the AtlaWire equivalent, adapted test, and verified outcome; do not silently
       drop mixed or manual suites.
-      If present in the local checkout, use `.development/review/2026-11-20_BBK_PARITY_BASELINE.md`
-      as the starting inventory.
+      Start from [the BBK parity baseline](.development/review/2026-11-20_BBK_PARITY_BASELINE.md)
 - [ ] Port and pass the applicable `bbk` regressions against the AtlaWire API. Keep offline
       tests as the default; run live reads and disposable-instance write checks separately.
       Test diagnostics and failure behavior as well as successful output.
@@ -344,7 +343,7 @@ workflow is exercised on the target and explicitly migrated.
       hostnames or captured user data in public fixtures or CI logs.
 - [ ] Use coverage reports to find untested changed behavior; add mutation testing only if a
       critical path needs stronger evidence.
-      Use [the subprocess coverage configuration](.development/review/coverage-subprocess.ini)
+      Use [the subprocess coverage configuration](.development/coverage-subprocess.ini)
       when including installed-CLI tests; the default coverage run does not measure those
       subprocesses.
 
