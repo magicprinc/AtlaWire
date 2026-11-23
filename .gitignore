@@ -26,6 +26,8 @@ venv/
 .ipynb_checkpoints/
 .tox/
 .nox/
+# Retained pytest basetemp roots from audit runs (--basetemp=pytest-audit-*)
+pytest-audit-*/
 htmlcov/
 coverage.xml
 .coverage
