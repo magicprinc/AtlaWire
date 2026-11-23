@@ -3,11 +3,13 @@
 The default renderer converts only the HTML that Jira already returned in
 ``renderedFields``. It keeps link labels and image alt text but drops link and
 image destinations, and escapes text that could otherwise become active
-Markdown or HTML. This is a readability measure, not a general HTML sanitizer.
-Rendered comment bodies are used only for unambiguous ids; raw descriptions or
-comments use a literal fenced text block. C0/C1 controls are shown as visible
-escape sequences instead of raw bytes.
-
+Markdown or HTML. An image without alt text has no visible text at all, so its
+source is kept as inert, labelled literal text instead of vanishing, and a
+rendered user mention keeps its account name next to the display name. Neither
+becomes an active link or image. This is a readability measure, not a general
+HTML sanitizer. Rendered comment bodies are used only for unambiguous ids; raw
+descriptions or comments use a literal fenced text block. C0/C1 controls are
+shown as visible escape sequences instead of raw bytes.
 Wiki mode (``use_wiki=True``) instead reads the raw Jira wiki markup in
 ``fields.description`` and in every ``fields.comment`` body; ``renderedFields``
 is then ignored. [wiki_to_markdown] supports a deliberately small subset:
@@ -21,6 +23,7 @@ are dropped, while bidi controls and lone surrogates become visible escapes.
 
 import re
 from typing import NamedTuple
+from urllib.parse import unquote
 
 from atlawire._markdown import (
     SafeMarkdownConverter,
@@ -36,6 +39,15 @@ _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _CONVERSION_UNAVAILABLE = (
     "_Rendered Markdown conversion was unavailable; no raw fallback was available._"
 )
+
+# A rendered image without alt text and a user mention both lose data under the
+# shared rules: the image has no visible text, and the mention keeps only the
+# display name. These patterns recover the account name and keep the image
+# source as labelled literal text, never as an active destination.
+_PROFILE_LINK = re.compile(r"[?&]name=([^&#\s]{1,256})")
+_USERNAME_LIMIT = 128
+_IMAGE_REFERENCE = "`[Jira image]`"
+_IMAGE_REFERENCE_PREFIX = _IMAGE_REFERENCE + " "
 
 # Jira wiki rules kept intentionally narrow. Each pattern owns one syntax and
 # there is no recursive parse: unsupported nesting stays literal text.
@@ -70,10 +82,117 @@ class _RenderedComments(NamedTuple):
     ambiguous: set[str]
 
 
+def _image_reference(source: str, label: str = "") -> str:
+    """Show an image source as inert, labelled literal text.
+
+    Markdown cannot show an image without loading its destination, which this
+    renderer never does, and an image without alt text has no other visible
+    text. Keeping the escaped source preserves the only data the image had.
+    """
+    reference = _IMAGE_REFERENCE
+    if label:
+        reference += " " + inline(label)
+    return reference + " " + inline(source)
+
+
+def _linked_image(text: str, attrs: dict[str, object]) -> str:
+    """Keep the file name and address of an image that is a link child.
+
+    A Jira attachment preview is ``<a title=... href=...><img .../></a>``: the
+    anchor names the attachment while the inner image only shows a thumbnail.
+    """
+    title = attrs.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return text
+    remainder = text[len(_IMAGE_REFERENCE_PREFIX) :]
+    if _IMAGE_REFERENCE in remainder:
+        return text
+    href = attrs.get("href")
+    source = href.strip() if isinstance(href, str) and href.strip() else remainder
+    return _image_reference(source, title.strip())
+
+
+def _attr_text(value: object) -> str:
+    """Read one HTML attribute, which a parser may split into a word list."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return " ".join(value)
+    return ""
+
+
+def _checked_username(name: str) -> str | None:
+    """Accept one account name only when it is short, single-line and visible."""
+    value = name.strip()
+    if not value or len(value) > _USERNAME_LIMIT:
+        return None
+    if any(char.isspace() or not char.isprintable() for char in value):
+        return None
+    return value
+
+
+def _user_name(attrs: dict[str, object]) -> str | None:
+    """Return the account name of a rendered Jira profile link, if it is one."""
+    href = _attr_text(attrs.get("href"))
+    profile_class = "user-hover" in _attr_text(attrs.get("class")).split()
+    if not profile_class and "ViewProfile.jspa" not in href:
+        return None
+    name = _checked_username(_attr_text(attrs.get("rel")))
+    if name is not None:
+        return name
+    match = _PROFILE_LINK.search(href)
+    if match is not None:
+        return _checked_username(unquote(match[1]))
+    return None
+
+
+def _user_mention(text: str, username: str) -> str:
+    """Keep the account name next to a rendered mention display name."""
+    visible = text.strip()
+    quoted = inline(username)
+    if not visible:
+        return f"~{quoted}"
+    if username in visible or quoted in visible:
+        return text
+    return f"{text} ({quoted})"
+
+
+class _IssueMarkdownConverter(SafeMarkdownConverter):
+    """Keep image sources and user identities that the shared rules drop.
+
+    [SafeMarkdownConverter] drops link and image destinations by design. That
+    leaves an image without alt text with no text at all and a user mention
+    with only the display name, so both are restored here as inert literal
+    text: no link and no image destination is ever emitted.
+    """
+
+    def convert_img(self, el: object, text: str, parent_tags: set[str]) -> str:
+        attrs = getattr(el, "attrs", {})
+        alt = attrs.get("alt")
+        if isinstance(alt, str) and alt.strip():
+            return inline(alt)
+        title = attrs.get("title")
+        if isinstance(title, str) and title.strip():
+            return inline(title)
+        source = attrs.get("src")
+        if isinstance(source, str) and source.strip():
+            return _image_reference(source.strip())
+        return ""
+
+    def convert_a(self, el: object, text: str, parent_tags: set[str]) -> str:
+        attrs = getattr(el, "attrs", {})
+        username = _user_name(attrs)
+        if username is not None:
+            return _user_mention(text, username)
+        if text.startswith(_IMAGE_REFERENCE_PREFIX):
+            return _linked_image(text, attrs)
+        return text
+
+
 def _render_html(html: str) -> str | None:
     return convert_html(
         html,
-        SafeMarkdownConverter(escape_misc=True, heading_style="atx", bullets="-"),
+        _IssueMarkdownConverter(escape_misc=True, heading_style="atx", bullets="-"),
     )
 
 
