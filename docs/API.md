@@ -349,6 +349,9 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 **`get_page_markdown(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> str`** — `confluence.py:406`
 - REST: тот же один GET; Markdown через `render_page_markdown`, без второго запроса.
 
+**`page_forms(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> PageForms`** — `confluence.py:445`
+- Один `GET`; → `{document, storage, markdown}` из одного документа (три формы без трёх запросов).
+
 **`get_page_web_url(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> str`** — `confluence.py:241`
 - REST: `GET /rest/api/content/{id}` (через `get_page`); отдаёт `base_url` + `_links.webui`
   либо fallback `/pages/viewpage.action?pageId={id}`.
@@ -461,6 +464,9 @@ JQL-поиск для коротких строк фиксирует
 **`get_issue_markdown(base_url, key_or_url, *, token, use_wiki=False, allow_http_loopback=False) -> str`** — `jira.py:258`
 - REST: один `GET /rest/api/2/issue/{key}` с `renderedFields`; Markdown через
   `render_issue_markdown`, без второго запроса.
+
+**`issue_forms(base_url, key_or_url, *, token, allow_http_loopback=False) -> IssueForms`** — `jira.py:291`
+- Один `GET`; → `{document, markdown, wiki_markdown}` из одного документа.
 
 **`get_issue_worklogs(base_url, key_or_url, *, token, allow_http_loopback=False) -> dict[str, object]`** — `jira.py:244`
 - REST: `GET /rest/api/2/issue/{key}/worklog`; query нет.

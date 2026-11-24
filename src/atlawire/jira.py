@@ -280,6 +280,39 @@ def get_issue_markdown(
     return render_issue_markdown(issue, use_wiki=use_wiki)
 
 
+class IssueForms(TypedDict):
+    """One issue in three forms, all from a single read."""
+
+    document: dict[str, object]
+    markdown: str
+    wiki_markdown: str
+
+
+def issue_forms(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> IssueForms:
+    """Return one issue as JSON, rendered Markdown, and wiki Markdown in one call.
+
+    Exactly one GET reads the issue with rendered fields; every form is
+    rendered from that document, so a caller does not pay three requests.
+    """
+    issue = get_issue(
+        base_url,
+        key_or_url,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    return IssueForms(
+        document=issue,
+        markdown=render_issue_markdown(issue),
+        wiki_markdown=render_issue_markdown(issue, use_wiki=True),
+    )
+
+
 def get_issue_worklogs(
     base_url: str,
     key_or_url: str,

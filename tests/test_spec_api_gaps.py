@@ -237,6 +237,44 @@ def test_batch_diff_rejects_an_empty_and_oversized_selection(server):
     assert state.calls == []
 
 
+def test_page_forms_returns_three_forms_from_one_request(server):
+    state, base = server
+    _page_routes(state)
+
+    forms = confluence.page_forms(base, "42", token=TOKEN, allow_http_loopback=True)
+
+    assert set(forms) == {"document", "storage", "markdown"}
+    assert forms["document"] == PAGE
+    assert forms["storage"] == PAGE["body"]["storage"]["value"]
+    assert "hello" in forms["markdown"]
+    assert len(state.calls) == 1
+
+
+def test_issue_forms_returns_three_forms_from_one_request(server):
+    state, base = server
+    _page_routes(state)
+
+    forms = jira.issue_forms(base, "DEMO-7", token=TOKEN, allow_http_loopback=True)
+
+    assert set(forms) == {"document", "markdown", "wiki_markdown"}
+    assert forms["document"] == ISSUE
+    assert "rendered text" in forms["markdown"]
+    assert isinstance(forms["wiki_markdown"], str)
+    assert len(state.calls) == 1
+
+
+def test_forms_match_the_single_form_helpers(server):
+    state, base = server
+    _page_routes(state)
+
+    forms = jira.issue_forms(base, "DEMO-7", token=TOKEN, allow_http_loopback=True)
+    single = jira.get_issue_markdown(
+        base, "DEMO-7", token=TOKEN, allow_http_loopback=True
+    )
+
+    assert forms["markdown"] == single
+
+
 def test_repository_scan_opens_one_session(server, monkeypatch):
     state, base = server
     state.routes["/rest/api/1.0/projects/PRJ/repos/widgets/raw/a.txt"] = None

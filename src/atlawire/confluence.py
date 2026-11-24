@@ -434,6 +434,45 @@ def get_page_markdown(
     return render_page_markdown(page)
 
 
+class PageForms(TypedDict):
+    """One page in three forms, all from a single read."""
+
+    document: dict[str, object]
+    storage: str
+    markdown: str
+
+
+def page_forms(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> PageForms:
+    """Return one page as JSON, raw storage XHTML, and Markdown in one call.
+
+    Exactly one GET reads the page; every form is rendered from that document,
+    so a caller does not pay three requests. ``storage`` and ``markdown`` are
+    the same values the single-form helpers return.
+    """
+    page = get_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    body = page.get("body")
+    storage = body.get("storage") if isinstance(body, dict) else None
+    value = storage.get("value") if isinstance(storage, dict) else None
+    if not isinstance(value, str):
+        raise AtlaWireError("Expected a Confluence page storage body.")
+    return PageForms(
+        document=page,
+        storage=value,
+        markdown=render_page_markdown(page),
+    )
+
+
 def get_page_history(
     base_url: str,
     page_id_or_url: str | int,
