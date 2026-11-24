@@ -67,13 +67,26 @@ def test_every_mapped_atlawire_function_exists():
     assert missing == []
 
 
-def test_guide_keeps_the_verified_gaps_explicit():
+def test_guide_keeps_the_verified_behaviour_notes():
     text = _guide_text()
 
-    for gap in ("pr_compact", "jira.url", "page_storage"):
-        assert gap in text
     assert "Bearer only" in text
     assert "No typed-layer retry" in text
+    assert "issue_url" in text
+    assert "get_page_storage" in text
+    assert "get_pull_request_diffs" in text
+    assert "repo_search.search_repositories" in text
+
+
+def test_the_gap_closures_the_guide_claims_really_exist():
+    from atlawire import repo_search
+
+    assert callable(jira.issue_url)
+    assert callable(confluence.get_page_storage)
+    assert callable(confluence.get_page_title)
+    assert callable(bitbucket.get_pull_request_diffs)
+    assert callable(bitbucket.pr_compact)
+    assert callable(repo_search.search_repositories)
 
 
 def test_the_typed_entry_points_the_guide_relies_on_are_public():

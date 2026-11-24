@@ -62,11 +62,11 @@ equivalent.
 | `jira.titles` | `jira.titles` | same name, explicit pair |
 | `jira.resolve_user` | `jira.resolve_user` | |
 | `jira.recent_comments` | `jira_comments_search` module | no same-name function |
-| `jira.url` | — | no equivalent; build the browse URL yourself |
+| `jira.url` | `jira.issue_url(base, key)` | pure browse URL; no request |
 | `confluence.page` | `confluence.get_page` | |
-| `confluence.page_storage` | `confluence.get_page(...)["body"]["storage"]["value"]` | no one-call helper |
+| `confluence.page_storage` | `confluence.get_page_storage(base, page, token=...)` | one call, one GET |
 | `confluence.page_md` | `confluence_markdown.render_page_markdown(page)` | takes the page document |
-| `confluence.title` | field of `confluence.get_page` | no one-call helper |
+| `confluence.title` | `confluence.get_page_title(base, page, token=...)` | one call, one GET |
 | `confluence.url_for` | `confluence.get_page_web_url` | |
 | `confluence.children` | `confluence.list_children` | |
 | `confluence.spaces` | `confluence.list_spaces` | |
@@ -77,14 +77,15 @@ equivalent.
 | `bitbucket.file_at` | `bitbucket.get_repository_file` | default branch when `at` is omitted |
 | `bitbucket.pr` | `bitbucket.get_pull_request` | |
 | `bitbucket.pr_files` | `bitbucket.list_pull_request_files` | |
-| `bitbucket.pr_diff` | `bitbucket.get_pull_request_diff` | one path per call; no `paths=[...]` batch |
+| `bitbucket.pr_diff` | `bitbucket.get_pull_request_diff` / `get_pull_request_diffs` | one path per call, or `paths=[...]` for a batch |
 | `bitbucket.pr_file` | `bitbucket.get_pull_request_file` | |
 | `bitbucket.pr_comments` | `bitbucket.list_pull_request_comments` | |
 | `bitbucket.pr_commits` | `bitbucket.list_pull_request_commits` | |
-| `bitbucket.pr_compact` | — | no compact PR projection |
+| `bitbucket.pr_compact` | `bitbucket.pr_compact` | same name; drops service fields |
 | `bitbucket.my_prs` | `bitbucket.list_my_pull_requests` | |
 | `bitbucket.prs` | `bitbucket.list_pull_requests` | |
 | `bitbucket.search_code` | `bitbucket_search.search_code` | scope by `project=` **or** `repo=` (slug only) |
+| cross-repository search | `repo_search.search_repositories` | `index` engine for speed, `bytes` for a regex over default branches, `fetch="archive"` for one zip per repo |
 | `bitbucket.find_repos` | `bitbucket.find_repositories` | |
 | `bitbucket.branches` | `bitbucket.list_branches` | |
 | `bitbucket.commits` | `bitbucket.list_commits` | |
@@ -126,6 +127,12 @@ equivalent.
 - **File revision.** `get_repository_file` and `file` omit `at` by default,
   matching the listing commands. Pass an explicit ref or a commit id when you
   need one pinned snapshot; a branch name still moves.
+- **Three content forms in one call.** `confluence.page_forms` and
+  `jira.issue_forms` return the JSON document, the raw source, and Markdown from
+  one request. BBK's `page_md`/`issue_md` re-fetched per form.
+- **`--json` everywhere.** Every JSON-printing command accepts it; it is a
+  no-op where JSON is the only output and selects JSON where Markdown, storage,
+  or TSV is the default.
 
 ## 5. Live evidence (2026-11-24, one self-hosted deployment)
 
@@ -135,10 +142,13 @@ equivalent.
   Confluence page JSON, page storage, spaces, children, CQL, page URL;
   Bitbucket projects, repos, file list, file text, branches, commits, PRs,
   my PRs, PR card, PR files, PR comments, PR commits, find-repos.
-- **AtlaWire-only available:** `jira.get_current_user`, `confluence.get_page_web_url`,
-  `confluence.search_cql` (typed), `federated_search`, `identity.whoami` (explicit pairs).
-- **Deliberate gaps:** `pr_compact`; `jira.url`; one-call `page_storage`/`title`;
-  `pr_diff(paths=[...])` batching; public `review` heuristics.
+- **AtlaWire-only available:** `jira.get_current_user`, `jira.issue_url`,
+  `confluence.get_page_web_url`, `confluence.search_cql` (typed), `federated_search`,
+  `identity.whoami` (explicit pairs), `repo_search.search_repositories` (cross-repository).
+- **Gaps closed after this run:** `pr_compact`, `jira.url`, one-call
+  `page_storage`/`title`, and `pr_diff(paths=[...])` now have equivalents; see §3.
+- **Remaining gaps:** public `review` heuristics (private helpers), and BBK's
+  `compact`/`compact_json` formatters.
 - **Not a product bug:** my first `search_code(repo=...)` call used a slug
   keyword; the correct scope is `repo="KEY/slug"` or `project="KEY"`.
 - **Markdown differs in size** for Jira and Confluence. Both are inert and
@@ -157,10 +167,13 @@ atlawire issue DEMO-42 --token-from-env
 atlawire page 12345 --markdown --token-from-env
 atlawire pr DEMO/widgets 7 diff --token-from-env
 atlawire repos DEMO --json --token-from-env
+atlawire repo-search "WidgetService" --project DEMO --engine index --json
 ```
 
-`--json` is not universal; check `atlawire <command> --help`. List commands
-that page without a row cap expose `--max-pages`; a few also take `--limit`.
+Every command that prints JSON accepts `--json`; where JSON is already the only
+output the flag changes nothing, and `attachment-get` uses `--base64`/`--out`
+instead. List commands that page without a row cap expose `--max-pages`; a few
+also take `--limit`.
 
 ## 7. Verification before switching
 

@@ -90,7 +90,7 @@ read-only учёткой. Отсутствие строк не доказыва�
 Публичные модули: `atlawire.bitbucket` (41 функция), `atlawire.jira` (33),
 `atlawire.confluence` (17), `atlawire.operations` (5), `atlawire.sdk` (6),
 `atlawire.http` (сессии и транспорт), `atlawire.repo_scan` (2), `atlawire.repo_grep` (1),
-`atlawire.identity` (1), `atlawire.federated` (1). Полный
+`atlawire.repo_search` (1), `atlawire.identity` (1), `atlawire.federated` (1). Полный
 справочник сигнатур, REST-маршрутов и лимитов — [API.md](API.md).
 
 ## Документация

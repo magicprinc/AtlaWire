@@ -6,9 +6,17 @@ query (`class`). Aggregates only; no payloads, hosts, or identifiers.
 Command shape:
 
 ```python
-search_repositories(base_url, "class", token=..., project=PROJECT,
-                    engine=..., fetch=..., limit=200, max_repos=...,
-                    path_glob="*.java")
+search_repositories(
+    base_url,
+    "class",
+    token=...,
+    project=PROJECT,
+    engine=...,
+    fetch=...,
+    limit=200,
+    max_repos=...,
+    path_glob="*.java",
+)
 ```
 
 | Engine | Fetch | Rows | Repos in result | Repos scanned / total | Files scanned | Seconds |

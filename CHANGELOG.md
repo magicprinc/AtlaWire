@@ -13,6 +13,28 @@ subsequent agent-facing batch (the latter spans commits `2960a43..a4efee1`).
 
 ### Added
 
+- `atlawire repo-search` and `repo_search.search_repositories`: cross-repository
+  search with an `index` engine (one plugin call), a `bytes` engine (regex over
+  default branches), and `fetch="archive"` (one zip per repository, with
+  zip-slip rejection and per-entry/total caps). `engine="auto"` picks a
+  predictable default. One live run returned rows from multiple repositories;
+  archive mode was 2.8x faster than per-file reads.
+- `--json` on every command that prints JSON. It is a no-op where JSON is the
+  only output; `file --json` and `page-url --json` add real projections, and
+  `issue`/`page` refuse to combine it with another format.
+- `confluence.page_forms` and `jira.issue_forms`: JSON, raw source, and Markdown
+  from a single read.
+- `confluence.get_page_storage`, `get_page_title`, `get_page_markdown`;
+  `jira.issue_url` and `get_issue_markdown`.
+- `bitbucket.pr_compact` and `bitbucket.get_pull_request_diffs` (batch diffs in
+  request order).
+- Markdown: a plain link now keeps its destination as inert `label (url)` text,
+  and runs of blank lines collapse outside fenced code. Measured on 55 live Jira
+  descriptions and 21 Confluence pages: more URLs kept, zero active HTML, fewer
+  blank lines than before.
+- `repo_grep` reads every file of a repository through one session instead of
+  opening a new connection per file.
+
 **Initial read-only surface**
 
 - Flat, read-only CLI and Python library for Jira, Confluence, and Bitbucket: Bitbucket
