@@ -857,12 +857,36 @@ def read_operation_command(
     malformed or non-object JSON, and unknown IDs fail before any request
     without echoing the input. No pagination is attempted.
     """
-    arguments = _operation_json_object(raw_params)
-    query = _operation_json_object(raw_query) if raw_query is not None else None
-    product = _operation_product(operation_id)
-    resolved_url, token = _product_base_url_and_token(
-        product, base_url, token_from_env, allow_http_loopback
-    )
+    try:
+        arguments = _operation_json_object(raw_params)
+        query = _operation_json_object(raw_query) if raw_query is not None else None
+        product = _operation_product(operation_id)
+    except click.ClickException as exc:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    None,
+                    code="validation_error",
+                    message=exc.format_message(),
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
+    try:
+        resolved_url, token = _product_base_url_and_token(
+            product, base_url, token_from_env, allow_http_loopback
+        )
+    except (click.ClickException, click.UsageError) as exc:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="credentials_error",
+                    message=exc.format_message(),
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
     try:
         result = read_operation(
             operation_id,
@@ -873,7 +897,19 @@ def read_operation_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        validation = exc.category in {"validation", "unknown_operation", "credentials"}
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error" if validation else "read_error",
+                    message=str(exc),
+                    status=exc.http_status,
+                    classification=exc.category or "client_error",
+                )
+            )
+        )
+        raise click.exceptions.Exit(2 if validation else 1) from None
     click.echo(json.dumps(result))
 
 
