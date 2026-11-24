@@ -616,8 +616,9 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
 
     The request overrides ``Accept`` to ``text/plain`` and never follows a
     redirect. It accepts up to 1 MiB of decoded content, including bytes
-    produced by decompression; an oversize or failed read returns no partial
-    text. The response is always closed, and the caller owns the session.
+    produced by decompression; an oversize, truncated or undecodable gzip
+    member returns no partial text. The response is always closed, and the
+    caller owns the session.
     Validation is deliberately generic so diagnostics cannot echo the
     path, query, contents, or credentials. Text that would disclose this
     session's bearer token, including common URL-encoded or base64 spellings, is
@@ -636,7 +637,7 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
                 response.status_code, method="GET"
             )
             _check_text_type(response.headers.get("Content-Type"))
-            payload = _read_limited(
+            payload = read_encoded_limited(
                 response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
             )
     except requests.Timeout:

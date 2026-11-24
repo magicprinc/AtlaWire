@@ -12,7 +12,12 @@ import pytest
 
 from atlawire import sdk
 from atlawire.cli import _write_bytes
-from atlawire.http import AtlaWireError, bearer_session, get_json_object
+from atlawire.http import (
+    AtlaWireError,
+    bearer_session,
+    get_json_object,
+    get_text,
+)
 
 TOKEN = "synthetic-transport-safety-token"
 JSON = "application/json"
@@ -143,6 +148,24 @@ def test_sdk_json_rejects_non_finite_numbers(server, literal):
         sdk.get_json(
             "jira", base, "/rest/api/2/myself", token=TOKEN, allow_http_loopback=True
         )
+
+
+def test_get_text_decodes_a_complete_gzip_member(server):
+    state, base = server
+    state.body = gzip.compress(b"hello\n")
+    state.headers = {"Content-Type": "text/plain", "Content-Encoding": "gzip"}
+
+    with bearer_session(TOKEN) as session:
+        assert get_text(session, base + "/raw/a.txt", params={}) == "hello\n"
+
+
+def test_get_text_rejects_a_truncated_gzip_member(server):
+    state, base = server
+    state.body = gzip.compress(b"hello\n")[:-8]
+    state.headers = {"Content-Type": "text/plain", "Content-Encoding": "gzip"}
+
+    with bearer_session(TOKEN) as session, pytest.raises(AtlaWireError):
+        get_text(session, base + "/raw/a.txt", params={})
 
 
 @pytest.mark.parametrize("literal", [b"1e999", b"-1e999", b"NaN", b"Infinity"])
