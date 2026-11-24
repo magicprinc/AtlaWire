@@ -311,6 +311,8 @@ class PrReviewChecks(TypedDict):
     unavailable_files: list[dict[str, object]]
     files_not_analyzed: list[str]
     notes: list[str]
+    # Names of the short lists that were shortened by a fixed packet cap.
+    truncated: list[str]
 
 
 class PrReviewProfile(TypedDict):
@@ -538,7 +540,7 @@ def _core_reads(
     wants_diff: bool,
     context: int,
     loopback: bool,
-) -> tuple[dict[str, object], list[object], list[object], object]:
+) -> tuple[dict[str, object], Sequence[object], Sequence[object], object]:
     """Read the four required Bitbucket constituents or raise."""
     info = bitbucket.get_pull_request(
         base, repo, pr_id, token=token, allow_http_loopback=loopback
@@ -723,6 +725,10 @@ def _partial_reasons(packet: PrReviewPacket) -> list[str]:
         reasons.append(
             "Heuristic source reads were unavailable for one or more files."
         )
+    if checks["truncated"]:
+        reasons.append(
+            "Review check lists were shortened: " + ", ".join(checks["truncated"]) + "."
+        )
     return reasons
 
 
@@ -755,6 +761,7 @@ def _empty_checks(
         unavailable_files=[],
         files_not_analyzed=[],
         notes=[_HEURISTIC_NOTE],
+        truncated=[],
     )
 
 
@@ -1397,7 +1404,7 @@ def _checks(
         if entry["path"].endswith((".java", ".kt"))
     ]
     test_entries = [entry for entry in files if entry["test"]]
-    test_names = [entry["path"] for entry in test_entries][:TEST_NAME_LIMIT]
+    test_names = [entry["path"] for entry in test_entries]
     if not packet["diff"]["requested"]:
         return _no_diff_checks(
             packet, java_entries, test_entries, test_names
@@ -1483,11 +1490,13 @@ def _no_diff_checks(
     test_entries: list[PrReviewFile],
     test_names: list[str],
 ) -> PrReviewChecks:
+    capped_names, names_truncated = _capped(test_names, TEST_NAME_LIMIT)
+    truncated = ["test_names"] if names_truncated else []
     return PrReviewChecks(
-        files_total=len(packet["files"]),
+        files_total=packet["files_total"],
         java_files=len(java_entries),
         test_files=len(test_entries),
-        test_names=test_names,
+        test_names=capped_names,
         methods_touched=0,
         methods_without_javadoc=0,
         types_without_javadoc=0,
@@ -1496,7 +1505,7 @@ def _no_diff_checks(
         red_flags=[],
         added_symbols=[],
         description_chars=len(packet["description"]),
-        commits=len(packet["commits"]),
+        commits=packet["commits_total"],
         diff_requested=False,
         symbols=[],
         heuristic=True,
@@ -1509,6 +1518,7 @@ def _no_diff_checks(
             "Diff was not requested; heuristic checks and symbol analysis "
             "were not evaluated.",
         ],
+        truncated=truncated,
     )
 
 
@@ -1580,7 +1590,7 @@ def _member_metrics(
             and (member["lines"] > 40 or member["complexity"] > 10)
         ],
         key=lambda item: (-item[1]["lines"], -item[1]["complexity"]),
-    )[:BIG_METHOD_LIMIT]
+    )
     undocumented_types = [
         (path, member)
         for path, member in members_by_file
@@ -1594,6 +1604,13 @@ def _member_metrics(
     return big, undocumented_types, undocumented_methods, len(methods)
 
 
+def _capped[T](values: Sequence[T], limit: int) -> tuple[list[T], bool]:
+    """Return the first ``limit`` values and whether more were dropped."""
+    if len(values) > limit:
+        return list(values[:limit]), True
+    return list(values), False
+
+
 def _checks_result(
     packet: PrReviewPacket,
     java_entries: list[PrReviewFile],
@@ -1601,20 +1618,40 @@ def _checks_result(
     test_names: list[str],
     bundle: _AnalysisBundle,
 ) -> PrReviewChecks:
+    names, names_truncated = _capped(test_names, TEST_NAME_LIMIT)
+    undocumented_types, undocumented_truncated = _capped(
+        bundle.undocumented_types, UNDOCUMENTED_LIMIT
+    )
+    big_methods, big_truncated = _capped(bundle.big, BIG_METHOD_LIMIT)
+    red_flags, red_flags_truncated = _capped(bundle.flags, RED_FLAG_LIMIT)
+    added_symbols, added_symbols_truncated = _capped(
+        bundle.added_symbols, ADDED_SYMBOL_LIMIT
+    )
+    truncated = [
+        name
+        for name, was_truncated in (
+            ("test_names", names_truncated),
+            ("undocumented_types", undocumented_truncated),
+            ("big_methods", big_truncated),
+            ("red_flags", red_flags_truncated),
+            ("added_symbols", added_symbols_truncated),
+        )
+        if was_truncated
+    ]
     return PrReviewChecks(
-        files_total=len(packet["files"]),
+        files_total=packet["files_total"],
         java_files=len(java_entries),
         test_files=len(test_entries),
-        test_names=test_names,
+        test_names=names,
         methods_touched=bundle.method_count,
         methods_without_javadoc=len(bundle.undocumented_methods),
         types_without_javadoc=len(bundle.undocumented_types),
-        undocumented_types=_undocumented_labels(bundle.undocumented_types),
-        big_methods=_big_method_rows(bundle.big),
-        red_flags=bundle.flags[:RED_FLAG_LIMIT],
-        added_symbols=bundle.added_symbols[:ADDED_SYMBOL_LIMIT],
+        undocumented_types=_undocumented_labels(undocumented_types),
+        big_methods=_big_method_rows(big_methods),
+        red_flags=red_flags,
+        added_symbols=added_symbols,
         description_chars=len(packet["description"]),
-        commits=len(packet["commits"]),
+        commits=packet["commits_total"],
         diff_requested=True,
         symbols=bundle.symbols,
         heuristic=True,
@@ -1623,16 +1660,14 @@ def _checks_result(
         unavailable_files=bundle.failures,
         files_not_analyzed=bundle.not_analyzed,
         notes=bundle.notes,
+        truncated=truncated,
     )
 
 
 def _undocumented_labels(
     types: list[tuple[str, _Member]],
 ) -> list[str]:
-    return [
-        f"{path}:{member['line']} {member['name']}"
-        for path, member in types[:UNDOCUMENTED_LIMIT]
-    ]
+    return [f"{path}:{member['line']} {member['name']}" for path, member in types]
 
 
 def _big_method_rows(
@@ -1956,7 +1991,15 @@ def parse_pr_link(value: str) -> tuple[str, int]:
             "Expected /projects/KEY/repos/slug/pull-requests/N."
         )
     repo = f"{match.group('project')}/{match.group('slug')}"
-    return repo, int(match.group("id"))
+    identifier = match.group("id")
+    # Bound the digits before ``int()``: CPython refuses to convert a string
+    # longer than ``sys.get_int_max_str_digits()`` and would surface a raw
+    # ``ValueError`` as a traceback instead of a usage error.
+    if len(identifier) > 19:
+        raise AtlaWireError(
+            "Expected /projects/KEY/repos/slug/pull-requests/N."
+        )
+    return repo, int(identifier)
 
 
 def is_test_path(path: str) -> bool:
@@ -2261,14 +2304,15 @@ def _render_symbols_markdown(checks: PrReviewChecks) -> list[str]:
         "|---|---|---|---|---|---|",
     ]
     order = {"added": 0, "modified": 1, "removed": 2}
-    for symbol in sorted(
+    ordered = sorted(
         checks["symbols"],
         key=lambda item: (
             order.get(item["status"], 9),
             item["file"],
             item["line"],
         ),
-    )[:40]:
+    )
+    for symbol in ordered[:40]:
         lines.append(
             f"| {symbol['status']} | {_table_text(symbol['name'])} "
             f"({symbol['kind']}) | "
@@ -2277,6 +2321,12 @@ def _render_symbols_markdown(checks: PrReviewChecks) -> list[str]:
             f"| {symbol['complexity']} "
             f"| {'yes' if symbol['javadoc'] else 'no'} |"
         )
+    if len(ordered) > 40:
+        lines += [
+            "",
+            f"_Showing the first 40 of {len(ordered)} changed symbols; the JSON "
+            "packet contains all of them._",
+        ]
     return lines
 
 
