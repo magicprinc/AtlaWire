@@ -5,10 +5,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from atlawire.http import AtlaWireError
 
 from atlawire import jira
-
+from atlawire.http import AtlaWireError
 
 TOKEN = "synthetic-token-search"
 SENTINEL = "synthetic-response-sentinel-search"

@@ -6,9 +6,9 @@ from click.testing import CliRunner
 from atlawire.cli import cli
 from atlawire.http import AtlaWireError
 from atlawire.pr_review import (
-    _FileFacts,
     _capped,
     _counts_complete,
+    _FileFacts,
     _no_diff_checks,
     _partial_reasons,
     _render_symbols_markdown,

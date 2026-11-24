@@ -48,8 +48,7 @@ class SafeMarkdownConverter(MarkdownConverter):
         # newline is content. Stripping all of them would erase blank lines at
         # either boundary, so only that one structural newline is removed.
         content = escape_controls(text)
-        if content.startswith("\n"):
-            content = content[1:]
+        content = content.removeprefix("\n")
         return "\n\n" + fenced_block(content) + "\n\n"
 
 

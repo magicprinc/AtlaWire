@@ -4,9 +4,9 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+
 from atlawire import bitbucket
 from atlawire.http import AtlaWireError
-
 
 TOKEN = "synthetic-batch-token"
 SECRET_BODY = "synthetic-batch-error-body"

@@ -129,7 +129,7 @@ def split_lines(text: str) -> list[str]:
     lines = text.split("\n")
     if lines[-1] == "":
         lines.pop()
-    return [line[:-1] if line.endswith("\r") else line for line in lines]
+    return [line.removesuffix("\r") for line in lines]
 
 
 def match_lines(
@@ -151,14 +151,13 @@ def match_lines(
     _validate_common(pattern, ignore_case, timeout_s)
     _validate_limit(limit)
     actual = len(split_lines(text))
-    if line_count is not None:
-        if (
-            not isinstance(line_count, int)
-            or isinstance(line_count, bool)
-            or line_count < 0
-            or line_count != actual
-        ):
-            raise HelperFailure
+    if line_count is not None and (
+        not isinstance(line_count, int)
+        or isinstance(line_count, bool)
+        or line_count < 0
+        or line_count != actual
+    ):
+        raise HelperFailure
     request = {
         "mode": "lines",
         "pattern": pattern,
@@ -295,7 +294,9 @@ def _run(request: dict[str, object], timeout_s: float) -> bytes:
     if not executable:
         raise HelperFailure
     try:
-        process = subprocess.Popen(
+        # The argv is fixed and the request travels on stdin, so no caller text
+        # reaches the command line; the child runs with a minimal environment.
+        process = subprocess.Popen(  # noqa: S603
             [executable, "-I", "-S", "-c", HELPER_SOURCE],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

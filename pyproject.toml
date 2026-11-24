@@ -35,6 +35,19 @@ path = "src/atlawire/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/atlawire"]
 
+[tool.ruff]
+target-version = "py315"
+line-length = 88
+
+[tool.ruff.lint]
+extend-select = ["S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests and live checks assert by design and hold only synthetic credentials.
+# The security lint still applies in full to the shipped package.
+"tests/*" = ["S101", "S105", "S106", "S603"]
+"checks/*" = ["S101", "S105", "S106", "S603", "S607"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

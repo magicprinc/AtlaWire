@@ -18,6 +18,7 @@ def _run(args, *, env=None):
     return subprocess.run(
         [sys.executable, "-B", *args],
         cwd=ROOT,
+        check=False,
         capture_output=True,
         text=True,
         env=merged,

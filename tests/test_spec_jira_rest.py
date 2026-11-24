@@ -10,7 +10,6 @@ import pytest
 from atlawire import jira
 from atlawire.http import AtlaWireError
 
-
 # Jira Server 8.22.2 REST: https://docs.atlassian.com/software/jira/docs/api/REST/8.22.2/
 # atlassian-python-api 5.0.5: atlassian/jira/jira_server.py, reference reads.
 # list_statuses, list_transitions and get_current_user return the documented

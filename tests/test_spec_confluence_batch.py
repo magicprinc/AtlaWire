@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+
 from atlawire import confluence
 from atlawire.http import AtlaWireError
 

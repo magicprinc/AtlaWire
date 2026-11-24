@@ -4,9 +4,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from atlawire.http import AtlaWireError
-from atlawire.bitbucket import get_repository_file
 
+from atlawire.bitbucket import get_repository_file
+from atlawire.http import AtlaWireError
 
 TOKEN = "synthetic-token-xyz"
 SENTINEL = "synthetic-response-sentinel-xyz"
@@ -91,7 +91,7 @@ def test_file_error_is_sanitized_and_not_retried(server, status, capsys, caplog)
 def test_file_rejects_more_than_one_mib(server):
     httpd, url = server
     httpd.body = b"a" * (1024 * 1024 + 1)
-    with pytest.raises(Exception):
+    with pytest.raises(AtlaWireError, match="1 MiB"):
         get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
                             allow_http_loopback=True)
     assert len(httpd.calls) == 1

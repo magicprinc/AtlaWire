@@ -99,6 +99,7 @@ def _run(argv, *, base, credentials):
     return subprocess.run(
         [sys.executable, "-B", "-m", "atlawire", *argv],
         cwd=ROOT,
+        check=False,
         capture_output=True,
         text=True,
         env=env,

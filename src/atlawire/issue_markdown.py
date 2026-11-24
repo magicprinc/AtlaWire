@@ -453,7 +453,7 @@ def _code_content(value: str) -> str:
     Every later newline, including trailing ones, is code content and is kept.
     """
     content = escape_controls(value)
-    return content[1:] if content.startswith("\n") else content
+    return content.removeprefix("\n")
 
 
 def _code_span(content: str) -> str:

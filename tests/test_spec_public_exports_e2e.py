@@ -14,6 +14,7 @@ def _python(code):
     return subprocess.run(
         [sys.executable, "-B", "-c", code],
         cwd=ROOT,
+        check=False,
         capture_output=True,
         text=True,
         env=env,

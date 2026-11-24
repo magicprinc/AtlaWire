@@ -36,6 +36,8 @@ from atlawire._markdown import (
 from atlawire.http import (
     AtlaWireError,
     normalize_base_url,
+)
+from atlawire.http import (
     reject_credential_echo as reject_shared_credential_echo,
 )
 
@@ -69,22 +71,22 @@ PACKET_PROFILE = "read-only-review"
 PACKET_VERSION = 2
 DEFERRED_CAPABILITIES: tuple[str, ...] = ()
 PACKET_LIMITATIONS = (
-    "Java/Kotlin symbol, complexity, javadoc and red-flag checks are regex "
-    "heuristics, not a parser or compiler.",
+    ("Java/Kotlin symbol, complexity, javadoc and red-flag checks are regex "
+    "heuristics, not a parser or compiler."),
     "Same-name overloads are paired heuristically by kind and name.",
     "Heuristic source reads are capped at a fixed number of Java/Kotlin files.",
-    "Ticket discovery scans branch, commit, title and description text and may "
-    "select a key-shaped non-ticket token.",
-    "Browser before/after links use the changed path; a rename can make the "
-    "before link point at a path absent from the target revision.",
-    "A ref without repository metadata falls back to the pull request "
-    "repository for file links and heuristic source reads.",
+    ("Ticket discovery scans branch, commit, title and description text and may "
+    "select a key-shaped non-ticket token."),
+    ("Browser before/after links use the changed path; a rename can make the "
+    "before link point at a path absent from the target revision."),
+    ("A ref without repository metadata falls back to the pull request "
+    "repository for file links and heuristic source reads."),
     "An unflagged Bitbucket diff response is not proven complete.",
-    "Diff-derived line numbers are matched against source read at the refs "
+    ("Diff-derived line numbers are matched against source read at the refs "
     "captured before the diff; a push between those reads can misattribute a "
-    "symbol or its javadoc state.",
-    "profile.partial=False means no known omission was detected in requested "
-    "material; it is not a proof of snapshot or diff completeness.",
+    "symbol or its javadoc state."),
+    ("profile.partial=False means no known omission was detected in requested "
+    "material; it is not a proof of snapshot or diff completeness."),
 )
 
 # Packet bounds. Rows keep their whole projected fields; only long free text and
@@ -121,7 +123,7 @@ _BASE_URL_INVALID = (
 _REPO_INVALID = "Expected a repository as PROJECT/slug."
 _ID_INVALID = "Expected a pull request ID as a positive signed 64-bit integer."
 _CONTEXT_INVALID = "The diff context must be an integer from 0 to 100."
-_TOKEN_INVALID = "Missing or invalid bearer token."
+_TOKEN_INVALID = "Missing or invalid bearer token."  # noqa: S105
 _JIRA_PAIR_INVALID = "Jira base URL and token must be supplied together."
 
 # Validation mirrors the public adapters so bad arguments fail before the
@@ -1455,7 +1457,7 @@ def _analysis_bundle(
     by_source: dict[str, _FileFacts],
     from_ref: _Ref,
     to_ref: _Ref,
-    reader: "_FileReader",
+    reader: _FileReader,
 ) -> _AnalysisBundle:
     flags, added_symbols = _heuristic_signals(
         analysis_entries, by_destination, by_source
@@ -1537,8 +1539,8 @@ def _no_diff_checks(
         files_not_analyzed=[],
         notes=[
             _HEURISTIC_NOTE,
-            "Diff was not requested; heuristic checks and symbol analysis "
-            "were not evaluated.",
+            ("Diff was not requested; heuristic checks and symbol analysis "
+            "were not evaluated."),
         ],
         truncated=truncated,
     )
@@ -1565,7 +1567,7 @@ def _member_analysis(
     by_destination: dict[str, _FileFacts],
     by_source: dict[str, _FileFacts],
     from_ref: _Ref,
-    reader: "_FileReader",
+    reader: _FileReader,
     attempted: set[str],
     not_analyzed: list[str],
 ) -> list[tuple[str, _Member]]:
@@ -1722,7 +1724,7 @@ def _changed_symbols(
     by_source: dict[str, _FileFacts],
     from_ref: _Ref,
     to_ref: _Ref,
-    reader: "_FileReader",
+    reader: _FileReader,
     attempted: set[str],
     not_analyzed: list[str],
 ) -> list[PrReviewSymbol]:
@@ -1998,10 +2000,7 @@ def _packet_strings(value: object) -> list[str]:
     elif isinstance(value, dict):
         for item in value.values():
             strings.extend(_packet_strings(item))
-    elif isinstance(value, list):
-        for item in value:
-            strings.extend(_packet_strings(item))
-    elif isinstance(value, tuple):
+    elif isinstance(value, (list, tuple)):
         for item in value:
             strings.extend(_packet_strings(item))
     return strings
@@ -2194,7 +2193,6 @@ def _member_end(lines: list[str], start: int) -> tuple[int, str]:
 def _render_ticket_markdown(ticket: PrReviewTicket | None) -> list[str]:
     if ticket is None:
         return []
-    key = inline(ticket["key"])
     if not ticket["verified"]:
         return [
             f"## Ticket {_code(ticket['key'])} (unverified)",
@@ -2227,8 +2225,8 @@ def _render_ticket_markdown(ticket: PrReviewTicket | None) -> list[str]:
 
 def _render_files_markdown(packet: PrReviewPacket) -> list[str]:
     lines = [
-        f"## Files ({packet['files_total']}, tests: "
-        f"{packet['checks']['test_files']})",
+        (f"## Files ({packet['files_total']}, tests: "
+        f"{packet['checks']['test_files']})"),
         "",
     ]
     if packet["files_truncated"]:
@@ -2261,8 +2259,8 @@ def _render_checks_markdown(packet: PrReviewPacket) -> list[str]:
         "",
         f"_{inline(_HEURISTIC_NOTE)}_",
         "",
-        f"- **Tests**: {checks['test_files']} test file(s), "
-        f"{checks['java_files']} Java/Kotlin file(s) changed",
+        (f"- **Tests**: {checks['test_files']} test file(s), "
+        f"{checks['java_files']} Java/Kotlin file(s) changed"),
     ]
     if checks["test_names"]:
         lines.append(
@@ -2283,9 +2281,9 @@ def _render_checks_markdown(packet: PrReviewPacket) -> list[str]:
 
 def _render_heuristic_metrics(checks: PrReviewChecks) -> list[str]:
     lines = [
-        f"- **Javadoc heuristics**: {checks['types_without_javadoc']} type(s) "
+        (f"- **Javadoc heuristics**: {checks['types_without_javadoc']} type(s) "
         f"without javadoc, {checks['methods_without_javadoc']} method(s) "
-        f"without javadoc ({checks['methods_touched']} method(s) touched)"
+        f"without javadoc ({checks['methods_touched']} method(s) touched)")
     ]
     if checks["undocumented_types"]:
         lines.append(
@@ -2325,8 +2323,8 @@ def _render_symbols_markdown(checks: PrReviewChecks) -> list[str]:
         "",
         "### Changed types and methods (heuristic)",
         "",
-        "| status | symbol | file | lines before → after | "
-        "complexity | javadoc |",
+        ("| status | symbol | file | lines before → after | "
+        "complexity | javadoc |"),
         "|---|---|---|---|---|---|",
     ]
     order = {"added": 0, "modified": 1, "removed": 2}
@@ -2350,8 +2348,8 @@ def _render_symbols_markdown(checks: PrReviewChecks) -> list[str]:
     if len(ordered) > 40:
         lines += [
             "",
-            f"_Showing the first 40 of {len(ordered)} changed symbols; the JSON "
-            "packet contains all of them._",
+            (f"_Showing the first 40 of {len(ordered)} changed symbols; the JSON "
+            "packet contains all of them._"),
         ]
     return lines
 
@@ -2398,14 +2396,14 @@ def render_markdown(packet: PrReviewPacket) -> str:
     lines += [
         f"# {_code(packet['repo'])}#{packet['pr_id']} — {inline(packet['title'])}",
         "",
-        f"- state: **{inline(packet['state'])}**, author: "
-        f"{inline(packet['author'] or 'unknown')}",
-        f"- branches: {_code(packet['from_branch'])} → "
-        f"{_code(packet['to_branch'])}",
-        f"- hashes: {_code(packet['from_hash'][:10])} → "
-        f"{_code(packet['to_hash'][:10])}",
-        f"- links: [overview]({packet['links']['overview']}) · "
-        f"[diff]({packet['links']['diff']})",
+        (f"- state: **{inline(packet['state'])}**, author: "
+        f"{inline(packet['author'] or 'unknown')}"),
+        (f"- branches: {_code(packet['from_branch'])} → "
+        f"{_code(packet['to_branch'])}"),
+        (f"- hashes: {_code(packet['from_hash'][:10])} → "
+        f"{_code(packet['to_hash'][:10])}"),
+        (f"- links: [overview]({packet['links']['overview']}) · "
+        f"[diff]({packet['links']['diff']})"),
         "",
     ]
     lines.extend(_render_completeness_markdown(packet))
@@ -2445,8 +2443,8 @@ def render_markdown(packet: PrReviewPacket) -> str:
         if packet["diff"]["text_truncated"]:
             lines += [
                 "",
-                f"_Diff text truncated to {DIFF_TEXT_BYTES_LIMIT} bytes; "
-                "line counts still come from the full validated response._",
+                (f"_Diff text truncated to {DIFF_TEXT_BYTES_LIMIT} bytes; "
+                "line counts still come from the full validated response._"),
             ]
     return escape_controls("\n".join(lines).rstrip() + "\n")
 

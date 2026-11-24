@@ -5,9 +5,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from atlawire.http import AtlaWireError
-from atlawire.confluence import get_page
 
+from atlawire.confluence import get_page
+from atlawire.http import AtlaWireError
 
 PAGE = {
     "id": "123", "type": "page", "title": "Заголовок",

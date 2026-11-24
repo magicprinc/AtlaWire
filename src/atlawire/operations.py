@@ -103,7 +103,7 @@ _INVALID_ARGUMENTS = "Expected a mapping of registered path arguments."
 _INVALID_QUERY = "The query parameters are invalid."
 _INVALID_VALUE = "The {name} path argument is invalid."
 _BAD_SHAPE = "Unexpected JSON response shape for operation {operation_id}."
-_INVALID_TOKEN = "Missing or invalid bearer token."
+_INVALID_TOKEN = "Missing or invalid bearer token."  # noqa: S105
 # A path segment is restricted to unreserved ASCII by the per-operation
 # patterns. Reject separators, query/fragment markers, pre-encoded bytes, and
 # controls first, so a value can never change the fixed route or be decoded
@@ -2138,17 +2138,7 @@ def _valid_from_repo(value: str) -> bool:
     if _FROM_REPO_ID.fullmatch(value):
         return True
     project, separator, slug = value.partition("/")
-    if (
-        not separator
-        or not project
-        or not slug
-        or "/" in slug
-        or _FROM_REPO_PROJECT.fullmatch(project) is None
-        or _FROM_REPO_SLUG.fullmatch(slug) is None
-        or slug in {".", ".."}
-    ):
-        return False
-    return True
+    return not (not separator or not project or not slug or "/" in slug or _FROM_REPO_PROJECT.fullmatch(project) is None or _FROM_REPO_SLUG.fullmatch(slug) is None or slug in {".", ".."})
 
 
 def _validate_response(

@@ -19,8 +19,17 @@ def test_facade_class_is_not_part_of_the_public_surface():
 
 
 def test_product_and_helper_modules_import():
-    from atlawire import bitbucket, confluence, federated, identity, jira
-    from atlawire import operations, repo_grep, repo_scan, sdk
+    from atlawire import (
+        bitbucket,
+        confluence,
+        federated,
+        identity,
+        jira,
+        operations,
+        repo_grep,
+        repo_scan,
+        sdk,
+    )
 
     for module in (
         bitbucket,
