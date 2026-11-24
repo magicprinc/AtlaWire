@@ -27,13 +27,14 @@ not replace opening the underlying issue, page, or file as evidence.
   Hatchling backend; a clean install from that wheel is not yet verified here.
 - The offline suite in `tests/` is specification-first and runs with the installed
   CPython 3.15 (`python -B -m pytest -p no:cacheprovider -q tests`). It covers unit,
-  adapter-boundary, and installed-CLI loopback behaviour and never contacts a real
-  instance. A green suite is not release approval and does not prove live behaviour
-  or a clean-wheel install.
-- Local `ruff` and `pyright` runs exist; `pyright src` still reports one
-  `reportReturnType` error in the pull-request projection
-  (`src/atlawire/pr_review.py:562`), and no CI workflow or project-wide threshold is
-  configured (the repository has no CI configuration files).
+  adapter-boundary, and in-process Click-runner loopback behaviour and never contacts
+  a real instance. The installed console entry point is exercised by the release
+  gate, not by this suite. A green suite is not release approval and does not prove
+  live behaviour or a clean-wheel install.
+- Local gates are green: `ruff check src tests checks`, `ruff check --select S src`,
+  `ruff format --check src tests checks`, and `pyright src` all pass. The `tests/`
+  and `checks/` trees still carry known typing noise outside the release gate. No CI
+  workflow is configured yet (the repository has no CI configuration files).
 - Live read-only checks passed on one self-hosted setup on 2026-11-23
   (`checks/e2e_param_matrix_report.md`: CLI check 32/32 observations, Jira/Confluence
   CLI 22/22 steps, parameter matrix PASS=70 CAP=8 GAP=3 DEFECT=0, REST matrix 86 rows
@@ -225,9 +226,12 @@ with client_for("jira", "https://jira.example.com", token) as client:
     issues = client.jql("project = DEMO ORDER BY created DESC", limit=10)
 ```
 
-`client_for` returns the library's `Jira`, `ConfluenceServer` or `Bitbucket`
-client, so all of that library's public read methods remain available. Use
-`get_json`/`request_json` when a route has no high-level method.
+`client_for` returns a read-only wrapper around the library's `Jira`,
+`ConfluenceServer` or `Bitbucket` client: known mutating methods and the raw
+`request`/`get`/`post` verbs are refused, while the library's public read methods
+remain available. The wrapper is defense in depth; the read-only guarantee still
+comes from deploying with a read-only token. Use `get_json`/`request_json` when a
+route has no high-level method.
 
 `api-get` and `api-request` use `atlassian-python-api==5.0.5` for the HTTP,
 authentication, session and product client. `api-get` supports any standard
@@ -306,7 +310,8 @@ other products survive. `--limit` sets the per-term cap for each product
 completed results stay, `complete` is false, and no further term is started.
 The budget counts each product/term read plus each extra Bitbucket page; it
 does not promise a hard upper bound on every HTTP request, because Confluence
-and Jira may issue one follow-up request for a short page.
+and Jira page internally until the per-term cap and may issue several requests
+for one charged read.
 
 The result is deliberately incomplete: matches beyond each per-term cap may be
 omitted, Bitbucket covers only code indexed by the Search plugin (typically the
@@ -408,8 +413,10 @@ walk (default 100).
 
 Pattern mode can be expensive: one listing walk plus one raw read per eligible
 file. Any listing, ref, file-read, regex-helper, or page-budget failure aborts
-the whole call with no stdout. Default text-suffix selection can miss files
-without a known suffix; pass `--glob` or `--path` to widen it. CLI alias and core
+the whole call with no stdout, except that exhausting the overall `--timeout`
+between files returns the hits collected so far with `status: "timeout"` and
+`complete: false`. Default text-suffix selection can miss files without a known
+suffix; pass `--glob` or `--path` to widen it. CLI alias and core
 behaviour were exercised on one self-hosted setup in the 2026-11-23 live run
 (`checks/e2e_param_matrix_report.md`); BBK parity and other deployments are not
 claimed.
@@ -518,7 +525,10 @@ separately.
 The packet includes permanent links, a detected ticket (verified only with a
 successful Jira read), bounded source reads for regex-based heuristic notes, and
 the diff view. Those heuristics can miss issues or produce notes that need human
-review; source reads are bounded, and incomplete analysis is reported. The raw
+review; source reads are bounded, and incomplete analysis is reported. A fixed
+check-list cap is named in `checks.truncated` and sets `profile.partial`; the
+JSON packet still carries the complete `checks.symbols` list, and the Markdown
+table states when it shows only a prefix. The raw
 diff is never proven complete against an unflagged server cap, and the PR can
 change between requests, so a packet may mix revisions. This is not absolute
 BBK parity, and target-version behavior has not been verified live.
