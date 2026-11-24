@@ -34,6 +34,7 @@ from atlawire.http import (
     AtlaWireError,
     _NoRedirectSession,
     normalize_base_url,
+    read_encoded_limited,
     reject_credential_echo,
 )
 
@@ -287,7 +288,10 @@ _MUTATING = re.compile(
     r"assign|transition|do|post|put|upload|edit|rename|merge|close|disable|"
     r"enable|register|unregister|pin|unpin|watch|unwatch|vote|unvote|mark|"
     r"unmark|bulk|change|copy|reset|clean|reindex|start|cancel|approve|"
-    r"decline)(?:_|$)",
+    r"decline|write|deactivate|reopen|open|grant|attach|trigger|revoke|"
+    r"publish|schedule|execute|send|notify|invite|subscribe|unsubscribe|"
+    r"follow|unfollow|save|push|sync|import|install|uninstall|migrate|"
+    r"login|logout|apply|rollback|detach|unlink)(?:_|$)",
     re.IGNORECASE,
 )
 _RAW_TRANSPORT = frozenset({"request", "get", "post", "put", "delete", "patch"})
@@ -500,7 +504,7 @@ def download_to_file(
     max_bytes: int = _BINARY_LIMIT,
     allow_http_loopback: bool = False,
 ) -> tuple[str | None, int, str]:
-    """Stream one read-only response into a file and return its receipt.
+    """Read one bounded read-only response into a file and return its receipt.
 
     The destination must not exist. Bytes are written to an exclusive sibling
     temporary file and published atomically only after a complete, bounded
@@ -597,7 +601,7 @@ def _write_binary_body(
     *,
     product: str,
 ) -> tuple[int, str]:
-    """Validate the status, then stream a complete bounded body to ``temporary``."""
+    """Validate the status, then read and write one complete bounded body."""
     status = response.status_code
     if 300 <= status < 400:
         raise _error(
@@ -648,46 +652,45 @@ def _write_binary_body(
             product=product,
             method="GET",
         )
-    digest = hashlib.sha256()
-    written = 0
     try:
-        with temporary.open("wb") as stream:
-            for chunk in response.iter_content(chunk_size=_CHUNK):
-                written += len(chunk)
-                if written > max_bytes:
-                    raise SdkRequestError(
-                        status=status,
-                        code="invalid_response",
-                        classification="response_too_large",
-                        message=(
-                            f"The response exceeds the {max_bytes}-byte limit."
-                        ),
-                        body=None,
-                        content_type=response.headers.get("Content-Type"),
-                        path=path,
-                        body_truncated=True,
-                        product=product,
-                        method="GET",
-                    )
-                digest.update(chunk)
-                stream.write(chunk)
-    except requests.RequestException:
-        # An interrupted or undecodable body must not surface as a
-        # traceback or leave a partial file behind.
+        payload = read_encoded_limited(
+            response,
+            limit=max_bytes,
+            message=f"The response exceeds the {max_bytes}-byte limit.",
+        )
+    except AtlaWireError as exc:
+        if exc.category == "transport":
+            # An interrupted or undecodable body must not surface as a
+            # traceback or leave a partial file behind.
+            raise SdkRequestError(
+                status=status,
+                code="transport_error",
+                classification="transport",
+                message=_TRANSPORT_MESSAGE,
+                body=None,
+                content_type=response.headers.get("Content-Type"),
+                path=path,
+                product=product,
+                method="GET",
+            ) from None
         raise SdkRequestError(
             status=status,
-            code="transport_error",
-            classification="transport",
-            message=_TRANSPORT_MESSAGE,
+            code="invalid_response",
+            classification="response_too_large",
+            message=f"The response exceeds the {max_bytes}-byte limit.",
             body=None,
             content_type=response.headers.get("Content-Type"),
             path=path,
+            body_truncated=True,
             product=product,
             method="GET",
         ) from None
+    try:
+        with temporary.open("wb") as stream:
+            stream.write(payload)
     except OSError:
         raise AtlaWireError(_LOCAL_WRITE_MESSAGE) from None
-    return written, digest.hexdigest()
+    return len(payload), hashlib.sha256(payload).hexdigest()
 
 
 def _check_semantic_post(product: str, path: str) -> None:
@@ -940,6 +943,20 @@ def _consume(
             product=product,
             method=method,
         ) from None
+    except AtlaWireError:
+        # A truncated or undecodable gzip member: the shared reader already
+        # kept the diagnostic generic.
+        raise SdkRequestError(
+            status=status,
+            code="transport_error",
+            classification="transport",
+            message=_TRANSPORT_MESSAGE,
+            body=None,
+            content_type=response.headers.get("Content-Type"),
+            path=path,
+            product=product,
+            method=method,
+        ) from None
     except requests.RequestException:
         # The status line arrived but the body did not: the request is neither a
         # success nor an HTTP-status failure, so keep the real status and report
@@ -1002,15 +1019,23 @@ class _TooLarge(Exception):
 
 
 def _read_limited(response: requests.Response, limit: int) -> bytes:
-    """Read content-decoded bytes, stopping as soon as the limit is passed."""
-    chunks: list[bytes] = []
-    total = 0
-    for chunk in response.iter_content(chunk_size=_CHUNK):
-        total += len(chunk)
-        if total > limit:
-            raise _TooLarge
-        chunks.append(chunk)
-    return b"".join(chunks)
+    """Read content-decoded bytes under ``limit`` and validate a gzip member.
+
+    The shared reader owns the gzip-trailer check, so a truncated member is a
+    transport failure instead of a plausible prefix. An oversize body keeps the
+    local ``_TooLarge`` signal, which lets the caller classify it without
+    matching diagnostic text.
+    """
+    try:
+        return read_encoded_limited(
+            response,
+            limit=limit,
+            message=f"The JSON response exceeds the {limit}-byte limit.",
+        )
+    except AtlaWireError as exc:
+        if exc.category == "transport":
+            raise
+        raise _TooLarge from None
 
 
 def _read_excerpt(response: requests.Response) -> tuple[str | None, bool]:
