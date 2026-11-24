@@ -384,6 +384,7 @@ def _status_macro(name: object, parameters: list[_Parameter], text: str) -> str:
         pieces.append(body)
     return " ".join(pieces)
 
+
 def _literal_fallback(heading: str, marker: str, source: str) -> str:
     return heading + "\n\n" + marker + "\n\n" + fenced_block(source, "xml") + "\n"
 

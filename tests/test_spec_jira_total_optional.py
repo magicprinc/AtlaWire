@@ -268,8 +268,6 @@ def test_author_comments_fail_on_empty_page_before_known_total(server):
     )
 
 
-
-
 def user_row(name, display=None, email=None):
     row = {"name": name}
     if display is not None:

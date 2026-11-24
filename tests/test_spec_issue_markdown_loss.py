@@ -20,9 +20,7 @@ def _render(description: str, *, comment_html: str | None = None) -> str:
     rendered_fields: dict[str, object] = {"description": description}
     if comment_html is not None:
         fields["comment"] = {"comments": [{"id": "101", "body": "raw comment"}]}
-        rendered_fields["comment"] = {
-            "comments": [{"id": "101", "body": comment_html}]
-        }
+        rendered_fields["comment"] = {"comments": [{"id": "101", "body": comment_html}]}
     return render_issue_markdown(
         {"key": "DEMO-42", "fields": fields, "renderedFields": rendered_fields}
     )
@@ -111,9 +109,7 @@ def test_user_mention_without_rel_uses_the_profile_query():
 
 
 def test_user_mention_keeps_a_non_latin_account_name():
-    markdown = _render(
-        '<p><a class="user-hover" rel="иван.петров">Иван Петров</a></p>'
-    )
+    markdown = _render('<p><a class="user-hover" rel="иван.петров">Иван Петров</a></p>')
 
     assert "Иван Петров (иван.петров)" in markdown
 
@@ -162,9 +158,7 @@ def test_colored_text_keeps_its_text():
 
 
 def test_nested_lists_keep_items_and_depth():
-    markdown = _render(
-        "<ul><li>outer<ul><li>inner</li></ul></li><li>second</li></ul>"
-    )
+    markdown = _render("<ul><li>outer<ul><li>inner</li></ul></li><li>second</li></ul>")
 
     assert "- outer\n  - inner\n- second" in markdown
 
@@ -193,9 +187,7 @@ def test_expand_macro_keeps_control_and_hidden_text():
 
 
 def test_rendered_text_stays_inert():
-    markdown = _render(
-        "<p>literal **bold** and [brackets] &lt;tag&gt;</p>"
-    )
+    markdown = _render("<p>literal **bold** and [brackets] &lt;tag&gt;</p>")
 
     assert "\\*\\*bold\\*\\*" in markdown
     assert "\\[brackets\\]" in markdown

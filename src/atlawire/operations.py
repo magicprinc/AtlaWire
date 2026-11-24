@@ -1821,6 +1821,7 @@ def canonical_operations() -> list[dict[str, object]]:
         for operation_id in sorted(CANONICAL_IDS)
     ]
 
+
 def _invalid(message: str, operation: _Operation) -> AtlaWireError:
     """Build one argument-validation error for a known registered operation."""
     return AtlaWireError(
@@ -1829,6 +1830,7 @@ def _invalid(message: str, operation: _Operation) -> AtlaWireError:
         operation=operation.id,
         category="validation",
     )
+
 
 def _validated_body(
     operation: _Operation, body: Mapping[str, object] | None
@@ -2027,9 +2029,7 @@ def _render_path(operation: _Operation, arguments: Mapping[str, object]) -> str:
             f"Expected exactly the registered path arguments: {names}.", operation
         )
     rendered = {
-        argument.name: _segment(
-            argument, arguments[argument.name], operation=operation
-        )
+        argument.name: _segment(argument, arguments[argument.name], operation=operation)
         for argument in operation.arguments
     }
     # Replace explicitly: a repository-relative placeholder is written as
@@ -2043,9 +2043,7 @@ def _render_path(operation: _Operation, arguments: Mapping[str, object]) -> str:
     return path
 
 
-def _segment(
-    argument: _Argument, value: object, *, operation: _Operation
-) -> str:
+def _segment(argument: _Argument, value: object, *, operation: _Operation) -> str:
     if not isinstance(value, str) or not value or len(value) > _MAX_ARGUMENT_LENGTH:
         raise _invalid(_INVALID_VALUE.format(name=argument.name), operation)
     parts = value.split("/") if argument.allow_slash else [value]
@@ -2138,7 +2136,15 @@ def _valid_from_repo(value: str) -> bool:
     if _FROM_REPO_ID.fullmatch(value):
         return True
     project, separator, slug = value.partition("/")
-    return not (not separator or not project or not slug or "/" in slug or _FROM_REPO_PROJECT.fullmatch(project) is None or _FROM_REPO_SLUG.fullmatch(slug) is None or slug in {".", ".."})
+    return not (
+        not separator
+        or not project
+        or not slug
+        or "/" in slug
+        or _FROM_REPO_PROJECT.fullmatch(project) is None
+        or _FROM_REPO_SLUG.fullmatch(slug) is None
+        or slug in {".", ".."}
+    )
 
 
 def _validate_response(

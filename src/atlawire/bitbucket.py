@@ -376,11 +376,7 @@ def list_all_repositories(
     _validate_page_limit(max_pages)
     if not isinstance(start, int) or isinstance(start, bool) or start < 0:
         raise AtlaWireError("Expected a non-negative Bitbucket start index.")
-    if (
-        not isinstance(limit, int)
-        or isinstance(limit, bool)
-        or not 1 <= limit <= 1000
-    ):
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
         raise AtlaWireError("The repository page size must be between 1 and 1000.")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/1.0/repos"
@@ -397,9 +393,7 @@ def list_all_repositories(
             _check_page_echo(page, start=cursor, rows=len(values))
             for value in values:
                 if not isinstance(value, dict):
-                    raise AtlaWireError(
-                        "Expected a Bitbucket repository object."
-                    )
+                    raise AtlaWireError("Expected a Bitbucket repository object.")
                 rows.append(value)
             last = page.get("isLastPage")
             if not isinstance(last, bool):
@@ -1243,9 +1237,7 @@ def list_pull_requests(
     if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
         raise AtlaWireError("The pull request limit must be between 1 and 1000.")
     params = _pull_request_params(state, order, author, direction)
-    participant_name, participant_role = _participant_filter(
-        author, participant, role
-    )
+    participant_name, participant_role = _participant_filter(author, participant, role)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_repository_url(base, repo)}/pull-requests"
     with bearer_session(token) as session:
@@ -2309,9 +2301,7 @@ def _tag_params(filter_text: str | None, order_by: str | None) -> dict[str, str]
             params["filterText"] = _require_encodable(filter_text, "tag filter")
     if order_by is not None:
         if not isinstance(order_by, str) or order_by not in _TAG_ORDERS:
-            raise AtlaWireError(
-                "The tag order must be ALPHABETICAL or MODIFICATION."
-            )
+            raise AtlaWireError("The tag order must be ALPHABETICAL or MODIFICATION.")
         params["orderBy"] = order_by
     return params
 
@@ -2505,9 +2495,7 @@ def _revision_params(at: str | None) -> dict[str, str]:
 def _archive_format(value: str) -> str:
     """Return one documented archive format or reject it before any request."""
     if not isinstance(value, str) or value not in _ARCHIVE_FORMATS:
-        raise AtlaWireError(
-            "The archive format must be zip, tar, tar.gz, or tgz."
-        )
+        raise AtlaWireError("The archive format must be zip, tar, tar.gz, or tgz.")
     return value
 
 
@@ -2633,9 +2621,7 @@ def _check_raw_file_media_type(value: str | None) -> None:
     """
     media_type = (value or "").split(";", 1)[0].strip().lower()
     if media_type == "application/json" or media_type.endswith("+json"):
-        raise AtlaWireError(
-            "Expected a text response, not JSON.", category="upstream"
-        )
+        raise AtlaWireError("Expected a text response, not JSON.", category="upstream")
 
 
 def _selected_file_ref(value: dict[str, object], side: str) -> tuple[str, str, str]:
@@ -2750,9 +2736,7 @@ def _participant_filter(
             "The pull request role must be AUTHOR, REVIEWER, or PARTICIPANT."
         )
     if author is not None and (participant is not None or role is not None):
-        raise AtlaWireError(
-            "Use author or the role/participant filter, not both."
-        )
+        raise AtlaWireError("Use author or the role/participant filter, not both.")
     if participant is not None:
         return _author_name(participant), role
     return None, role
@@ -2914,9 +2898,7 @@ def _retained_diff_size(value: dict[str, object]) -> int:
     return len(json.dumps(value, separators=(",", ":")))
 
 
-def _fallback_change(
-    value: object, row: ChangedFile
-) -> _PullRequestFallbackChange:
+def _fallback_change(value: object, row: ChangedFile) -> _PullRequestFallbackChange:
     """Return one validated fallback path and its optional source path."""
     if not isinstance(value, dict):
         raise AtlaWireError("Expected a Bitbucket change object.")
@@ -2925,15 +2907,12 @@ def _fallback_change(
     if source is None:
         if row["type"] in _SOURCE_PATH_CHANGE_TYPES:
             raise AtlaWireError(
-                "A copied, moved, or renamed Bitbucket change requires "
-                "a source path."
+                "A copied, moved, or renamed Bitbucket change requires a source path."
             )
         return _PullRequestFallbackChange(path=row["path"], source_path=None)
     source_path = _require_encodable(_change_path(source), "change source path")
     _file_segments(source_path)
-    return _PullRequestFallbackChange(
-        path=row["path"], source_path=source_path
-    )
+    return _PullRequestFallbackChange(path=row["path"], source_path=source_path)
 
 
 def _changed_file(value: object) -> ChangedFile:
@@ -3054,9 +3033,7 @@ def _validate_diff(value: dict[str, object], *, subject: str) -> None:
         for hunk in hunks:
             truncated = _check_diff_hunk(hunk) or truncated
     if truncated:
-        raise DeclaredTruncationError(
-            f"Bitbucket reported a truncated {subject} diff."
-        )
+        raise DeclaredTruncationError(f"Bitbucket reported a truncated {subject} diff.")
 
 
 def _check_diff_hunk(hunk: object) -> bool:

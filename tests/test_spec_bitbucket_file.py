@@ -17,7 +17,14 @@ TEXT = "\ufeffПривет\r\nsecond\r\n"
 def server():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            self.server.calls.append((self.command, self.path, self.headers.get("Accept"), self.headers.get("Authorization")))
+            self.server.calls.append(
+                (
+                    self.command,
+                    self.path,
+                    self.headers.get("Accept"),
+                    self.headers.get("Authorization"),
+                )
+            )
             body = self.server.body
             self.send_response(self.server.status)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -25,7 +32,7 @@ def server():
             self.end_headers()
             try:
                 self.wfile.write(body)
-            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            except ConnectionResetError, ConnectionAbortedError, BrokenPipeError:
                 pass
 
         def log_message(self, *args):
@@ -45,12 +52,16 @@ def server():
         httpd.server_close()
 
 
-
-
 def test_file_wire_contract(server):
     httpd, url = server
-    get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                        at="refs/heads/feature", allow_http_loopback=True)
+    get_repository_file(
+        url,
+        "PROJ/repo",
+        "dir/file.txt",
+        token=TOKEN,
+        at="refs/heads/feature",
+        allow_http_loopback=True,
+    )
     assert len(httpd.calls) == 1
     method, target, accept, authorization = httpd.calls[0]
     assert authorization == "Bearer " + TOKEN
@@ -63,8 +74,9 @@ def test_file_wire_contract(server):
 
 def test_file_preserves_utf8_bom_and_crlf(server):
     _, url = server
-    result = get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                                 allow_http_loopback=True)
+    result = get_repository_file(
+        url, "PROJ/repo", "dir/file.txt", token=TOKEN, allow_http_loopback=True
+    )
     assert result == TEXT
     assert result.encode("utf-8") == TEXT.encode("utf-8")
 
@@ -75,8 +87,9 @@ def test_file_error_is_sanitized_and_not_retried(server, status, capsys, caplog)
     httpd.status = status
     httpd.body = f"{SENTINEL} {TOKEN}".encode()
     with pytest.raises(AtlaWireError) as error:
-        get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                            allow_http_loopback=True)
+        get_repository_file(
+            url, "PROJ/repo", "dir/file.txt", token=TOKEN, allow_http_loopback=True
+        )
     assert error.value.category == "http"
     assert error.value.http_status == status
     output = capsys.readouterr()
@@ -92,13 +105,15 @@ def test_file_rejects_more_than_one_mib(server):
     httpd, url = server
     httpd.body = b"a" * (1024 * 1024 + 1)
     with pytest.raises(AtlaWireError, match="1 MiB"):
-        get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                            allow_http_loopback=True)
+        get_repository_file(
+            url, "PROJ/repo", "dir/file.txt", token=TOKEN, allow_http_loopback=True
+        )
     assert len(httpd.calls) == 1
 
 
 def test_file_accepts_exactly_one_mib(server):
     httpd, url = server
     httpd.body = b"a" * (1024 * 1024)
-    assert get_repository_file(url, "PROJ/repo", "dir/file.txt", token=TOKEN,
-                               allow_http_loopback=True) == "a" * (1024 * 1024)
+    assert get_repository_file(
+        url, "PROJ/repo", "dir/file.txt", token=TOKEN, allow_http_loopback=True
+    ) == "a" * (1024 * 1024)

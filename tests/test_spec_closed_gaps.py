@@ -98,7 +98,9 @@ def server():
         thread.join(timeout=5)
 
 
-def _queue(httpd: _Server, document: object, headers: dict[str, str] | None = None) -> None:
+def _queue(
+    httpd: _Server, document: object, headers: dict[str, str] | None = None
+) -> None:
     item: dict[str, object] = {"status": 200, "json": document}
     if headers is not None:
         item["headers"] = headers
@@ -602,9 +604,7 @@ def test_cql_cli_prints_the_truncation_object(server) -> None:
     httpd, _ = server
     _queue(httpd, _cql_page([_cql_row(1)], total=3))
 
-    result = _invoke(
-        httpd, ("cql", CQL, "--limit", "1", "--json"), "confluence"
-    )
+    result = _invoke(httpd, ("cql", CQL, "--limit", "1", "--json"), "confluence")
 
     assert result.exit_code == 0, result.stderr
     printed = json.loads(result.stdout)
@@ -626,9 +626,7 @@ def test_children_cli_prints_the_truncation_object(server) -> None:
         },
     )
 
-    result = _invoke(
-        httpd, ("children", "123", "--limit", "1", "--json"), "confluence"
-    )
+    result = _invoke(httpd, ("children", "123", "--limit", "1", "--json"), "confluence")
 
     assert result.exit_code == 0, result.stderr
     assert json.loads(result.stdout) == {

@@ -262,9 +262,7 @@ _BBK_GREP_HEADER = re.compile(
     r"# (?P<count>[0-9]+) hit\(s\), engine=(?:archive|fanout|listing), "
     r"scanned=[0-9]+, partial=(?P<partial>True|False)"
 )
-_BBK_GREP_HIT = re.compile(
-    r"^(?P<file>.+):(?P<line>[1-9][0-9]*): (?P<text>.*)$"
-)
+_BBK_GREP_HIT = re.compile(r"^(?P<file>.+):(?P<line>[1-9][0-9]*): (?P<text>.*)$")
 
 # Every failure category this suite may report. A typo is a harness bug, not a
 # server result, and is rejected before it can be shown as a check outcome.
@@ -924,9 +922,7 @@ def check_repo_grep_parity(
 ) -> None:
     """Compare stable file/line hits and require the expected file in both."""
     bbk_hits, bbk_partial = _bbk_grep_page(bbk_raw, limit)
-    atlawire_hits, complete, truncated = _atlawire_grep_page(
-        atlawire_raw, limit
-    )
+    atlawire_hits, complete, truncated = _atlawire_grep_page(atlawire_raw, limit)
     if bbk_partial:
         raise InconclusiveError("grep_partial")
     if truncated:
@@ -1043,9 +1039,7 @@ def _live_author_comments(
     bbk_raw, atlawire_raw = run_pair(
         bbk_plan, atlawire_plan, runner=runner, environ=environ
     )
-    check_author_comment_parity(
-        bbk_raw, atlawire_raw, issue, comment_id
-    )
+    check_author_comment_parity(bbk_raw, atlawire_raw, issue, comment_id)
 
 
 def _live_repo_grep(

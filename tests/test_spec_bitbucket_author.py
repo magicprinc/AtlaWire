@@ -124,10 +124,18 @@ def test_pull_request_author_filter_is_a_server_query(server):
             200,
             page(
                 [
-                    {"id": 7, "title": "Mine", "state": "OPEN",
-                     "author": {"user": {"name": "alice"}}},
-                    {"id": 9, "title": "Answer", "state": "OPEN",
-                     "author": {"user": {"name": "bob"}}},
+                    {
+                        "id": 7,
+                        "title": "Mine",
+                        "state": "OPEN",
+                        "author": {"user": {"name": "alice"}},
+                    },
+                    {
+                        "id": 9,
+                        "title": "Answer",
+                        "state": "OPEN",
+                        "author": {"user": {"name": "bob"}},
+                    },
                 ],
                 True,
             ),
@@ -183,7 +191,11 @@ def test_commit_author_selection_filters_fetched_pages(server):
         ),
     ]
     rows = bitbucket.list_commits(
-        url, "PROJ/repo", token=TOKEN, author="alice", limit=3,
+        url,
+        "PROJ/repo",
+        token=TOKEN,
+        author="alice",
+        limit=3,
         allow_http_loopback=True,
     )
     assert rows == [projected_commit(SHA_C, "alice", "mine")]
@@ -216,13 +228,15 @@ def test_commit_author_selection_is_exact(server):
         )
     ]
     rows = bitbucket.list_commits(
-        url, "PROJ/repo", token=TOKEN, author="alice", limit=10,
+        url,
+        "PROJ/repo",
+        token=TOKEN,
+        author="alice",
+        limit=10,
         allow_http_loopback=True,
     )
     assert rows == [projected_commit(SHA_A, "alice", "exact")]
-    assert_calls(
-        httpd, f"{ROOT}/commits", [{"start": ["0"], "limit": ["10"]}]
-    )
+    assert_calls(httpd, f"{ROOT}/commits", [{"start": ["0"], "limit": ["10"]}])
 
 
 # No match is an empty result, not an error, and the completeness flag says the
@@ -252,11 +266,19 @@ def test_commit_author_selection_without_matches_is_empty(server):
         ),
     ]
     rows = bitbucket.list_commits(
-        url, "PROJ/repo", token=TOKEN, author="alice", limit=5,
+        url,
+        "PROJ/repo",
+        token=TOKEN,
+        author="alice",
+        limit=5,
         allow_http_loopback=True,
     )
     listing = bitbucket.list_commits_with_metadata(
-        url, "PROJ/repo", token=TOKEN, author="alice", limit=5,
+        url,
+        "PROJ/repo",
+        token=TOKEN,
+        author="alice",
+        limit=5,
         allow_http_loopback=True,
     )
     assert rows == []
@@ -302,9 +324,7 @@ def test_new_filters_do_not_change_existing_requests(server):
         f"{ROOT}/pull-requests",
         {"state": ["OPEN"], "start": ["0"], "limit": ["25"]},
     )
-    assert_call(
-        httpd.calls[1], f"{ROOT}/commits", {"start": ["0"], "limit": ["25"]}
-    )
+    assert_call(httpd.calls[1], f"{ROOT}/commits", {"start": ["0"], "limit": ["25"]})
     assert httpd.closed.wait(3), "client did not close the HTTP connection"
 
 
@@ -318,12 +338,18 @@ def test_invalid_author_and_direction_rejected_before_request(server):
         )
     with pytest.raises(AtlaWireError):
         bitbucket.list_pull_requests(
-            url, "PROJ/repo", token=TOKEN, author="ali\x00ce",
+            url,
+            "PROJ/repo",
+            token=TOKEN,
+            author="ali\x00ce",
             allow_http_loopback=True,
         )
     with pytest.raises(AtlaWireError):
         bitbucket.list_pull_requests(
-            url, "PROJ/repo", token=TOKEN, direction="SIDEWAYS",
+            url,
+            "PROJ/repo",
+            token=TOKEN,
+            direction="SIDEWAYS",
             allow_http_loopback=True,
         )
     with pytest.raises(AtlaWireError):
@@ -332,7 +358,10 @@ def test_invalid_author_and_direction_rejected_before_request(server):
         )
     with pytest.raises(AtlaWireError):
         bitbucket.list_commits_with_metadata(
-            url, "PROJ/repo", token=TOKEN, author="bo\x00b",
+            url,
+            "PROJ/repo",
+            token=TOKEN,
+            author="bo\x00b",
             allow_http_loopback=True,
         )
     assert httpd.calls == []

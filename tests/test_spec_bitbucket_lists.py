@@ -21,8 +21,14 @@ def server():
         protocol_version = "HTTP/1.1"
 
         def do_GET(self):
-            self.server.calls.append((self.command, self.path, self.headers.get("Accept"),
-                                      self.headers.get("Authorization")))
+            self.server.calls.append(
+                (
+                    self.command,
+                    self.path,
+                    self.headers.get("Accept"),
+                    self.headers.get("Authorization"),
+                )
+            )
             status, payload = self.server.responses.pop(0)
             data = json.dumps(payload).encode()
             self.send_response(status)
@@ -64,7 +70,9 @@ def page(values, last, next_start=None):
 
 def assert_calls(server, path, queries):
     assert len(server.calls) == len(queries)
-    for (method, target, accept, auth), query in zip(server.calls, queries, strict=True):
+    for (method, target, accept, auth), query in zip(
+        server.calls, queries, strict=True
+    ):
         parsed = urlsplit(target)
         assert (method, parsed.path, parse_qs(parsed.query)) == ("GET", path, query)
         assert accept == "application/json"
@@ -74,43 +82,103 @@ def assert_calls(server, path, queries):
 
 # Server 5.10 paged APIs use nextPageStart, not start + size:
 # https://docs.atlassian.com/bitbucket-server/rest/5.10.0/bitbucket-rest.html#paging-params
-@pytest.mark.parametrize(("function", "args", "path", "rows", "expected"), [
-    (bitbucket.list_projects, (), "/rest/api/1.0/projects",
-     [{"key": "A", "name": "Alpha"}, {"key": "B"}],
-     [{"key": "A", "name": "Alpha", "description": None, "public": None, "url": None},
-      {"key": "B", "name": None, "description": None, "public": None, "url": None}]),
-    (bitbucket.list_repositories, ("PRJ",), "/rest/api/1.0/projects/PRJ/repos",
-     [{"slug": "one", "name": "One"}, {"slug": "two"}],
-     [{"slug": "one", "name": "One", "state": None, "public": None},
-      {"slug": "two", "name": None, "state": None, "public": None}]),
-    (bitbucket.list_repository_files, ("PRJ/repo",),
-     "/rest/api/1.0/projects/PRJ/repos/repo/files",
-     ["a.txt", "dir/b.txt"], ["a.txt", "dir/b.txt"]),
-])
+@pytest.mark.parametrize(
+    ("function", "args", "path", "rows", "expected"),
+    [
+        (
+            bitbucket.list_projects,
+            (),
+            "/rest/api/1.0/projects",
+            [{"key": "A", "name": "Alpha"}, {"key": "B"}],
+            [
+                {
+                    "key": "A",
+                    "name": "Alpha",
+                    "description": None,
+                    "public": None,
+                    "url": None,
+                },
+                {
+                    "key": "B",
+                    "name": None,
+                    "description": None,
+                    "public": None,
+                    "url": None,
+                },
+            ],
+        ),
+        (
+            bitbucket.list_repositories,
+            ("PRJ",),
+            "/rest/api/1.0/projects/PRJ/repos",
+            [{"slug": "one", "name": "One"}, {"slug": "two"}],
+            [
+                {"slug": "one", "name": "One", "state": None, "public": None},
+                {"slug": "two", "name": None, "state": None, "public": None},
+            ],
+        ),
+        (
+            bitbucket.list_repository_files,
+            ("PRJ/repo",),
+            "/rest/api/1.0/projects/PRJ/repos/repo/files",
+            ["a.txt", "dir/b.txt"],
+            ["a.txt", "dir/b.txt"],
+        ),
+    ],
+)
 def test_paged_lists_follow_opaque_cursor(server, function, args, path, rows, expected):
     httpd, url = server
     httpd.responses = [(200, page([rows[0]], False, 37)), (200, page([rows[1]], True))]
     assert function(url, *args, token=TOKEN, allow_http_loopback=True) == expected
-    assert_calls(httpd, path, [{"start": ["0"], "limit": ["100"]},
-                               {"start": ["37"], "limit": ["100"]}])
+    assert_calls(
+        httpd,
+        path,
+        [{"start": ["0"], "limit": ["100"]}, {"start": ["37"], "limit": ["100"]}],
+    )
 
 
 # list_directory docstring requires the nested children envelope and preserves zero size.
 def test_directory_pages_and_revision(server):
     httpd, url = server
     httpd.responses = [
-        (200, {"children": page([{"path": {"toString": "dir/a"}, "type": "FILE", "size": 0}], False, 8)}),
-        (200, {"children": page([{"path": {"toString": "dir/b"}, "type": "DIRECTORY"}], True)}),
+        (
+            200,
+            {
+                "children": page(
+                    [{"path": {"toString": "dir/a"}, "type": "FILE", "size": 0}],
+                    False,
+                    8,
+                )
+            },
+        ),
+        (
+            200,
+            {
+                "children": page(
+                    [{"path": {"toString": "dir/b"}, "type": "DIRECTORY"}], True
+                )
+            },
+        ),
     ]
-    assert bitbucket.list_directory(url, "PRJ/repo", "dir", token=TOKEN, at="refs/heads/main",
-                                    allow_http_loopback=True) == [
+    assert bitbucket.list_directory(
+        url,
+        "PRJ/repo",
+        "dir",
+        token=TOKEN,
+        at="refs/heads/main",
+        allow_http_loopback=True,
+    ) == [
         {"path": "dir/a", "type": "FILE", "size": 0},
         {"path": "dir/b", "type": "DIRECTORY", "size": None},
     ]
-    assert_calls(httpd, "/rest/api/1.0/projects/PRJ/repos/repo/browse/dir", [
-        {"start": ["0"], "limit": ["100"], "at": ["refs/heads/main"]},
-        {"start": ["8"], "limit": ["100"], "at": ["refs/heads/main"]},
-    ])
+    assert_calls(
+        httpd,
+        "/rest/api/1.0/projects/PRJ/repos/repo/browse/dir",
+        [
+            {"start": ["0"], "limit": ["100"], "at": ["refs/heads/main"]},
+            {"start": ["8"], "limit": ["100"], "at": ["refs/heads/main"]},
+        ],
+    )
 
 
 # Server endpoint and query: https://docs.atlassian.com/bitbucket-server/rest/5.10.0/bitbucket-rest.html#idm532026360144
@@ -119,10 +187,17 @@ def test_last_modified_preserves_response(server):
     httpd, url = server
     value = {"latestCommit": "abc", "files": {"x": {"id": "123"}}, "extra": [1]}
     httpd.responses = [(200, value)]
-    assert bitbucket.get_last_modified(url, "PRJ/repo", "dir/a b", token=TOKEN, at="main",
-                                       allow_http_loopback=True) == value
-    assert_calls(httpd, "/rest/api/1.0/projects/PRJ/repos/repo/last-modified/dir/a%20b",
-                 [{"at": ["main"]}])
+    assert (
+        bitbucket.get_last_modified(
+            url, "PRJ/repo", "dir/a b", token=TOKEN, at="main", allow_http_loopback=True
+        )
+        == value
+    )
+    assert_calls(
+        httpd,
+        "/rest/api/1.0/projects/PRJ/repos/repo/last-modified/dir/a%20b",
+        [{"at": ["main"]}],
+    )
 
 
 # list_projects promises a complete list or an error, never partial output.

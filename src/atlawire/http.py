@@ -233,9 +233,7 @@ def _finite_float(value: str) -> float:
     return number
 
 
-def _check_status(
-    status: int, *, method: str | None = None
-) -> None:
+def _check_status(status: int, *, method: str | None = None) -> None:
     """Apply the shared read-only status policy without echoing the request.
 
     A 206 carries only part of a representation, so it is never a successful
@@ -465,9 +463,7 @@ def _get_json(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(
-                response.status_code, method="GET"
-            )
+            _check_status(response.status_code, method="GET")
             if allow_no_content and response.status_code == 204:
                 return _NO_CONTENT
             payload = _read_limited(
@@ -516,7 +512,9 @@ def _decode_json(payload: bytes, *, token: str | None = None) -> object:
             parse_float=_finite_float,
         )
     except ValueError, RecursionError:
-        raise AtlaWireError("Expected a valid JSON response.", category="upstream") from None
+        raise AtlaWireError(
+            "Expected a valid JSON response.", category="upstream"
+        ) from None
     if token is not None:
         _reject_json_echo(text, decoded, token)
     return decoded
@@ -544,9 +542,7 @@ def post_json_object(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(
-                response.status_code, method="POST"
-            )
+            _check_status(response.status_code, method="POST")
             data = _read_limited(
                 response, limit=_JSON_LIMIT, message=_JSON_LIMIT_MESSAGE
             )
@@ -633,9 +629,7 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(
-                response.status_code, method="GET"
-            )
+            _check_status(response.status_code, method="GET")
             _check_text_type(response.headers.get("Content-Type"))
             payload = read_encoded_limited(
                 response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
@@ -729,9 +723,7 @@ def _read_gzip_limited(
             try:
                 decoded = decoder.decompress(data, limit - total + 1)
             except zlib.error:
-                raise AtlaWireError(
-                    _TRANSPORT_MESSAGE, category="transport"
-                ) from None
+                raise AtlaWireError(_TRANSPORT_MESSAGE, category="transport") from None
             total += len(decoded)
             if total > limit:
                 raise AtlaWireError(message, category="upstream")

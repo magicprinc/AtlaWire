@@ -10,10 +10,14 @@ from atlawire.confluence import get_page
 from atlawire.http import AtlaWireError
 
 PAGE = {
-    "id": "123", "type": "page", "title": "Заголовок",
+    "id": "123",
+    "type": "page",
+    "title": "Заголовок",
     "body": {"storage": {"value": "<p>text</p>"}},
-    "version": {"number": 3}, "space": {"key": "DOC"},
-    "ancestors": [{"id": "1"}], "unknown": {"nested": [1, "extra"]},
+    "version": {"number": 3},
+    "space": {"key": "DOC"},
+    "ancestors": [{"id": "1"}],
+    "unknown": {"nested": [1, "extra"]},
 }
 EXPAND = "body.storage,version,space,ancestors"
 TOKEN = "synthetic-token-xyz"
@@ -24,7 +28,9 @@ SENTINEL = "synthetic-response-sentinel-xyz"
 def server():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            self.server.calls.append((self.command, self.path, self.headers.get("Authorization")))
+            self.server.calls.append(
+                (self.command, self.path, self.headers.get("Authorization"))
+            )
             body = self.server.body
             self.send_response(self.server.status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -47,8 +53,6 @@ def server():
         httpd.shutdown()
         thread.join(timeout=5)
         httpd.server_close()
-
-
 
 
 def test_get_page_wire_contract(server):

@@ -308,8 +308,7 @@ def _validated_webui_path(value: str) -> str | None:
             return None
         path = decoded.split("#", 1)[0].split("?", 1)[0]
         if any(
-            segment == "." or segment.startswith("..")
-            for segment in path.split("/")
+            segment == "." or segment.startswith("..") for segment in path.split("/")
         ):
             return None
         if decoded == candidate:
@@ -333,9 +332,7 @@ def _has_body_expansion(expand: str) -> bool:
     a ``body.storage.value`` in the response. Any other expansion may legally
     omit the body, so it is returned unchanged without that check.
     """
-    return any(
-        part.strip() in {"body", "body.storage"} for part in expand.split(",")
-    )
+    return any(part.strip() in {"body", "body.storage"} for part in expand.split(","))
 
 
 def _validated_page(
@@ -998,9 +995,7 @@ def _read_rows[RowT](
                     f"Confluence {label} returned an empty page before all "
                     f"matches; {empty_hint}"
                 )
-            return _RowsPage(
-                rows=rows, truncated=False, total=known_total, next=None
-            )
+            return _RowsPage(rows=rows, truncated=False, total=known_total, next=None)
         _check_repeated_rows(results, identity, seen_ids, seen_fallback_pages, label)
         # A server cap may shorten a page; the next offset uses the actual rows.
         rows.extend(project(result) for result in results)

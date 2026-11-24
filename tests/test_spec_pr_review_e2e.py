@@ -164,10 +164,7 @@ def test_pr_review_flags_a_diff_file_missing_from_the_changed_list(server):
 
 def test_pr_review_rejects_an_oversized_url_without_a_traceback(server):
     base, credentials = server
-    url = (
-        "http://127.0.0.1/projects/PRJ/repos/widgets/pull-requests/"
-        + "9" * 5000
-    )
+    url = "http://127.0.0.1/projects/PRJ/repos/widgets/pull-requests/" + "9" * 5000
 
     result = _run(
         ["pr-review", url, "--base-url", base, "--token-from-env"],

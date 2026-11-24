@@ -653,9 +653,7 @@ def _last_modified_path(
     return _observe(
         ["last-modified", _REPO, _FILE, "--at", _MERGE_SHA],
         f"exit=1, понятная ошибка без сырого HTTP 500: «{error}»",
-        completed.returncode == 1
-        and not completed.stdout.strip()
-        and friendly,
+        completed.returncode == 1 and not completed.stdout.strip() and friendly,
         completed,
     )
 
@@ -793,7 +791,9 @@ def _alias_matches(alias_argv: list[str], original_argv: list[str]) -> Any:
         )
         if isinstance(alias_value, list):
             count: object = len(alias_value)
-        elif isinstance(alias_value, dict) and isinstance(alias_value.get("hits"), list):
+        elif isinstance(alias_value, dict) and isinstance(
+            alias_value.get("hits"), list
+        ):
             count = len(alias_value["hits"])
         else:
             count = "?"

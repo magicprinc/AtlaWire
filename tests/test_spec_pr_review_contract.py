@@ -29,9 +29,7 @@ def test_counts_complete_accepts_matching_files():
 def test_counts_complete_rejects_a_listed_file_missing_from_the_diff():
     rows = [{"path": "A.java"}, {"path": "B.java"}]
 
-    assert (
-        _counts_complete(rows, {"A.java": _facts(destination="A.java")}, {}) is False
-    )
+    assert _counts_complete(rows, {"A.java": _facts(destination="A.java")}, {}) is False
 
 
 def test_counts_complete_rejects_a_diff_entry_missing_from_the_list():

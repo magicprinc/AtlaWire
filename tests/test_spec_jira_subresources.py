@@ -47,7 +47,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
+        except BrokenPipeError, ConnectionResetError:
             # The client closes the connection on an error status before reading
             # the body, so a reset here is expected and not a test failure.
             pass
@@ -55,7 +55,7 @@ class _Handler(BaseHTTPRequestHandler):
     def finish(self):
         try:
             super().finish()
-        except (BrokenPipeError, ConnectionResetError):
+        except BrokenPipeError, ConnectionResetError:
             pass
         finally:
             self.server.closed.set()
@@ -240,9 +240,7 @@ def test_subtasks_reject_bad_entry_without_partial_list(server):
         (200, [{"key": "EX-2", "fields": {"summary": "ok"}}, {"fields": {}}])
     ]
     with pytest.raises(AtlaWireError):
-        jira.list_issue_subtasks(
-            base, "EX-1", token=TOKEN, allow_http_loopback=True
-        )
+        jira.list_issue_subtasks(base, "EX-1", token=TOKEN, allow_http_loopback=True)
     assert len(httpd.calls) == 1
 
 
@@ -393,9 +391,7 @@ def test_property_key_is_one_encoded_path_segment(server):
     )
     assert result == {"key": "weird key+plus", "value": None}
     parsed = urlsplit(httpd.calls[0][1])
-    assert parsed.path == (
-        "/rest/api/2/issue/EX-1/properties/weird%20key%2Bplus"
-    )
+    assert parsed.path == ("/rest/api/2/issue/EX-1/properties/weird%20key%2Bplus")
     assert unquote(parsed.path) == "/rest/api/2/issue/EX-1/properties/weird key+plus"
     assert parse_qs(parsed.query) == {}
 
@@ -419,9 +415,7 @@ def test_issue_link_projection_and_wire_path(server):
             },
         )
     ]
-    result = jira.get_issue_link(
-        base, 52461, token=TOKEN, allow_http_loopback=True
-    )
+    result = jira.get_issue_link(base, 52461, token=TOKEN, allow_http_loopback=True)
     assert result == {
         "id": "52461",
         "type": "Blocks",
@@ -436,9 +430,7 @@ def test_issue_link_projection_and_wire_path(server):
 def test_issue_link_missing_sides_are_none(server):
     httpd, base = server
     httpd.responses = [(200, {"id": "7"})]
-    assert jira.get_issue_link(
-        base, "7", token=TOKEN, allow_http_loopback=True
-    ) == {
+    assert jira.get_issue_link(base, "7", token=TOKEN, allow_http_loopback=True) == {
         "id": "7",
         "type": None,
         "inwardIssue": None,

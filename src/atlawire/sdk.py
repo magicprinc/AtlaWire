@@ -92,6 +92,8 @@ def _supported_product(product: object) -> str | None:
     an arbitrary caller string must not reach structured metadata.
     """
     return product if isinstance(product, str) and product in _CLIENTS else None
+
+
 # Each semantic-read POST belongs to exactly one product. A Confluence
 # conversion sent through the Jira client is a product mismatch, not a read.
 _READ_ONLY_POSTS: dict[str, tuple[frozenset[str], tuple[str, ...]]] = {

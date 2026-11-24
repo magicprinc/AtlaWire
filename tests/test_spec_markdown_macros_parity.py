@@ -164,6 +164,7 @@ def test_wiki_link_keeps_its_destination():
     assert "[docs](<https://example.com/a?b=1&c=2>)" in markdown
     assert "[path](<https://example.com/a_(b)>)" in markdown
 
+
 def test_wiki_mixed_document_keeps_every_supported_construct():
     markdown = wiki_to_markdown(
         "h2. Title\n\n"

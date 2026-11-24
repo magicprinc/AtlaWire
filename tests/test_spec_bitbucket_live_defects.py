@@ -183,7 +183,9 @@ def test_file_keeps_text_plain_behavior(server):
 def test_file_rejects_json_document(server):
     httpd, base = server
     document = {"errors": [{"message": SECRET, "exceptionName": None}]}
-    route(httpd, ROOT + "/raw/README.md", content_type="application/json", body=document)
+    route(
+        httpd, ROOT + "/raw/README.md", content_type="application/json", body=document
+    )
     with pytest.raises(AtlaWireError) as caught:
         bitbucket.get_repository_file(
             base,
@@ -267,6 +269,7 @@ def test_last_modified_path_resolves_missing_at(server, at):
         accept="application/json",
         calls=2,
     )
+
 
 # Regression guard for the documented request shape: one GET on the path
 # template with at as the only query parameter, and the response preserved.

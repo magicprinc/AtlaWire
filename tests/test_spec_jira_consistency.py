@@ -178,40 +178,61 @@ def test_search_raw_fields_string_and_list_are_identical(server):
     envelope = {"startAt": 0, "maxResults": 5, "total": 0, "issues": []}
     route_ok(httpd, SEARCH_PATH, envelope)
     assert (
-        jira.search_raw(base, JQL, token=TOKEN, fields="summary,status", limit=5,
-                        allow_http_loopback=True)
+        jira.search_raw(
+            base,
+            JQL,
+            token=TOKEN,
+            fields="summary,status",
+            limit=5,
+            allow_http_loopback=True,
+        )
         == envelope
     )
     assert (
-        jira.search_raw(base, JQL, token=TOKEN, fields=["summary", "status"],
-                        limit=5, allow_http_loopback=True)
+        jira.search_raw(
+            base,
+            JQL,
+            token=TOKEN,
+            fields=["summary", "status"],
+            limit=5,
+            allow_http_loopback=True,
+        )
         == envelope
     )
     # Без явного fields обе функции используют один и тот же дефолт.
-    assert jira.search_raw(base, JQL, token=TOKEN, limit=5,
-                           allow_http_loopback=True) == envelope
-    assert jira.search_all_issues(
-        base, JQL, token=TOKEN, fields=["summary", "status"],
-        allow_http_loopback=True,
-    ) == []
+    assert (
+        jira.search_raw(base, JQL, token=TOKEN, limit=5, allow_http_loopback=True)
+        == envelope
+    )
+    assert (
+        jira.search_all_issues(
+            base,
+            JQL,
+            token=TOKEN,
+            fields=["summary", "status"],
+            allow_http_loopback=True,
+        )
+        == []
+    )
     first = parse_qs(urlsplit(httpd.calls[0][1]).query)
     second = parse_qs(urlsplit(httpd.calls[1][1]).query)
     assert first == second
     assert first["fields"] == ["summary,status"]
     assert parse_qs(urlsplit(httpd.calls[2][1]).query)["fields"] == ["*all"]
-    assert parse_qs(urlsplit(httpd.calls[3][1]).query)["fields"] == [
-        "summary,status"
-    ]
+    assert parse_qs(urlsplit(httpd.calls[3][1]).query)["fields"] == ["summary,status"]
     calls_before = len(httpd.calls)
     for fields in ("", "   ", [], [""], ["summary", " "]):
         with pytest.raises(AtlaWireError):
-            jira.search_raw(base, JQL, token=TOKEN, fields=fields, limit=5,
-                            allow_http_loopback=True)
+            jira.search_raw(
+                base, JQL, token=TOKEN, fields=fields, limit=5, allow_http_loopback=True
+            )
         with pytest.raises(AtlaWireError):
-            jira.search_all_issues(base, JQL, token=TOKEN, fields=fields,
-                                   allow_http_loopback=True)
+            jira.search_all_issues(
+                base, JQL, token=TOKEN, fields=fields, allow_http_loopback=True
+            )
     assert len(httpd.calls) == calls_before
     assert_no_leak(httpd)
+
 
 # --- 2. Неполнота поиска видна без второго запроса ----------------------------
 
@@ -224,15 +245,17 @@ def test_search_issues_with_metadata_reports_truncation_without_extra_request(
     route_ok(
         httpd,
         SEARCH_PATH,
-        {"startAt": 0, "maxResults": 5, "total": 244,
-         "issues": [issue_row(i) for i in range(5)]},
+        {
+            "startAt": 0,
+            "maxResults": 5,
+            "total": 244,
+            "issues": [issue_row(i) for i in range(5)],
+        },
     )
     result = jira.search_issues_with_metadata(
         base, JQL, token=TOKEN, limit=5, allow_http_loopback=True
     )
-    assert [row["key"] for row in result["rows"]] == [
-        f"SPEC-{i}" for i in range(5)
-    ]
+    assert [row["key"] for row in result["rows"]] == [f"SPEC-{i}" for i in range(5)]
     assert result["rows"] == [projected_row(i) for i in range(5)]
     assert result["truncated"] is True
     assert result["total"] == 244
@@ -251,8 +274,12 @@ def test_search_issues_with_metadata_reports_complete_when_total_reached(server)
     route_ok(
         httpd,
         SEARCH_PATH,
-        {"startAt": 0, "maxResults": 2, "total": 2,
-         "issues": [issue_row(0), issue_row(1)]},
+        {
+            "startAt": 0,
+            "maxResults": 2,
+            "total": 2,
+            "issues": [issue_row(0), issue_row(1)],
+        },
     )
     result = jira.search_issues_with_metadata(
         base, JQL, token=TOKEN, limit=5, allow_http_loopback=True
@@ -271,8 +298,7 @@ def test_search_issues_with_metadata_marks_cap_without_total_as_incomplete(
     route_ok(
         httpd,
         SEARCH_PATH,
-        {"startAt": 0, "maxResults": 2,
-         "issues": [issue_row(0), issue_row(1)]},
+        {"startAt": 0, "maxResults": 2, "issues": [issue_row(0), issue_row(1)]},
     )
     result = jira.search_issues_with_metadata(
         base, JQL, token=TOKEN, limit=2, allow_http_loopback=True
@@ -290,8 +316,12 @@ def test_search_all_issues_with_metadata_reports_limit_truncation(server):
     route_ok(
         httpd,
         SEARCH_PATH,
-        {"startAt": 0, "maxResults": 2, "total": 9,
-         "issues": [issue_row(0), issue_row(1)]},
+        {
+            "startAt": 0,
+            "maxResults": 2,
+            "total": 9,
+            "issues": [issue_row(0), issue_row(1)],
+        },
     )
     result = jira.search_all_issues_with_metadata(
         base, JQL, token=TOKEN, limit=2, allow_http_loopback=True
@@ -314,10 +344,13 @@ def test_search_all_issues_with_metadata_walks_to_total(server):
         httpd,
         SEARCH_PATH,
         {
-            0: {"startAt": 0, "maxResults": 2, "total": 3,
-                "issues": [issue_row(0), issue_row(1)]},
-            2: {"startAt": 2, "maxResults": 1, "total": 3,
-                "issues": [issue_row(2)]},
+            0: {
+                "startAt": 0,
+                "maxResults": 2,
+                "total": 3,
+                "issues": [issue_row(0), issue_row(1)],
+            },
+            2: {"startAt": 2, "maxResults": 1, "total": 3, "issues": [issue_row(2)]},
         },
     )
     result = jira.search_all_issues_with_metadata(
@@ -330,8 +363,6 @@ def test_search_all_issues_with_metadata_walks_to_total(server):
     assert_no_leak(httpd)
 
 
-
-
 # --- 3. Worklog: полный обход с бюджетом --------------------------------------
 
 
@@ -342,12 +373,24 @@ def test_list_issue_worklogs_walks_every_page(server):
         httpd,
         WORKLOG_PATH,
         {
-            0: {"startAt": 0, "maxResults": 2, "total": 5,
-                "worklogs": [worklog_row(1), worklog_row(2)]},
-            2: {"startAt": 2, "maxResults": 2, "total": 5,
-                "worklogs": [worklog_row(3), worklog_row(4)]},
-            4: {"startAt": 4, "maxResults": 1, "total": 5,
-                "worklogs": [worklog_row(5)]},
+            0: {
+                "startAt": 0,
+                "maxResults": 2,
+                "total": 5,
+                "worklogs": [worklog_row(1), worklog_row(2)],
+            },
+            2: {
+                "startAt": 2,
+                "maxResults": 2,
+                "total": 5,
+                "worklogs": [worklog_row(3), worklog_row(4)],
+            },
+            4: {
+                "startAt": 4,
+                "maxResults": 1,
+                "total": 5,
+                "worklogs": [worklog_row(5)],
+            },
         },
     )
     rows = jira.list_issue_worklogs(
@@ -373,15 +416,26 @@ def test_list_issue_worklogs_exhausted_budget_is_explicit_error(server):
         httpd,
         WORKLOG_PATH,
         {
-            0: {"startAt": 0, "maxResults": 2, "total": 5,
-                "worklogs": [worklog_row(1), worklog_row(2)]},
-            2: {"startAt": 2, "maxResults": 2, "total": 5,
-                "worklogs": [worklog_row(3), worklog_row(4)]},
+            0: {
+                "startAt": 0,
+                "maxResults": 2,
+                "total": 5,
+                "worklogs": [worklog_row(1), worklog_row(2)],
+            },
+            2: {
+                "startAt": 2,
+                "maxResults": 2,
+                "total": 5,
+                "worklogs": [worklog_row(3), worklog_row(4)],
+            },
         },
     )
     with pytest.raises(AtlaWireError) as caught:
         jira.list_issue_worklogs(
-            base, "ABC-123", token=TOKEN, max_pages=2,
+            base,
+            "ABC-123",
+            token=TOKEN,
+            max_pages=2,
             allow_http_loopback=True,
         )
     message = str(caught.value)
@@ -404,15 +458,17 @@ def test_list_issue_worklogs_rejects_wrong_offset_instead_of_silent_repeat(
         # лист; повторная страница должна быть замечена по эху startAt.
         offsets.append(int(query["startAt"][0]))
         return 200, json_reply(
-            {"startAt": 0, "maxResults": 2, "total": 5,
-             "worklogs": [worklog_row(1), worklog_row(2)]}
+            {
+                "startAt": 0,
+                "maxResults": 2,
+                "total": 5,
+                "worklogs": [worklog_row(1), worklog_row(2)],
+            }
         )
 
     httpd.routes[WORKLOG_PATH] = handle
     with pytest.raises(AtlaWireError) as caught:
-        jira.list_issue_worklogs(
-            base, "ABC-123", token=TOKEN, allow_http_loopback=True
-        )
+        jira.list_issue_worklogs(base, "ABC-123", token=TOKEN, allow_http_loopback=True)
     assert "startAt" in str(caught.value)
     # Второй запрос ушёл, но повторную страницу библиотека отвергла.
     assert offsets == [0, 2]
@@ -428,9 +484,7 @@ def test_list_issue_worklogs_http_error_is_sanitized(server):
         http_error(403, {"errorMessages": [SECRET + TOKEN]}),
     )
     with pytest.raises(AtlaWireError) as caught:
-        jira.list_issue_worklogs(
-            base, "ABC-123", token=TOKEN, allow_http_loopback=True
-        )
+        jira.list_issue_worklogs(base, "ABC-123", token=TOKEN, allow_http_loopback=True)
     rendered = "".join(traceback.format_exception(caught.value))
     assert SECRET not in rendered and TOKEN not in rendered
     assert caught.value.http_status == 403
@@ -450,13 +504,22 @@ def test_list_issue_changelog_returns_complete_history(server):
     route_ok(
         httpd,
         ISSUE_PATH,
-        {"key": "ABC-123",
-         "changelog": {"startAt": 0, "maxResults": 2, "total": 2,
-                       "histories": histories}},
+        {
+            "key": "ABC-123",
+            "changelog": {
+                "startAt": 0,
+                "maxResults": 2,
+                "total": 2,
+                "histories": histories,
+            },
+        },
     )
-    assert jira.list_issue_changelog(
-        base, "ABC-123", token=TOKEN, allow_http_loopback=True
-    ) == histories
+    assert (
+        jira.list_issue_changelog(
+            base, "ABC-123", token=TOKEN, allow_http_loopback=True
+        )
+        == histories
+    )
     assert_calls(httpd, [(ISSUE_PATH, {"expand": ["changelog"]})])
     assert_no_leak(httpd)
 
@@ -467,9 +530,15 @@ def test_list_issue_changelog_incomplete_page_is_explicit_error(server):
     route_ok(
         httpd,
         ISSUE_PATH,
-        {"key": "ABC-123",
-         "changelog": {"startAt": 0, "maxResults": 20, "total": 5,
-                       "histories": [{"id": "10"}, {"id": "11"}]}},
+        {
+            "key": "ABC-123",
+            "changelog": {
+                "startAt": 0,
+                "maxResults": 20,
+                "total": 5,
+                "histories": [{"id": "10"}, {"id": "11"}],
+            },
+        },
     )
     with pytest.raises(AtlaWireError) as caught:
         jira.list_issue_changelog(

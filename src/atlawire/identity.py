@@ -157,9 +157,7 @@ def _run(product: str, probe: Callable[[], IdentityCheck]) -> IdentityCheck:
     try:
         return probe()
     except AtlaWireError as exc:
-        return IdentityCheck(
-            ok=False, error=f"{product} check failed: {_reason(exc)}."
-        )
+        return IdentityCheck(ok=False, error=f"{product} check failed: {_reason(exc)}.")
 
 
 def _confluence_check(
@@ -290,9 +288,7 @@ def _reason(exc: AtlaWireError) -> str:
     return "unexpected response"
 
 
-def _target(
-    product: str, value: object, allow_http_loopback: bool
-) -> ProductTarget:
+def _target(product: str, value: object, allow_http_loopback: bool) -> ProductTarget:
     """Validate one explicit pair and normalize only its destination.
 
     Every rejection is ``_InvalidTarget``: it becomes that product's sanitized

@@ -71,22 +71,34 @@ PACKET_PROFILE = "read-only-review"
 PACKET_VERSION = 2
 DEFERRED_CAPABILITIES: tuple[str, ...] = ()
 PACKET_LIMITATIONS = (
-    ("Java/Kotlin symbol, complexity, javadoc and red-flag checks are regex "
-    "heuristics, not a parser or compiler."),
+    (
+        "Java/Kotlin symbol, complexity, javadoc and red-flag checks are regex "
+        "heuristics, not a parser or compiler."
+    ),
     "Same-name overloads are paired heuristically by kind and name.",
     "Heuristic source reads are capped at a fixed number of Java/Kotlin files.",
-    ("Ticket discovery scans branch, commit, title and description text and may "
-    "select a key-shaped non-ticket token."),
-    ("Browser before/after links use the changed path; a rename can make the "
-    "before link point at a path absent from the target revision."),
-    ("A ref without repository metadata falls back to the pull request "
-    "repository for file links and heuristic source reads."),
+    (
+        "Ticket discovery scans branch, commit, title and description text and may "
+        "select a key-shaped non-ticket token."
+    ),
+    (
+        "Browser before/after links use the changed path; a rename can make the "
+        "before link point at a path absent from the target revision."
+    ),
+    (
+        "A ref without repository metadata falls back to the pull request "
+        "repository for file links and heuristic source reads."
+    ),
     "An unflagged Bitbucket diff response is not proven complete.",
-    ("Diff-derived line numbers are matched against source read at the refs "
-    "captured before the diff; a push between those reads can misattribute a "
-    "symbol or its javadoc state."),
-    ("profile.partial=False means no known omission was detected in requested "
-    "material; it is not a proof of snapshot or diff completeness."),
+    (
+        "Diff-derived line numbers are matched against source read at the refs "
+        "captured before the diff; a push between those reads can misattribute a "
+        "symbol or its javadoc state."
+    ),
+    (
+        "profile.partial=False means no known omission was detected in requested "
+        "material; it is not a proof of snapshot or diff completeness."
+    ),
 )
 
 # Packet bounds. Rows keep their whole projected fields; only long free text and
@@ -117,9 +129,7 @@ LINES_DIFF_NO_HUNKS = "server-diff-no-textual-hunks"
 LINES_DIFF_MISSING = "server-diff-missing-file"
 LINES_NOT_REQUESTED = "not-requested"
 
-_BASE_URL_INVALID = (
-    "Use an HTTPS base URL without credentials, query, or fragment."
-)
+_BASE_URL_INVALID = "Use an HTTPS base URL without credentials, query, or fragment."
 _REPO_INVALID = "Expected a repository as PROJECT/slug."
 _ID_INVALID = "Expected a pull request ID as a positive signed 64-bit integer."
 _CONTEXT_INVALID = "The diff context must be an integer from 0 to 100."
@@ -194,8 +204,7 @@ _ADDED_SYMBOL = re.compile(
     r"default)\s+)+[\w.$<>\[\], ?]+\s+\w+\s*\("
 )
 _RENDER_UNAVAILABLE = (
-    "_Rendered description conversion was unavailable; no safe fallback was "
-    "available._"
+    "_Rendered description conversion was unavailable; no safe fallback was available._"
 )
 _HEURISTIC_NOTE = (
     "These are heuristic signals from changed lines and source text, not a "
@@ -488,9 +497,7 @@ def collect_pr_review(
     )
     from_ref = _ref(info, "fromRef", repository)
     to_ref = _ref(info, "toRef", repository)
-    ticket = _ticket_packet(
-        _find_ticket(info, commits), jira_config, loopback
-    )
+    ticket = _ticket_packet(_find_ticket(info, commits), jira_config, loopback)
     diff_section, by_destination, by_source = _diff_section(
         diff_value, context_lines, requested=wants_diff
     )
@@ -697,8 +704,7 @@ def _partial_reasons(packet: PrReviewPacket) -> list[str]:
     diff = packet["diff"]
     if not diff["requested"]:
         reasons.append(
-            "Diff was not requested; diff review material was intentionally "
-            "omitted."
+            "Diff was not requested; diff review material was intentionally omitted."
         )
     else:
         if diff["text_truncated"]:
@@ -722,13 +728,10 @@ def _partial_reasons(packet: PrReviewPacket) -> list[str]:
         reasons.append("Heuristic analysis is incomplete.")
     if checks["analysis_limited"] or checks["files_not_analyzed"]:
         reasons.append(
-            "Heuristic analysis skipped files because the source-read cap was "
-            "reached."
+            "Heuristic analysis skipped files because the source-read cap was reached."
         )
     if checks["unavailable_files"]:
-        reasons.append(
-            "Heuristic source reads were unavailable for one or more files."
-        )
+        reasons.append("Heuristic source reads were unavailable for one or more files.")
     if checks["truncated"]:
         reasons.append(
             "Review check lists were shortened: " + ", ".join(checks["truncated"]) + "."
@@ -820,9 +823,7 @@ def _require_repo(value: object) -> str:
 
 def _require_token(value: object, *, product: str) -> str:
     if not isinstance(value, str) or not value or _TOKEN.fullmatch(value) is None:
-        raise AtlaWireError(
-            _TOKEN_INVALID, category="credentials", product=product
-        )
+        raise AtlaWireError(_TOKEN_INVALID, category="credentials", product=product)
     return value
 
 
@@ -832,13 +833,9 @@ def _jira_config(
     if base_url is None and token is None:
         return None
     if base_url is None or token is None:
-        raise AtlaWireError(
-            _JIRA_PAIR_INVALID, category="credentials", product="jira"
-        )
+        raise AtlaWireError(_JIRA_PAIR_INVALID, category="credentials", product="jira")
     if not isinstance(base_url, str) or not isinstance(token, str):
-        raise AtlaWireError(
-            _JIRA_PAIR_INVALID, category="credentials", product="jira"
-        )
+        raise AtlaWireError(_JIRA_PAIR_INVALID, category="credentials", product="jira")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     return _JiraConfig(base_url=base, token=_require_token(token, product="jira"))
 
@@ -964,15 +961,9 @@ def _file_row(
         added = facts.added
         removed = facts.removed
         lines_source = LINES_FROM_DIFF
-    before_path = (
-        facts.source_path
-        if facts is not None and facts.source_path
-        else path
-    )
+    before_path = facts.source_path if facts is not None and facts.source_path else path
     after_path = (
-        facts.destination_path
-        if facts is not None and facts.destination_path
-        else path
+        facts.destination_path if facts is not None and facts.destination_path else path
     )
     return PrReviewFile(
         path=path,
@@ -1011,8 +1002,7 @@ def _counts_complete(
     if set(by_destination) - listed:
         return False
     return all(
-        row["path"] in by_destination or row["path"] in by_source
-        for row in file_rows
+        row["path"] in by_destination or row["path"] in by_source for row in file_rows
     )
 
 
@@ -1039,14 +1029,10 @@ def _file_links(
 ) -> PrReviewFileLinks:
     before = ""
     if exists_before and to_ref.commit:
-        before = _browse_link(
-            base, to_ref.repository, before_path, at=to_ref.commit
-        )
+        before = _browse_link(base, to_ref.repository, before_path, at=to_ref.commit)
     after = ""
     if exists_after and from_ref.commit:
-        after = _browse_link(
-            base, from_ref.repository, after_path, at=from_ref.commit
-        )
+        after = _browse_link(base, from_ref.repository, after_path, at=from_ref.commit)
     project, _, slug = repo.partition("/")
     diff = (
         f"{base}/projects/{quote(project, safe='')}"
@@ -1212,9 +1198,7 @@ def _hunk_lines(value: object) -> tuple[list[_LineChange], list[_LineChange]]:
                 source_line += 1
                 destination_line += 1
             else:
-                raise AtlaWireError(
-                    "Unsupported type in a Bitbucket diff segment."
-                )
+                raise AtlaWireError("Unsupported type in a Bitbucket diff segment.")
     return added, removed
 
 
@@ -1225,9 +1209,7 @@ def _start_line(hunk: dict[str, object], key: str) -> int:
     return value
 
 
-def _merge_facts(
-    mapping: dict[str, _FileFacts], key: str, facts: _FileFacts
-) -> None:
+def _merge_facts(mapping: dict[str, _FileFacts], key: str, facts: _FileFacts) -> None:
     previous = mapping.get(key)
     if previous is None:
         mapping[key] = facts
@@ -1259,9 +1241,7 @@ def _bounded_diff_text(text: str) -> tuple[str, int, int, bool]:
     return "".join(kept), total, used, True
 
 
-def _find_ticket(
-    info: dict[str, object], commits: Sequence[object]
-) -> str | None:
+def _find_ticket(info: dict[str, object], commits: Sequence[object]) -> str | None:
     """Find a key-shaped ticket from branches, commits, title or description."""
     branches = []
     for key in ("fromRef", "toRef"):
@@ -1385,9 +1365,7 @@ def _ticket_description(
     if isinstance(rendered, str) and rendered.strip():
         converted = convert_html(
             rendered,
-            SafeMarkdownConverter(
-                escape_misc=True, heading_style="atx", bullets="-"
-            ),
+            SafeMarkdownConverter(escape_misc=True, heading_style="atx", bullets="-"),
         )
         if converted:
             if len(converted) <= TICKET_DESCRIPTION_LIMIT:
@@ -1423,16 +1401,12 @@ def _checks(
 ) -> PrReviewChecks:
     files = packet["files"]
     java_entries = [
-        entry
-        for entry in files
-        if entry["path"].endswith((".java", ".kt"))
+        entry for entry in files if entry["path"].endswith((".java", ".kt"))
     ]
     test_entries = [entry for entry in files if entry["test"]]
     test_names = [entry["path"] for entry in test_entries]
     if not packet["diff"]["requested"]:
-        return _no_diff_checks(
-            packet, java_entries, test_entries, test_names
-        )
+        return _no_diff_checks(packet, java_entries, test_entries, test_names)
 
     reader = _FileReader(base, bearer, loopback)
     analysis_entries = [entry for entry in java_entries if not entry["test"]]
@@ -1445,9 +1419,7 @@ def _checks(
         to_ref,
         reader,
     )
-    return _checks_result(
-        packet, java_entries, test_entries, test_names, bundle
-    )
+    return _checks_result(packet, java_entries, test_entries, test_names, bundle)
 
 
 def _analysis_bundle(
@@ -1483,8 +1455,8 @@ def _analysis_bundle(
         attempted,
         not_analyzed,
     )
-    big, undocumented_types, undocumented_methods, method_count = (
-        _member_metrics(members_by_file)
+    big, undocumented_types, undocumented_methods, method_count = _member_metrics(
+        members_by_file
     )
     analysis_complete = not reader.failures and not not_analyzed
     notes = [_HEURISTIC_NOTE]
@@ -1539,8 +1511,10 @@ def _no_diff_checks(
         files_not_analyzed=[],
         notes=[
             _HEURISTIC_NOTE,
-            ("Diff was not requested; heuristic checks and symbol analysis "
-            "were not evaluated."),
+            (
+                "Diff was not requested; heuristic checks and symbol analysis "
+                "were not evaluated."
+            ),
         ],
         truncated=truncated,
     )
@@ -1581,9 +1555,7 @@ def _member_analysis(
         after_path = facts.destination_path or entry["path"]
         if not _claim_attempt(after_path, attempted, not_analyzed):
             continue
-        text = reader.text(
-            from_ref.repository, after_path, from_ref.commit, "new"
-        )
+        text = reader.text(from_ref.repository, after_path, from_ref.commit, "new")
         if text is None:
             continue
         touched = _members_touched(
@@ -1603,9 +1575,7 @@ def _member_metrics(
     list[_Member],
     int,
 ]:
-    methods = [
-        member for _, member in members_by_file if member["kind"] == "method"
-    ]
+    methods = [member for _, member in members_by_file if member["kind"] == "method"]
     big = sorted(
         [
             (path, member)
@@ -1621,9 +1591,7 @@ def _member_metrics(
         if member["kind"] == "type" and not member["javadoc"]
     ]
     undocumented_methods = [
-        member
-        for member in methods
-        if not member["javadoc"] and member["lines"] > 3
+        member for member in methods if not member["javadoc"] and member["lines"] > 3
     ]
     return big, undocumented_types, undocumented_methods, len(methods)
 
@@ -1758,16 +1726,12 @@ def _changed_symbols(
         before_ok = entry["type"] == "ADD"
         after_ok = entry["type"] == "DELETE"
         if entry["type"] != "ADD":
-            text = reader.text(
-                to_ref.repository, before_path, to_ref.commit, "old"
-            )
+            text = reader.text(to_ref.repository, before_path, to_ref.commit, "old")
             before_ok = text is not None
             if text is not None:
                 before = _java_members(text)
         if entry["type"] != "DELETE":
-            text = reader.text(
-                from_ref.repository, after_path, from_ref.commit, "new"
-            )
+            text = reader.text(from_ref.repository, after_path, from_ref.commit, "new")
             after_ok = text is not None
             if text is not None:
                 after = _java_members(text)
@@ -1788,9 +1752,7 @@ def _changed_symbols(
     return rows
 
 
-def _claim_attempt(
-    path: str, attempted: set[str], not_analyzed: list[str]
-) -> bool:
+def _claim_attempt(path: str, attempted: set[str], not_analyzed: list[str]) -> bool:
     """Reserve one distinct file for heuristic reading within the cap."""
     if path in attempted:
         return True
@@ -1872,9 +1834,7 @@ def _symbol_row(
     )
 
 
-def _members_touched(
-    members: list[_Member], lines: set[int]
-) -> list[_Member]:
+def _members_touched(members: list[_Member], lines: set[int]) -> list[_Member]:
     if not lines:
         return []
     touched: list[_Member] = []
@@ -1891,9 +1851,7 @@ def _add_unique(values: list[str], value: str, limit: int) -> None:
         values.append(value)
 
 
-def _red_flags(
-    lines: tuple[_LineChange, ...], path: str
-) -> list[dict[str, object]]:
+def _red_flags(lines: tuple[_LineChange, ...], path: str) -> list[dict[str, object]]:
     found: list[dict[str, object]] = []
     for change in lines:
         for name, pattern in _RED_FLAGS:
@@ -1927,9 +1885,7 @@ class _FileReader:
         self._cache: dict[tuple[str, str, str], str | None] = {}
         self.failures: list[dict[str, object]] = []
 
-    def text(
-        self, repo: str, path: str, at: str, side: str
-    ) -> str | None:
+    def text(self, repo: str, path: str, at: str, side: str) -> str | None:
         if not at:
             self._fail(path, side, "Missing commit hash for this side.")
             return None
@@ -1957,9 +1913,7 @@ class _FileReader:
         self.failures.append({"path": path, "side": side, "error": error})
 
 
-def reject_credential_echo(
-    packet: object, *, tokens: Sequence[str | None]
-) -> None:
+def reject_credential_echo(packet: object, *, tokens: Sequence[str | None]) -> None:
     """Refuse a completed packet that echoes a supplied credential.
 
     Every string value is HTML-entity-decoded and also checked in a
@@ -1967,9 +1921,7 @@ def reject_credential_echo(
     adjacent fields cannot leak through a library caller. The error is generic
     and contains no credential.
     """
-    secrets = [
-        token for token in tokens if isinstance(token, str) and token
-    ]
+    secrets = [token for token in tokens if isinstance(token, str) and token]
     if not secrets:
         return
     strings = list(_packet_strings(packet))
@@ -1978,8 +1930,7 @@ def reject_credential_echo(
     for secret in secrets:
         if any(secret in value for value in decoded) or secret in joined:
             raise AtlaWireError(
-                "The completed packet would echo a credential; output was "
-                "refused."
+                "The completed packet would echo a credential; output was refused."
             )
 
 
@@ -2012,18 +1963,14 @@ def parse_pr_link(value: str) -> tuple[str, int]:
         raise AtlaWireError("Expected a Bitbucket pull request link.")
     match = _PR_URL.search(value)
     if match is None:
-        raise AtlaWireError(
-            "Expected /projects/KEY/repos/slug/pull-requests/N."
-        )
+        raise AtlaWireError("Expected /projects/KEY/repos/slug/pull-requests/N.")
     repo = f"{match.group('project')}/{match.group('slug')}"
     identifier = match.group("id")
     # Bound the digits before ``int()``: CPython refuses to convert a string
     # longer than ``sys.get_int_max_str_digits()`` and would surface a raw
     # ``ValueError`` as a traceback instead of a usage error.
     if len(identifier) > 19:
-        raise AtlaWireError(
-            "Expected /projects/KEY/repos/slug/pull-requests/N."
-        )
+        raise AtlaWireError("Expected /projects/KEY/repos/slug/pull-requests/N.")
     return repo, int(identifier)
 
 
@@ -2083,9 +2030,7 @@ def _code_only(source: str) -> str:
     return "".join(out)
 
 
-def _has_javadoc(
-    clean_lines: list[str], original_lines: list[str], index: int
-) -> bool:
+def _has_javadoc(clean_lines: list[str], original_lines: list[str], index: int) -> bool:
     """Inspect original comment text because cleaned lines blank javadoc.
 
     Blank and annotation lines are skipped; a comment block is recognized by
@@ -2120,11 +2065,7 @@ def _java_members(source: str) -> list[_Member]:
         type_match = _JAVA_TYPE.match(line)
         method_match = _JAVA_METHOD.match(line)
         is_type = bool(type_match)
-        is_method = (
-            bool(method_match)
-            and not stripped.startswith("*")
-            and not is_type
-        )
+        is_method = bool(method_match) and not stripped.startswith("*") and not is_type
         if is_method:
             name = method_match.group("name") if method_match else ""
             if name in _CONTROL_NAMES:
@@ -2143,9 +2084,7 @@ def _java_members(source: str) -> list[_Member]:
                 line=index + 1,
                 lines=end - index + 1,
                 complexity=(
-                    1 + len(_COMPLEXITY_TOKENS.findall(body))
-                    if not is_type
-                    else 0
+                    1 + len(_COMPLEXITY_TOKENS.findall(body)) if not is_type else 0
                 ),
                 javadoc=has_doc,
             )
@@ -2216,8 +2155,7 @@ def _render_ticket_markdown(ticket: PrReviewTicket | None) -> list[str]:
         lines += ["", "### What the ticket asks", "", ticket["description"]]
         if ticket["description_truncated"]:
             lines.append(
-                f"\n_Description truncated to {TICKET_DESCRIPTION_LIMIT} "
-                "characters._"
+                f"\n_Description truncated to {TICKET_DESCRIPTION_LIMIT} characters._"
             )
     lines.append("")
     return lines
@@ -2225,8 +2163,10 @@ def _render_ticket_markdown(ticket: PrReviewTicket | None) -> list[str]:
 
 def _render_files_markdown(packet: PrReviewPacket) -> list[str]:
     lines = [
-        (f"## Files ({packet['files_total']}, tests: "
-        f"{packet['checks']['test_files']})"),
+        (
+            f"## Files ({packet['files_total']}, tests: "
+            f"{packet['checks']['test_files']})"
+        ),
         "",
     ]
     if packet["files_truncated"]:
@@ -2237,9 +2177,7 @@ def _render_files_markdown(packet: PrReviewPacket) -> list[str]:
     ]
     for entry in packet["files"]:
         marks = (
-            "—"
-            if entry["added"] is None
-            else f"+{entry['added']}/-{entry['removed']}"
+            "—" if entry["added"] is None else f"+{entry['added']}/-{entry['removed']}"
         )
         before = _link("before", entry["links"]["before"])
         after = _link("after", entry["links"]["after"])
@@ -2259,13 +2197,13 @@ def _render_checks_markdown(packet: PrReviewPacket) -> list[str]:
         "",
         f"_{inline(_HEURISTIC_NOTE)}_",
         "",
-        (f"- **Tests**: {checks['test_files']} test file(s), "
-        f"{checks['java_files']} Java/Kotlin file(s) changed"),
+        (
+            f"- **Tests**: {checks['test_files']} test file(s), "
+            f"{checks['java_files']} Java/Kotlin file(s) changed"
+        ),
     ]
     if checks["test_names"]:
-        lines.append(
-            f"  - {', '.join(_code(path) for path in checks['test_names'])}"
-        )
+        lines.append(f"  - {', '.join(_code(path) for path in checks['test_names'])}")
     if not checks["diff_requested"]:
         lines += [
             "- Diff was not requested; deeper checks were not evaluated.",
@@ -2281,9 +2219,11 @@ def _render_checks_markdown(packet: PrReviewPacket) -> list[str]:
 
 def _render_heuristic_metrics(checks: PrReviewChecks) -> list[str]:
     lines = [
-        (f"- **Javadoc heuristics**: {checks['types_without_javadoc']} type(s) "
-        f"without javadoc, {checks['methods_without_javadoc']} method(s) "
-        f"without javadoc ({checks['methods_touched']} method(s) touched)")
+        (
+            f"- **Javadoc heuristics**: {checks['types_without_javadoc']} type(s) "
+            f"without javadoc, {checks['methods_without_javadoc']} method(s) "
+            f"without javadoc ({checks['methods_touched']} method(s) touched)"
+        )
     ]
     if checks["undocumented_types"]:
         lines.append(
@@ -2323,8 +2263,7 @@ def _render_symbols_markdown(checks: PrReviewChecks) -> list[str]:
         "",
         "### Changed types and methods (heuristic)",
         "",
-        ("| status | symbol | file | lines before → after | "
-        "complexity | javadoc |"),
+        ("| status | symbol | file | lines before → after | complexity | javadoc |"),
         "|---|---|---|---|---|---|",
     ]
     order = {"added": 0, "modified": 1, "removed": 2}
@@ -2348,8 +2287,10 @@ def _render_symbols_markdown(checks: PrReviewChecks) -> list[str]:
     if len(ordered) > 40:
         lines += [
             "",
-            (f"_Showing the first 40 of {len(ordered)} changed symbols; the JSON "
-            "packet contains all of them._"),
+            (
+                f"_Showing the first 40 of {len(ordered)} changed symbols; the JSON "
+                "packet contains all of them._"
+            ),
         ]
     return lines
 
@@ -2396,14 +2337,19 @@ def render_markdown(packet: PrReviewPacket) -> str:
     lines += [
         f"# {_code(packet['repo'])}#{packet['pr_id']} — {inline(packet['title'])}",
         "",
-        (f"- state: **{inline(packet['state'])}**, author: "
-        f"{inline(packet['author'] or 'unknown')}"),
-        (f"- branches: {_code(packet['from_branch'])} → "
-        f"{_code(packet['to_branch'])}"),
-        (f"- hashes: {_code(packet['from_hash'][:10])} → "
-        f"{_code(packet['to_hash'][:10])}"),
-        (f"- links: [overview]({packet['links']['overview']}) · "
-        f"[diff]({packet['links']['diff']})"),
+        (
+            f"- state: **{inline(packet['state'])}**, author: "
+            f"{inline(packet['author'] or 'unknown')}"
+        ),
+        (f"- branches: {_code(packet['from_branch'])} → {_code(packet['to_branch'])}"),
+        (
+            f"- hashes: {_code(packet['from_hash'][:10])} → "
+            f"{_code(packet['to_hash'][:10])}"
+        ),
+        (
+            f"- links: [overview]({packet['links']['overview']}) · "
+            f"[diff]({packet['links']['diff']})"
+        ),
         "",
     ]
     lines.extend(_render_completeness_markdown(packet))
@@ -2443,8 +2389,10 @@ def render_markdown(packet: PrReviewPacket) -> str:
         if packet["diff"]["text_truncated"]:
             lines += [
                 "",
-                (f"_Diff text truncated to {DIFF_TEXT_BYTES_LIMIT} bytes; "
-                "line counts still come from the full validated response._"),
+                (
+                    f"_Diff text truncated to {DIFF_TEXT_BYTES_LIMIT} bytes; "
+                    "line counts still come from the full validated response._"
+                ),
             ]
     return escape_controls("\n".join(lines).rstrip() + "\n")
 
@@ -2501,11 +2449,7 @@ def _table_safe_text(value: str) -> str:
     surrogates are escaped by the shared control helper.
     """
     text = escape_controls(value)
-    return (
-        text.replace("\n", "\\n")
-        .replace("\t", "\\t")
-        .replace("\ufeff", "\\ufeff")
-    )
+    return text.replace("\n", "\\n").replace("\t", "\\t").replace("\ufeff", "\\ufeff")
 
 
 def _table_code_segment(text: str) -> str:
@@ -2520,9 +2464,7 @@ def _table_code_segment(text: str) -> str:
         default=0,
     )
     fence = "`" * max(1, longest + 1)
-    edge_needs_pad = (
-        text.startswith((" ", "`")) or text.endswith((" ", "`"))
-    )
+    edge_needs_pad = text.startswith((" ", "`")) or text.endswith((" ", "`"))
     not_all_ascii_spaces = bool(text.strip(" "))
     pad = " " if not_all_ascii_spaces and edge_needs_pad else ""
     return f"{fence}{pad}{text}{pad}{fence}"

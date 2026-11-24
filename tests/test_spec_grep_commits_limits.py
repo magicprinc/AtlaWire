@@ -106,7 +106,9 @@ def server():
 
 def default_branch(httpd, *, delay: float = 0.0) -> None:
     payload = {"displayId": "main", "id": "refs/heads/main", "latestCommit": SHA}
-    httpd.routes[ROOT + "/branches/default"] = lambda query: json_reply(payload, delay=delay)
+    httpd.routes[ROOT + "/branches/default"] = lambda query: json_reply(
+        payload, delay=delay
+    )
 
 
 def file_listing(httpd, names: list[str]) -> None:
@@ -193,10 +195,12 @@ def commits_route(pages: list[tuple[int, tuple[int, ...], int]]):
         expected_start, rows, next_start = remaining.pop(0)
         assert start == expected_start, start
         taken = rows[:size]
-        rest = rows[len(taken):]
+        rest = rows[len(taken) :]
         last = not rest and not remaining
         payload: dict[str, object] = {
-            "values": [{"id": f"{row:040x}", "message": f"commit {row}"} for row in taken],
+            "values": [
+                {"id": f"{row:040x}", "message": f"commit {row}"} for row in taken
+            ],
             "start": start,
             "size": len(taken),
             "limit": size,
@@ -219,7 +223,9 @@ def test_list_commits_metadata_reports_incomplete_limited_listing(server):
     assert len(result["commits"]) == 3
     assert result["limit"] == 3
     assert result["complete"] is False
-    assert [row["hash"] for row in result["commits"]] == [f"{i:040x}" for i in (0, 1, 3)]
+    assert [row["hash"] for row in result["commits"]] == [
+        f"{i:040x}" for i in (0, 1, 3)
+    ]
     # Текущая форма вызова остаётся прежней: список коммитов без метаданных.
     httpd.routes[ROOT + "/commits"] = commits_route([(0, (0, 1), 3), (3, (3, 4), 0)])
     rows = bitbucket.list_commits(
@@ -238,7 +244,9 @@ def test_list_commits_metadata_walks_server_cursor_to_the_end(server):
     result = bitbucket.list_commits_with_metadata(
         base, "PROJ/repo", token=TOKEN, limit=10, allow_http_loopback=True
     )
-    assert [row["hash"] for row in result["commits"]] == [f"{i:040x}" for i in (0, 1, 3, 4)]
+    assert [row["hash"] for row in result["commits"]] == [
+        f"{i:040x}" for i in (0, 1, 3, 4)
+    ]
     assert result["complete"] is True
     assert [urlsplit(call[1]).path for call in httpd.calls] == [ROOT + "/commits"] * 2
     assert_no_leak(httpd)
@@ -256,7 +264,9 @@ def test_last_modified_without_at_resolves_default_branch_commit(server):
 
     httpd.routes[ROOT + "/last-modified"] = handle
     assert (
-        bitbucket.get_last_modified(base, "PROJ/repo", token=TOKEN, allow_http_loopback=True)
+        bitbucket.get_last_modified(
+            base, "PROJ/repo", token=TOKEN, allow_http_loopback=True
+        )
         == payload
     )
     assert [urlsplit(call[1]).path for call in httpd.calls] == [

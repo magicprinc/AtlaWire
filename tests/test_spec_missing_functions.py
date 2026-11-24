@@ -77,9 +77,7 @@ def load(server, status, value, content_type=JSON):
 def assert_calls(server, expected):
     assert server.unexpected == []
     assert len(server.calls) == len(expected)
-    for call, (method, path, query, accept) in zip(
-        server.calls, expected, strict=True
-    ):
+    for call, (method, path, query, accept) in zip(server.calls, expected, strict=True):
         parsed = urlsplit(call.target)
         assert (
             call.method,
@@ -136,9 +134,11 @@ def test_search_all_issues_pages_until_total(server):
         search_page(0, [ISSUE_ONE, ISSUE_TWO], 3, max_results=2, is_last=True),
     )
     load(httpd, 200, search_page(2, [ISSUE_THREE], 3, max_results=2))
-    assert jira.search_all_issues(
-        base, JQL, token=TOKEN, allow_http_loopback=True
-    ) == [ISSUE_ONE, ISSUE_TWO, ISSUE_THREE]
+    assert jira.search_all_issues(base, JQL, token=TOKEN, allow_http_loopback=True) == [
+        ISSUE_ONE,
+        ISSUE_TWO,
+        ISSUE_THREE,
+    ]
     assert_calls(
         httpd,
         [
@@ -216,9 +216,10 @@ def test_search_all_issues_stops_when_total_is_reached(server):
         200,
         search_page(0, [ISSUE_ONE, ISSUE_TWO], 2, max_results=2, is_last=False),
     )
-    assert jira.search_all_issues(
-        base, JQL, token=TOKEN, allow_http_loopback=True
-    ) == [ISSUE_ONE, ISSUE_TWO]
+    assert jira.search_all_issues(base, JQL, token=TOKEN, allow_http_loopback=True) == [
+        ISSUE_ONE,
+        ISSUE_TWO,
+    ]
     assert_calls(
         httpd,
         [
@@ -241,9 +242,9 @@ def test_search_all_issues_stops_on_empty_page_without_total(server):
     httpd, base = server
     load(httpd, 200, search_page(0, [ISSUE_ONE], max_results=2))
     load(httpd, 200, search_page(1, [], max_results=2))
-    assert jira.search_all_issues(
-        base, JQL, token=TOKEN, allow_http_loopback=True
-    ) == [ISSUE_ONE]
+    assert jira.search_all_issues(base, JQL, token=TOKEN, allow_http_loopback=True) == [
+        ISSUE_ONE
+    ]
     assert_calls(
         httpd,
         [
@@ -439,9 +440,7 @@ def test_list_all_repositories_http_error_is_sanitized(server):
     httpd, base = server
     load(httpd, 404, {"errors": [{"message": SECRET + TOKEN}]})
     with pytest.raises(AtlaWireError) as caught:
-        bitbucket.list_all_repositories(
-            base, token=TOKEN, allow_http_loopback=True
-        )
+        bitbucket.list_all_repositories(base, token=TOKEN, allow_http_loopback=True)
     assert_sanitized(caught.value, 404)
     assert len(httpd.calls) == 1
 

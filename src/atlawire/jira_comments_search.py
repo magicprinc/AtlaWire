@@ -133,9 +133,7 @@ def find_author_comments(
     if a comment thread exceeds :data:`COMMENT_PAGE_LIMIT` pages, the call
     raises instead of returning an incomplete list.
     """
-    _validate_parameters(
-        days=days, limit=limit, max_issues=max_issues, project=project
-    )
+    _validate_parameters(days=days, limit=limit, max_issues=max_issues, project=project)
     if grep is not None and not isinstance(grep, str):
         raise AtlaWireError("Expected the grep pattern as text.")
     pattern = grep or None
@@ -240,9 +238,7 @@ def _grep_match_documents(bodies: list[str], pattern: str) -> list[bool]:
             "Grep regex evaluation failed; no result was produced."
         ) from None
     if len(matches) != len(bodies):
-        raise AtlaWireError(
-            "Grep regex evaluation failed; no result was produced."
-        )
+        raise AtlaWireError("Grep regex evaluation failed; no result was produced.")
     return matches
 
 
@@ -297,9 +293,7 @@ class _CollectorSlot:
         self._limit = limit
         self._heap: list[tuple[datetime, int, AuthorCommentRow]] = []
 
-    def offer(
-        self, timestamp: datetime, row: AuthorCommentRow, serial: int
-    ) -> int:
+    def offer(self, timestamp: datetime, row: AuthorCommentRow, serial: int) -> int:
         """Offer one row and return the next arrival serial."""
         entry = (timestamp, -serial, row)
         if len(self._heap) < self._limit:
@@ -454,9 +448,7 @@ def _issue_comments(
     summary = _summary(fields.get("summary"))
     comments, block_total = _comment_block(fields.get("comment"))
     if block_total > len(comments):
-        for batch in _read_thread_pages(
-            session, base, key, block_total=block_total
-        ):
+        for batch in _read_thread_pages(session, base, key, block_total=block_total):
             for entry in _page_entries(
                 batch,
                 base=base,
@@ -671,9 +663,7 @@ def _page_entries(
         bodies = [entry[1]["body"] for entry in entries]
         matches = _grep_match_documents(bodies, grep)
         entries = [
-            entry
-            for entry, is_match in zip(entries, matches, strict=True)
-            if is_match
+            entry for entry, is_match in zip(entries, matches, strict=True) if is_match
         ]
     return entries
 
@@ -702,9 +692,7 @@ def _comment_instant(value: str) -> datetime:
     except ValueError:
         raise AtlaWireError("Invalid Jira comment created timestamp.") from None
     if instant.tzinfo is None or instant.utcoffset() is None:
-        raise AtlaWireError(
-            "Jira comment created timestamp must include a timezone."
-        )
+        raise AtlaWireError("Jira comment created timestamp must include a timezone.")
     return instant
 
 

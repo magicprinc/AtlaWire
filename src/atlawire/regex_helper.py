@@ -185,9 +185,7 @@ def match_documents(
     newlines and ``(?m)``/``(?s)`` apply.
     """
     _validate_common(pattern, ignore_case, timeout_s)
-    if not isinstance(documents, Sequence) or isinstance(
-        documents, (str, bytes)
-    ):
+    if not isinstance(documents, Sequence) or isinstance(documents, (str, bytes)):
         raise HelperFailure
     texts = list(documents)
     if any(not isinstance(document, str) for document in texts):
@@ -207,9 +205,7 @@ def match_documents(
     return decode_document_matches(stdout, count=len(texts))
 
 
-def validate_regex(
-    pattern: str, *, ignore_case: bool, timeout_s: float
-) -> None:
+def validate_regex(pattern: str, *, ignore_case: bool, timeout_s: float) -> None:
     """Compile the pattern in a killable helper without evaluating text."""
     _validate_common(pattern, ignore_case, timeout_s)
     stdout = _run(
@@ -225,9 +221,7 @@ def validate_regex(
         raise HelperFailure
 
 
-def decode_line_matches(
-    stdout: bytes, *, limit: int, line_count: int
-) -> list[int]:
+def decode_line_matches(stdout: bytes, *, limit: int, line_count: int) -> list[int]:
     """Validate and decode one lines-mode helper response."""
     value = _decode_json(stdout)
     matches = value.get("matches")
@@ -259,9 +253,7 @@ def decode_document_matches(stdout: bytes, *, count: int) -> list[bool]:
     return [bool(item) for item in matches]
 
 
-def _validate_common(
-    pattern: str, ignore_case: bool, timeout_s: float
-) -> None:
+def _validate_common(pattern: str, ignore_case: bool, timeout_s: float) -> None:
     if not isinstance(pattern, str) or not isinstance(ignore_case, bool):
         raise HelperFailure
     if (
@@ -281,7 +273,7 @@ def _validate_limit(limit: int) -> None:
 def _decode_json(stdout: bytes) -> dict[str, object]:
     try:
         value = json.loads(stdout.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
+    except UnicodeDecodeError, ValueError:
         raise HelperFailure from None
     if not isinstance(value, dict):
         raise HelperFailure
@@ -316,7 +308,7 @@ def _run(request: dict[str, object], timeout_s: float) -> bytes:
             _stop_helper(process)
             cleaned = True
             raise RegexTimeout from None
-        except (OSError, ValueError):
+        except OSError, ValueError:
             raise HelperFailure from None
     finally:
         if not cleaned and process.poll() is None:

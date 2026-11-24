@@ -284,7 +284,9 @@ def _jql(cli: Cli, state: RunState) -> None:
         machine_json=ok_json,
         forced_ok=ok_json and count > 0,
     )
-    projected_keys = sorted(value[0]) if ok_json and isinstance(value, list) and value else []
+    projected_keys = (
+        sorted(value[0]) if ok_json and isinstance(value, list) and value else []
+    )
     if state.stopped_by is not None:
         return
     fields_args = (

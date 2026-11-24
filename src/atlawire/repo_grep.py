@@ -79,11 +79,48 @@ REGEX_TIMEOUT_DEFAULT = 5.0
 HIT_TEXT_LIMIT = 300
 TEXT_SUFFIXES = frozenset(
     {
-        ".java", ".kt", ".kts", ".groovy", ".py", ".js", ".mjs", ".ts", ".tsx",
-        ".jsx", ".go", ".rs", ".c", ".h", ".cpp", ".hpp", ".cs", ".rb", ".php",
-        ".swift", ".scala", ".sql", ".sh", ".bash", ".ps1", ".bat", ".cmd",
-        ".yml", ".yaml", ".json", ".xml", ".properties", ".md", ".txt",
-        ".gradle", ".toml", ".ini", ".conf", ".html", ".css", ".proto", ".vue",
+        ".java",
+        ".kt",
+        ".kts",
+        ".groovy",
+        ".py",
+        ".js",
+        ".mjs",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".go",
+        ".rs",
+        ".c",
+        ".h",
+        ".cpp",
+        ".hpp",
+        ".cs",
+        ".rb",
+        ".php",
+        ".swift",
+        ".scala",
+        ".sql",
+        ".sh",
+        ".bash",
+        ".ps1",
+        ".bat",
+        ".cmd",
+        ".yml",
+        ".yaml",
+        ".json",
+        ".xml",
+        ".properties",
+        ".md",
+        ".txt",
+        ".gradle",
+        ".toml",
+        ".ini",
+        ".conf",
+        ".html",
+        ".css",
+        ".proto",
+        ".vue",
         ".lua",
     }
 )
@@ -888,7 +925,5 @@ def _timeout_value(value: float, label: str) -> float:
         or not math.isfinite(value)
         or value <= 0
     ):
-        raise AtlaWireError(
-            f"The {label} timeout must be a finite positive number."
-        )
+        raise AtlaWireError(f"The {label} timeout must be a finite positive number.")
     return float(value)

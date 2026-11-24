@@ -437,9 +437,7 @@ def _wiki_parts(text: str) -> list[_WikiPart]:
             parts.append(_WikiPart(text[position : match.start()]))
         closing = closer.search(text, match.end())
         if closing is None:
-            parts.append(
-                _WikiPart(text[match.end() :], macro, info, terminated=False)
-            )
+            parts.append(_WikiPart(text[match.end() :], macro, info, terminated=False))
             break
         parts.append(_WikiPart(text[match.end() : closing.start()], macro, info))
         position = closing.end()
@@ -655,20 +653,15 @@ def _comment_blocks(
         None if use_wiki else _rendered_comments(rendered_fields)
     )
     comments, total = _comments(fields)
-    ambiguous_raw: set[str] = (
-        set() if use_wiki else _ambiguous_raw_ids(comments)
-    )
+    ambiguous_raw: set[str] = set() if use_wiki else _ambiguous_raw_ids(comments)
     if not (comments or (total is not None and total > 0)):
         return []
     blocks = ["## Comments"]
     if total is not None and total > len(comments):
-        blocks.append(
-            f"_Comments are incomplete: showing {len(comments)} of {total}._"
-        )
+        blocks.append(f"_Comments are incomplete: showing {len(comments)} of {total}._")
     if use_wiki:
         blocks.extend(
-            _wiki_comment(index, entry)
-            for index, entry in enumerate(comments, 1)
+            _wiki_comment(index, entry) for index, entry in enumerate(comments, 1)
         )
     elif rendered_comments is not None:
         blocks.extend(
@@ -691,9 +684,7 @@ def _metadata(fields: dict[str, object]) -> str:
     )
 
 
-def render_issue_markdown(
-    issue: dict[str, object], *, use_wiki: bool = False
-) -> str:
+def render_issue_markdown(issue: dict[str, object], *, use_wiki: bool = False) -> str:
     """Return a self-contained Markdown representation of a fetched issue.
 
     The function is pure: it reads the issue mapping and performs no I/O. A

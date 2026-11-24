@@ -405,9 +405,7 @@ def _worklog_page(
         raise AtlaWireError("Expected a Jira worklogs array.")
     if not worklogs:
         if total != start:
-            raise AtlaWireError(
-                "Jira worklogs ended before all worklogs were read."
-            )
+            raise AtlaWireError("Jira worklogs ended before all worklogs were read.")
         return worklogs, total
     advertised = page.get("maxResults")
     if (
@@ -936,7 +934,7 @@ def titles(
     with bearer_session(token) as session:
         # One JQL read per batch of 50; a longer IN list would overflow the URL.
         for start in range(0, len(unique), 50):
-            batch = unique[start:start + 50]
+            batch = unique[start : start + 50]
             envelope = get_json_object(
                 session,
                 url,
@@ -951,14 +949,20 @@ def titles(
                 raise AtlaWireError("Expected a Jira search issues array.")
             for issue in issues:
                 if not isinstance(issue, dict):
-                    raise AtlaWireError("Expected Jira issue objects in search results.")
+                    raise AtlaWireError(
+                        "Expected Jira issue objects in search results."
+                    )
                 key = issue.get("key")
                 if not _valid_issue_key(key):
-                    raise AtlaWireError("Expected valid Jira issue keys in search results.")
+                    raise AtlaWireError(
+                        "Expected valid Jira issue keys in search results."
+                    )
                 fields = issue.get("fields")
                 summary = fields.get("summary") if isinstance(fields, dict) else None
                 if not isinstance(summary, str):
-                    raise AtlaWireError("Expected Jira issue summaries in search results.")
+                    raise AtlaWireError(
+                        "Expected Jira issue summaries in search results."
+                    )
                 found[key] = summary
     return {key: found[key] for key in unique if key in found}
 
@@ -1751,9 +1755,7 @@ def _read_all_issues(
                 "maxResults": size,
             },
         )
-        issues, total, advertised = _all_issues_page(
-            page, start=start, requested=size
-        )
+        issues, total, advertised = _all_issues_page(page, start=start, requested=size)
         if advertised is not None:
             page_size = min(advertised, _SEARCH_ALL_PAGE_SIZE)
         if total is not None and start + len(issues) > total:
@@ -1802,16 +1804,12 @@ def _all_issues_page(
         or advertised <= 0
     ):
         raise AtlaWireError("Invalid Jira search maxResults.")
-    if len(issues) > requested or (
-        advertised is not None and len(issues) > advertised
-    ):
+    if len(issues) > requested or (advertised is not None and len(issues) > advertised):
         raise AtlaWireError("Jira search returned more issues than requested.")
     rows: list[dict[str, object]] = []
     for issue in issues:
         if not isinstance(issue, dict):
-            raise AtlaWireError(
-                "Expected Jira issue objects in search results."
-            )
+            raise AtlaWireError("Expected Jira issue objects in search results.")
         rows.append(issue)
     return rows, total, advertised
 

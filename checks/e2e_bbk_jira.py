@@ -267,9 +267,7 @@ def test_mine_narrows_to_an_exact_status(
         assert row["status"] == status, "row escaped the requested status"
 
 
-def test_issue_returns_fields_and_rendered_fields(
-    live: _Live, issue_key: str
-) -> None:
+def test_issue_returns_fields_and_rendered_fields(live: _Live, issue_key: str) -> None:
     """bbk.issue promise: the full issue JSON, rendered fields included."""
     issue = _call(jira.get_issue, live.base_url, issue_key, token=live.token)
     assert isinstance(issue, dict), "issue is not an object"
@@ -291,9 +289,7 @@ def test_issue_accepts_a_browse_url(live: _Live, issue_key: str) -> None:
     assert issue.get("key") == issue_key, "browse URL resolved to another issue"
 
 
-def test_issue_markdown_renders_the_same_issue(
-    live: _Live, issue_key: str
-) -> None:
+def test_issue_markdown_renders_the_same_issue(live: _Live, issue_key: str) -> None:
     """bbk.issue_md promise: a Markdown card for HTML and wiki source."""
     issue = _call(jira.get_issue, live.base_url, issue_key, token=live.token)
     for use_wiki in (False, True):
@@ -329,9 +325,7 @@ def test_current_user_has_the_three_identity_fields(
     _assert_no_token(current, live.token)
 
 
-def _transitions(
-    live: _Live, candidates: list[str]
-) -> list[dict[str, object]]:
+def _transitions(live: _Live, candidates: list[str]) -> list[dict[str, object]]:
     """Return the first non-empty transition list from the sampled issues."""
     for key in candidates:
         rows = _call(jira.list_transitions, live.base_url, key, token=live.token)
@@ -384,9 +378,7 @@ def test_user_search_finds_the_current_login(
     _assert_no_token(users, live.token)
 
 
-def test_titles_map_the_issue_key_to_its_summary(
-    live: _Live, issue_key: str
-) -> None:
+def test_titles_map_the_issue_key_to_its_summary(live: _Live, issue_key: str) -> None:
     """bbk.titles promise: a key-to-summary mapping for the requested keys."""
     issue = _call(jira.get_issue, live.base_url, issue_key, token=live.token)
     fields = issue.get("fields")

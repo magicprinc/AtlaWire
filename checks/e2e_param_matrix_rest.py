@@ -331,9 +331,7 @@ def _discover_bitbucket(ctx: Ctx) -> None:
     ctx.fixtures["bb_pr"] = pr_id
     ctx.fixtures["bb_project"] = repo_name.split("/", 1)[0]
     branches = bitbucket.list_branches(base, repo_name, token=token)
-    default_branch = next(
-        (row for row in branches if row.get("default")), branches[0]
-    )
+    default_branch = next((row for row in branches if row.get("default")), branches[0])
     ctx.fixtures["bb_branch"] = str(default_branch["name"])
     ctx.fixtures["bb_default_commit"] = str(default_branch["commit"])
     tags = bitbucket.list_tags(base, repo_name, token=token, limit=3)
@@ -495,6 +493,7 @@ def _conf_children_truncation(ctx: Ctx) -> str:
     if reported is not None and reported < 2:
         raise Divergence(f"metadata total {reported} contradicts a non-empty cap")
     return f"limit=1 of {total} -> truncated=True, total={reported}"
+
 
 def _conf_spaces(limit: int | None) -> Callable[[Ctx], str]:
     def run(ctx: Ctx) -> str:
@@ -935,7 +934,11 @@ def _bb_tags_truncation(ctx: Ctx) -> str:
     base, token = ctx.bitbucket.base_url, ctx.bitbucket.token
     repo = _fixture(ctx, "bb_repo")
     limited = bitbucket.list_tags_with_metadata(base, repo, token=token, limit=2)
-    if limited["limit"] != 2 or len(limited["tags"]) != 2 or limited["complete"] is not False:
+    if (
+        limited["limit"] != 2
+        or len(limited["tags"]) != 2
+        or limited["complete"] is not False
+    ):
         return (
             f"limit=2 -> rows={len(limited['tags'])} complete={limited['complete']}; "
             "cap not observable"
@@ -947,6 +950,7 @@ def _bb_tags_truncation(ctx: Ctx) -> str:
         f"limit=2 of {len(full['tags'])} tags -> complete=False (truncated); "
         f"limit=1000 -> complete=True"
     )
+
 
 def _bb_blame(pinned: bool) -> Callable[[Ctx], str]:
     def run(ctx: Ctx) -> str:
@@ -1028,7 +1032,9 @@ def _bb_last_modified_file(ctx: Ctx) -> str:
     except AtlaWireError as exc:
         message = str(exc)
         if exc.category != "upstream" or exc.http_status != 500:
-            raise Divergence(f"file path error category {exc.category}/{exc.http_status}") from None
+            raise Divergence(
+                f"file path error category {exc.category}/{exc.http_status}"
+            ) from None
         if "path names a file" not in message or "repository-root" not in message:
             raise Divergence("file path error does not name the workaround") from None
         if "HTTP 500" in message:
@@ -1052,6 +1058,7 @@ def _bb_last_modified_default(ctx: Ctx) -> str:
     if latest != expected:
         raise Divergence("default last-modified did not resolve the default branch tip")
     return f"default at -> files={len(files)} latestCommit == default branch tip"
+
 
 def _bb_commits(at: bool, path_fixture: str | None, limit: int) -> Callable[[Ctx], str]:
     def run(ctx: Ctx) -> str:

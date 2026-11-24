@@ -12,14 +12,38 @@ TOKEN = "synthetic-batch-token"
 SECRET_BODY = "synthetic-batch-error-body"
 SHA = "a" * 40
 PR = {
-    "id": 42, "title": "A title", "state": "OPEN",
-    "fromRef": {"latestCommit": SHA, "repository": {"project": {"key": "FORK"}, "slug": "copy"}},
-    "toRef": {"latestCommit": "b" * 40, "repository": {"project": {"key": "DEST"}, "slug": "target"}},
+    "id": 42,
+    "title": "A title",
+    "state": "OPEN",
+    "fromRef": {
+        "latestCommit": SHA,
+        "repository": {"project": {"key": "FORK"}, "slug": "copy"},
+    },
+    "toRef": {
+        "latestCommit": "b" * 40,
+        "repository": {"project": {"key": "DEST"}, "slug": "target"},
+    },
     "extra": {"nested": [1, None]},
 }
-MERGE = {"canMerge": False, "conflicted": True, "vetoes": [{"summary": "reason"}], "extra": [1]}
-TAG = {"id": "refs/tags/release/v1", "displayId": "release/v1", "latestCommit": SHA, "extra": {"x": 1}}
-COMMIT = {"id": SHA, "message": "message\nsecond line", "author": {"name": "Ada"}, "parents": [{"id": "b" * 40}], "extra": [1]}
+MERGE = {
+    "canMerge": False,
+    "conflicted": True,
+    "vetoes": [{"summary": "reason"}],
+    "extra": [1],
+}
+TAG = {
+    "id": "refs/tags/release/v1",
+    "displayId": "release/v1",
+    "latestCommit": SHA,
+    "extra": {"x": 1},
+}
+COMMIT = {
+    "id": SHA,
+    "message": "message\nsecond line",
+    "author": {"name": "Ada"},
+    "parents": [{"id": "b" * 40}],
+    "extra": [1],
+}
 TEXT = "first line\nsecond: café\n"
 CASES = ["pr", "merge", "tag", "commit", "repo_file", "pr_file"]
 
@@ -32,7 +56,7 @@ def server(request):
         def handle(self):
             try:
                 super().handle()
-            except (ConnectionResetError, ConnectionAbortedError):
+            except ConnectionResetError, ConnectionAbortedError:
                 pass
 
         def finish(self):
@@ -46,8 +70,12 @@ def server(request):
         def do_GET(self):
             with self.server.connection_condition:
                 self.server.request_connections.add(self.client_address)
-            self.server.calls.append((self.command, self.path, self.headers.get("Authorization")))
-            failure = self.server.status != 200 and (not self.server.fail_raw or "/raw/" in self.path)
+            self.server.calls.append(
+                (self.command, self.path, self.headers.get("Authorization"))
+            )
+            failure = self.server.status != 200 and (
+                not self.server.fail_raw or "/raw/" in self.path
+            )
             if failure:
                 message = SECRET_BODY + (TOKEN if self.server.echo_token else "")
                 body = json.dumps({"errors": [{"message": message}]}).encode()
@@ -57,7 +85,12 @@ def server(request):
             else:
                 body, status = json.dumps(self.server.payload).encode(), 200
             self.send_response(status)
-            self.send_header("Content-Type", "text/plain; charset=utf-8" if not failure and "/raw/" in self.path else "application/json")
+            self.send_header(
+                "Content-Type",
+                "text/plain; charset=utf-8"
+                if not failure and "/raw/" in self.path
+                else "application/json",
+            )
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -98,13 +131,23 @@ def invoke(case, base):
     if case == "commit":
         return bitbucket.get_commit(base, "PROJ/repo", "aaaaaaa", **options)
     if case == "repo_file":
-        return bitbucket.get_repository_file(base, "PROJ/repo", "dir/a file.txt", at="refs/heads/main", **options)
-    return bitbucket.get_pull_request_file(base, "PROJ/repo", 42, "dir/a file.txt", **options)
+        return bitbucket.get_repository_file(
+            base, "PROJ/repo", "dir/a file.txt", at="refs/heads/main", **options
+        )
+    return bitbucket.get_pull_request_file(
+        base, "PROJ/repo", 42, "dir/a file.txt", **options
+    )
 
 
 def configure(httpd, case):
-    httpd.payload = {"pr": PR, "merge": MERGE, "tag": TAG, "commit": COMMIT, "repo_file": PR, "pr_file": PR}[case]
-
+    httpd.payload = {
+        "pr": PR,
+        "merge": MERGE,
+        "tag": TAG,
+        "commit": COMMIT,
+        "repo_file": PR,
+        "pr_file": PR,
+    }[case]
 
 
 @pytest.mark.parametrize("case", CASES)
@@ -119,16 +162,28 @@ def test_wire_route_query_and_bearer(server, case):
         "tag": [root + "/tags/release/v1"],
         "commit": [root + "/commits/aaaaaaa"],
         "repo_file": [root + "/raw/dir/a%20file.txt?at=refs%2Fheads%2Fmain"],
-        "pr_file": [root + "/pull-requests/42", "/rest/api/1.0/projects/FORK/repos/copy/raw/dir/a%20file.txt?at=" + SHA],
+        "pr_file": [
+            root + "/pull-requests/42",
+            "/rest/api/1.0/projects/FORK/repos/copy/raw/dir/a%20file.txt?at=" + SHA,
+        ],
     }
-    assert httpd.calls == [("GET", target, "Bearer " + TOKEN) for target in targets[case]]
+    assert httpd.calls == [
+        ("GET", target, "Bearer " + TOKEN) for target in targets[case]
+    ]
 
 
 @pytest.mark.parametrize("case", CASES)
 def test_result_preserves_server_fields_or_text(server, case):
     httpd, base = server
     configure(httpd, case)
-    expected = {"pr": PR, "merge": MERGE, "tag": TAG, "commit": COMMIT, "repo_file": TEXT, "pr_file": TEXT}
+    expected = {
+        "pr": PR,
+        "merge": MERGE,
+        "tag": TAG,
+        "commit": COMMIT,
+        "repo_file": TEXT,
+        "pr_file": TEXT,
+    }
     assert invoke(case, base) == expected[case]
 
 
@@ -144,14 +199,22 @@ def test_http_errors_are_typed_and_sanitized(server, case, status, capsys, caplo
     assert caught.value.category == "http"
     assert caught.value.http_status == status
     captured = capsys.readouterr()
-    text = str(caught.value) + "".join(traceback.format_exception(caught.value)) + captured.out + captured.err + caplog.text
+    text = (
+        str(caught.value)
+        + "".join(traceback.format_exception(caught.value))
+        + captured.out
+        + captured.err
+        + caplog.text
+    )
     assert TOKEN not in text
     assert SECRET_BODY not in text
     assert len(httpd.calls) == (2 if case == "pr_file" else 1)
 
 
 @pytest.mark.parametrize("case", CASES)
-def test_http_error_echo_of_token_is_sanitized_and_keeps_status(server, case, capsys, caplog):
+def test_http_error_echo_of_token_is_sanitized_and_keeps_status(
+    server, case, capsys, caplog
+):
     httpd, base = server
     configure(httpd, case)
     httpd.status = 401
@@ -160,7 +223,13 @@ def test_http_error_echo_of_token_is_sanitized_and_keeps_status(server, case, ca
     with pytest.raises(AtlaWireError) as caught:
         invoke(case, base)
     captured = capsys.readouterr()
-    text = str(caught.value) + "".join(traceback.format_exception(caught.value)) + captured.out + captured.err + caplog.text
+    text = (
+        str(caught.value)
+        + "".join(traceback.format_exception(caught.value))
+        + captured.out
+        + captured.err
+        + caplog.text
+    )
     assert TOKEN not in text
     assert SECRET_BODY not in text
     assert caught.value.category == "http"
@@ -185,6 +254,9 @@ def test_connection_closes_after_success_and_error(server, case, status):
     assert len(httpd.calls) == (2 if case == "pr_file" else 1)
     with httpd.connection_condition:
         assert httpd.connection_condition.wait_for(
-            lambda: bool(httpd.request_connections) and httpd.request_connections <= httpd.closed_connections,
+            lambda: (
+                bool(httpd.request_connections)
+                and httpd.request_connections <= httpd.closed_connections
+            ),
             timeout=3,
         ), "client left an HTTP connection open"
