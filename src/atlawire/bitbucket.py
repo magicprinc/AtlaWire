@@ -506,14 +506,17 @@ def get_repository_file(
     path: str,
     *,
     token: str,
-    at: str = "master",
+    at: str | None = None,
     allow_http_loopback: bool = False,
 ) -> str:
     """Return one repository file at a revision as exact UTF-8 text.
 
     ``repo`` is ``PROJECT/slug`` and ``path`` is a relative Git path with safe
-    segments. The revision defaults to ``master`` and is sent only as the
-    ``at`` query parameter. The call makes one streamed raw request with
+    segments. The revision is optional: omitting it reads the server's default
+    branch, exactly like the listing readers, so a list-then-read workflow stays
+    on the same branch. A non-empty ``at`` is sent only as the ``at`` query
+    parameter; pass a commit id when one exact snapshot is required. The call
+    makes one streamed raw request with
     ``Accept: text/plain``; this server refuses the raw route without it. The
     route serves the stored bytes with a media type derived from the file, so
     ``.java`` and ``.gradle`` arrive as ``text/plain`` while ``.md`` arrives as
@@ -524,7 +527,7 @@ def get_repository_file(
     shared ones, so an oversize or binary response raises without returning
     partial text, while a JSON document is treated as an error response.
     """
-    revision = _revision(at)
+    params = _revision_params(at)
     segments = _file_segments(path)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
@@ -532,7 +535,7 @@ def get_repository_file(
         return _read_raw_file_text(
             session,
             _raw_file_url(base, project, slug, segments),
-            params={"at": revision},
+            params=params,
             token=token,
         )
 

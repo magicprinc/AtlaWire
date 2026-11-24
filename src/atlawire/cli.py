@@ -1854,7 +1854,9 @@ def commit_diff_command(
 @cli.command("file")
 @click.argument("repo")
 @click.argument("path")
-@click.option("--at", default="master", show_default=True, help="Revision to read.")
+@click.option(
+    "--at", default=None, help="Revision to read; omit for the default branch."
+)
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
 @click.option(
@@ -1863,7 +1865,7 @@ def commit_diff_command(
 def file_command(
     repo: str,
     path: str,
-    at: str,
+    at: str | None,
     base_url: str | None,
     token_from_env: bool,
     allow_http_loopback: bool,

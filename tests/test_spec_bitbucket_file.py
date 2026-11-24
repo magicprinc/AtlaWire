@@ -72,6 +72,28 @@ def test_file_wire_contract(server):
     assert accept == "text/plain"
 
 
+def test_file_omits_at_for_the_server_default_branch(server):
+    httpd, url = server
+    get_repository_file(
+        url, "PROJ/repo", "dir/file.txt", token=TOKEN, allow_http_loopback=True
+    )
+    assert len(httpd.calls) == 1
+    assert parse_qs(urlsplit(httpd.calls[0][1]).query) == {}
+
+
+def test_file_sends_an_explicit_revision_verbatim(server):
+    httpd, url = server
+    get_repository_file(
+        url,
+        "PROJ/repo",
+        "dir/file.txt",
+        token=TOKEN,
+        at="master",
+        allow_http_loopback=True,
+    )
+    assert parse_qs(urlsplit(httpd.calls[0][1]).query) == {"at": ["master"]}
+
+
 def test_file_preserves_utf8_bom_and_crlf(server):
     _, url = server
     result = get_repository_file(
