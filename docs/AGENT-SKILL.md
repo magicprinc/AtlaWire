@@ -5,6 +5,10 @@ AtlaWire — read-only CLI к Jira, Confluence, Bitbucket. Никаких зап
 
 Правила:
 - Источник истины по командам и флагам — `atlawire --catalog` и `atlawire <cmd> --help`.
+  `--json` есть не у всех команд: `page-comments`, `page-history`, `page-version`,
+  `page-attachments`, `last-modified`, `jira-me`, `issue-changelog` печатают текст.
+- Переходишь с BBK — [MIGRATION-FROM-BBK.md](MIGRATION-FROM-BBK.md): карта функций,
+  отличия по кредам и ретраям, что реально читается на живом стенде.
 - Read — один ограниченный ответ; строка поиска это lead, а не доказательство.
 - `--json` — проекция для агента, `--raw` — сырой ответ сервера (где флаг есть).
 - Токен не передаётся аргументом и не печатается; ошибки без трейсбека и без токена

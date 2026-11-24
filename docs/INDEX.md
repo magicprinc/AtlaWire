@@ -101,6 +101,7 @@ read-only учёткой. Отсутствие строк не доказыва�
 | [AGENT-SKILL.md](AGENT-SKILL.md) | короткая таблица «задача → команда → что вернётся» |
 | [API.md](API.md) | справочник функций Python-API по модулям |
 | [LIVE-READ-ONLY.md](LIVE-READ-ONLY.md) | как проверять живой стенд только на чтение |
+| [MIGRATION-FROM-BBK.md](MIGRATION-FROM-BBK.md) | перенос агентских read-сценариев с BBK: карта функций, отличия, живая сверка |
 | [RESEARCH-COVERAGE.md](RESEARCH-COVERAGE.md) | что заменяет BBK, а что нет |
 | [DEFERRED-WRITES.md](DEFERRED-WRITES.md) | исторический справочник пишущих операций BBK (в AtlaWire их нет) |
 | [FEEDBACK.md](FEEDBACK.md) | шаблон отчёта о практических блокерах |

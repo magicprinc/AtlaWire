@@ -51,7 +51,9 @@ not replace opening the underlying issue, page, or file as evidence.
 Start with the [agent quickstart](docs/AGENT-QUICKSTART.md), use the
 [agent skill table](docs/AGENT-SKILL.md) for task-to-command lookup, verify a
 deployment with the [read-only runbook](docs/LIVE-READ-ONLY.md), and report practical
-gaps with the [feedback template](docs/FEEDBACK.md). See the [research coverage
+gaps with the [feedback template](docs/FEEDBACK.md). Moving an agent from BBK:
+the [migration notes](docs/MIGRATION-FROM-BBK.md) map every function, the calling
+convention change, and the verified differences. See the [research coverage
 matrix](docs/RESEARCH-COVERAGE.md) for BBK replacement limits and the
 [historical write API reference](docs/DEFERRED-WRITES.md) for operations
 deliberately excluded from AtlaWire.
