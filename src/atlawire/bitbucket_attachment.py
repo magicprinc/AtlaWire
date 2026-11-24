@@ -96,7 +96,7 @@ def get_repository_attachment(
         f"{base}/rest/api/1.0/projects/{quote(project, safe='')}"
         f"/repos/{quote(slug, safe='')}/attachments/{quote(identifier, safe='')}"
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         try:
             with session.get(
                 url,
@@ -105,7 +105,7 @@ def get_repository_attachment(
                 allow_redirects=False,
                 stream=True,
             ) as response:
-                _check_status(response.status_code)
+                _check_status(response.status_code, product="bitbucket")
                 payload = read_encoded_limited(
                     response,
                     limit=limit,

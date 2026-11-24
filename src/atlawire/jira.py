@@ -227,7 +227,7 @@ def get_issue(
         params["updateHistory"] = "true"
     if fail_fast:
         params["failFast"] = "true"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         issue = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}",
@@ -331,7 +331,7 @@ def get_issue_worklogs(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/rest/api/2/issue/{key}/worklog", params={}
         )
@@ -362,7 +362,7 @@ def get_issue_changelog(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         issue = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}",
@@ -404,7 +404,7 @@ def list_issue_worklogs(
     _check_worklog_pages(max_pages)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/issue/{key}/worklog"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         return _read_worklogs(session, url, max_pages)
 
 
@@ -514,7 +514,7 @@ def list_issue_changelog(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         issue = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}",
@@ -606,7 +606,7 @@ def list_issue_comments_with_metadata(
     _check_comment_pages(max_pages)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/issue/{key}/comment"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         rows, truncated, total = _read_comments(session, url, max_pages, limit)
     return CommentThreadMetadata(rows=rows, truncated=truncated, total=total)
 
@@ -810,7 +810,7 @@ def search_raw(
     if expand is not None:
         params["expand"] = expand
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         return get_json_object(session, f"{base}/rest/api/2/search", params=params)
 
 
@@ -883,7 +883,7 @@ def search_issues_with_metadata(
         )
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/search"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         rows, truncated, total = _read_search(session, url, query, selected, limit)
     return IssueSearchMetadata(rows=rows, truncated=truncated, total=total)
 
@@ -967,7 +967,7 @@ def search_all_issues_with_metadata(
         raise AtlaWireError("The page limit must be between 1 and 1000.")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/search"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         rows, truncated, total = _read_all_issues(
             session, url, jql, selected, limit, max_pages
         )
@@ -1003,7 +1003,7 @@ def titles(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/api/2/search"
     found: dict[str, str] = {}
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         # One JQL read per batch of 50; a longer IN list would overflow the URL.
         for start in range(0, len(unique), 50):
             batch = unique[start : start + 50]
@@ -1107,7 +1107,7 @@ def list_statuses(
     is returned, so a malformed late entry cannot yield a partial list.
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         values = get_json_array(session, f"{base}/rest/api/2/status", params={})
     names: list[str] = []
     for value in values:
@@ -1217,7 +1217,7 @@ def list_jira_projects(
     project exists; a short array is not a completeness claim.
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         values = get_json_array(session, f"{base}/rest/api/2/project", params={})
     return [_reference_object(value, "project") for value in values]
 
@@ -1232,7 +1232,7 @@ def _read_reference_list(
 ) -> list[dict[str, object]]:
     """Read one fixed reference endpoint and validate every row before returning."""
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         values = get_json_array(session, f"{base}{path}", params={})
     return [_reference_object(value, label) for value in values]
 
@@ -1264,7 +1264,7 @@ def search_users(
     """
     _check_user_search(username, start_at, max_results)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         values = get_json_array(
             session,
             f"{base}/rest/api/2/user/search",
@@ -1318,7 +1318,7 @@ def list_transitions(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         envelope = get_json_object(
             session, f"{base}/rest/api/2/issue/{key}/transitions", params={}
         )
@@ -1385,7 +1385,7 @@ def list_issue_remote_links(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         values = get_json_array(
             session, f"{base}/rest/api/2/issue/{key}/remotelink", params={}
         )
@@ -1413,7 +1413,7 @@ def get_current_user(
     implies that the caller is anonymous or authorized.
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         user = get_json_object(session, f"{base}/rest/api/2/myself", params={})
     return _project_current_user(user)
 
@@ -1962,7 +1962,7 @@ def get_issue_votes(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/rest/api/2/issue/{key}/votes", params={}
         )
@@ -1986,7 +1986,7 @@ def get_issue_watchers(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/rest/api/2/issue/{key}/watchers", params={}
         )
@@ -2010,7 +2010,7 @@ def list_issue_subtasks(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         values = get_json_array(
             session, f"{base}/rest/api/2/issue/{key}/subtask", params={}
         )
@@ -2038,7 +2038,7 @@ def get_issue_comment(
     key = _issue_key(key_or_url)
     checked = _jira_id(comment_id, "comment")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}/comment/{checked}",
@@ -2067,7 +2067,7 @@ def get_issue_worklog(
     key = _issue_key(key_or_url)
     checked = _jira_id(worklog_id, "worklog")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}/worklog/{checked}",
@@ -2093,7 +2093,7 @@ def get_issue_properties(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/rest/api/2/issue/{key}/properties", params={}
         )
@@ -2121,7 +2121,7 @@ def get_issue_property(
     checked = _property_key(property_key)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     segment = quote(checked, safe="")
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session,
             f"{base}/rest/api/2/issue/{key}/properties/{segment}",
@@ -2146,7 +2146,7 @@ def get_issue_link(
     """
     checked = _jira_id(link_id, "issue link")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/rest/api/2/issueLink/{checked}", params={}
         )

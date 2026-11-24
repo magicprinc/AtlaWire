@@ -22,7 +22,7 @@ REST-пути — из f-строк, констант и словарей `param
 
 ## Общий транспорт (`src/atlawire/http.py`, `sdk.py`)
 
-* `base_url` проверяется `http.normalize_base_url` (`http.py:135`): только HTTPS; HTTP — лишь
+* `base_url` проверяется `http.normalize_base_url` (`http.py:147`): только HTTPS; HTTP — лишь
   для `127.0.0.1`/`::1` при `allow_http_loopback=True`; без userinfo, query и fragment;
   завершающий `/` срезается.
 * `token` — Bearer-токен (грамматика `[A-Za-z0-9._~+/=-]+`), уходит только в заголовке
@@ -30,9 +30,9 @@ REST-пути — из f-строк, констант и словарей `param
 * JSON-транспорт: таймауты `(5, 30)`, редиректы не следуются (3xx — ошибка и тело не
   читается), HTTP 206 отвергается, JSON ≤ 8 MiB после распаковки, текст ≤ 1 MiB, только
   UTF-8, gzip ограничен одним членом.
-* `http.bearer_session(token)` (`http.py:193`) — строгая read-сессия; закрывает вызывающий.
+* `http.bearer_session(token)` (`http.py:206`) — строгая read-сессия; закрывает вызывающий.
   `http.new_session(base_url, token=None, *, follow_redirects=False, trust_env=False,
-  timeout=None, allow_http_loopback=False)` (`http.py:153`) — публичная фабрика с явной
+  timeout=None, allow_http_loopback=False)` (`http.py:165`) — публичная фабрика с явной
   политикой редиректов/env/таймаута; `token=None` даёт сессию без Authorization.
 * Списки строятся целиком до возврата: поздний сбой не отдаёт частичный результат. Где
   сервер может молча урезать выдачу, есть отдельная `*_with_metadata`/`*Listing`-функция с
@@ -41,6 +41,10 @@ REST-пути — из f-строк, констант и словарей `param
   `product`, `operation`, `category`, `http_status`, `method`, `path`; `category` ∈
   `transport`, `http`, `validation`, `unknown_operation`, `credentials`, `upstream` или `None`.
   Текст ошибки не содержит тела ответа, токена и сырых аргументов.
+  Типизированные вызовы всегда заполняют `product`; `operation` заполняется только у
+  чтения через реестр (`read`/`read_operation`), у типизированной функции его нет.
+* Сессия объявляет продукт: `bearer_session(token, product="jira")` (и
+  `new_session(..., product=...)`) — так ошибка транспорта знает продукт без разбора текста.
 
 ## Bitbucket (`src/atlawire/bitbucket.py`)
 
@@ -55,20 +59,20 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - Ошибки/лимиты: `max_pages` 1..1000; битые поля; исчерпание бюджета —
   `AtlaWireError("Bitbucket page limit reached; increase --max-pages.")`.
 
-**`list_repositories(base_url, project, *, token, max_pages=100, allow_http_loopback=False) -> list[Repository]`** — `bitbucket.py:336`
+**`list_repositories(base_url, project, *, token, max_pages=100, allow_http_loopback=False) -> list[Repository]`** — `bitbucket.py:342`
 - REST: `GET /rest/api/1.0/projects/{project}/repos`; query `start`, `limit`.
 - → `Repository` (`slug`, `name`, `state`, `public`).
 - Ошибки/лимиты: `project` должен соответствовать `~?[A-Za-z0-9_][A-Za-z0-9_.-]*`;
   лимиты как у `list_projects`.
 
-**`list_all_repositories(base_url, *, token, start=0, limit=100, max_pages=100, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:355`
+**`list_all_repositories(base_url, *, token, start=0, limit=100, max_pages=100, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:367`
 - REST: `GET /rest/api/1.0/repos` (все видимые репозитории инстанса); query `start` —
   начальный курсор, `limit` — желаемый размер страницы.
 - → сырые объекты репозиториев как есть, включая неизвестные поля; `start` не вычисляется
   из `limit`, каждая нетерминальная страница идёт по своему `nextPageStart`.
 - Ошибки/лимиты: исчерпан `max_pages` — ошибка без частичного списка.
 
-**`find_repositories(base_url, name, *, token, limit=25, max_pages=100, allow_http_loopback=False) -> list[RepositoryMatch]`** — `bitbucket.py:407`
+**`find_repositories(base_url, name, *, token, limit=25, max_pages=100, allow_http_loopback=False) -> list[RepositoryMatch]`** — `bitbucket.py:419`
 - REST: `GET /rest/api/1.0/projects`, затем по каждому проекту
   `GET /rest/api/1.0/projects/{project}/repos`; query `start`, `limit`.
 - → `RepositoryMatch` (`project`, `slug`, `name`, `state`); поиск без учёта регистра по
@@ -76,18 +80,18 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - Ошибки/лимиты: пустое `name`; `limit` 1..1000; `max_pages` — общий бюджет на список
   проектов и все страницы репозиториев; останавливается на `limit` совпадений.
 
-**`get_pull_request(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:449`
+**`get_pull_request(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:461`
 - REST: `GET /rest/api/1.0/projects/{project}/repos/{slug}/pull-requests/{id}`; query нет.
 - → сырой объект PR целиком.
 - Ошибки: `repo` не `PROJECT/slug`; `pr_id` не положительный signed-64-bit; ответ без
   `id`/`title`/`state` или с `id` ≠ запрошенному — ошибка.
 
-**`get_pull_request_merge_status(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:473`
+**`get_pull_request_merge_status(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:485`
 - REST: `GET .../pull-requests/{id}/merge`; query нет.
 - → сырой объект mergeability (`canMerge`, `conflicted`, `outcome`, `vetoes`, ...).
 - Ошибки/лимиты: один GET; POST на merge не отправляется.
 
-**`get_repository_file(base_url, repo, path, *, token, at="master", allow_http_loopback=False) -> str`** — `bitbucket.py:548`
+**`get_repository_file(base_url, repo, path, *, token, at="master", allow_http_loopback=False) -> str`** — `bitbucket.py:560`
 - REST: `GET .../raw/{path}`; query `at` (по умолчанию `"master"`); заголовок
   `Accept: text/plain`.
 - → точный текст файла в UTF-8.
@@ -95,7 +99,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   media type — текстом файла (`.md` приходит как `text/markdown`); 1 MiB; управляющие
   символы и эхо токена отвергаются.
 
-**`get_repository_archive(base_url, project_key, repository_slug, *, token, at=None, format=None, max_bytes=67108864, allow_http_loopback=False) -> bytes`** — `bitbucket.py:617`
+**`get_repository_archive(base_url, project_key, repository_slug, *, token, at=None, format=None, max_bytes=67108864, allow_http_loopback=False) -> bytes`** — `bitbucket.py:629`
 - REST: `GET /rest/api/1.0/projects/{project}/repos/{slug}/archive` ровно один раз;
   заголовок `Accept: */*`; query `at` (если задан), `format` (`zip`/`tar`/`tar.gz`/`tgz`,
   по умолчанию серверный `zip`).
@@ -104,24 +108,24 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   остаётся); `at=None` — серверная ветка по умолчанию, пустая строка отвергается;
   redirect/206/не-2xx/oversize — ошибка без частичного тела.
 
-**`get_file_blame(base_url, repo, path, *, token, at=None, allow_http_loopback=False) -> list[BlameLine]`** — `bitbucket.py:711`
+**`get_file_blame(base_url, repo, path, *, token, at=None, allow_http_loopback=False) -> list[BlameLine]`** — `bitbucket.py:723`
 - REST: `GET .../browse/{path}`; query `blame=true`, `noContent=true`, `at` (только непустой).
 - → `BlameLine` (`line` 1-based, `author`, `email`, `date` `YYYY-MM-DD` UTC, `commit`).
 - Ошибки/лимиты: пейджинговый file-конверт вместо голого массива отвергается.
 
-**`list_repository_files(base_url, repo, *, token, at=None, max_pages=100, before_page=None, allow_http_loopback=False) -> list[str]`** — `bitbucket.py:753`
+**`list_repository_files(base_url, repo, *, token, at=None, max_pages=100, before_page=None, allow_http_loopback=False) -> list[str]`** — `bitbucket.py:765`
 - REST: `GET .../files`; query `at` (если непустой), `start`, `limit` (100).
 - → список путей рекурсивно от корня.
 - Ошибки/лимиты: `max_pages`; исключение `before_page` пробрасывается; поздний сбой не
   отдаёт частичный список.
 
-**`list_directory(base_url, repo, path="", *, token, at=None, max_pages=100, allow_http_loopback=False) -> list[DirectoryEntry]`** — `bitbucket.py:791`
+**`list_directory(base_url, repo, path="", *, token, at=None, max_pages=100, allow_http_loopback=False) -> list[DirectoryEntry]`** — `bitbucket.py:806`
 - REST: `GET .../browse[/{path}]`; query `at`, `start`, `limit`; строки берутся из
   вложенного `children`.
 - → `DirectoryEntry` (`path`, `type`, `size`).
 - Ошибки/лимиты: ответ `lines` (файл) или отсутствие `children` — ошибка; `max_pages`.
 
-**`get_last_modified(base_url, repo, path=None, *, token, at=None, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:829`
+**`get_last_modified(base_url, repo, path=None, *, token, at=None, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:847`
 - REST: `GET .../last-modified[/{path}]`; query `at` **обязателен**: при `at=None` функция
   сама резолвит default-ветку через `get_default_branch` и отправляет её `latestCommit`
   (полный 40-hex) — живая проверка 2026-11-23 показала HTTP 400 без `at`.
@@ -130,21 +134,21 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   на path-форму, указывающую на файл, превращается в понятную ошибку (root-форма и каталог
   работают).
 
-**`get_pull_request_file(base_url, repo, pr_id, path, *, token, side="new", allow_http_loopback=False) -> str`** — `bitbucket.py:906`
+**`get_pull_request_file(base_url, repo, pr_id, path, *, token, side="new", allow_http_loopback=False) -> str`** — `bitbucket.py:924`
 - REST: два запроса — `GET .../pull-requests/{id}`, затем `GET .../raw/{path}` (или raw
   fork-репозитория из метаданных PR); query `at=<40-hex latestCommit>`; `Accept: text/plain`.
 - → текст выбранной стороны (`new` = `fromRef`, `old` = `toRef`).
 - Ошибки/лимиты: `side` не `new`/`old`; небезопасный путь; битые `fromRef`/`toRef`/
   `latestCommit`; 1 MiB текста.
 
-**`list_pull_request_files(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> list[ChangedFile]`** — `bitbucket.py:946`
+**`list_pull_request_files(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> list[ChangedFile]`** — `bitbucket.py:964`
 - REST: `GET .../pull-requests/{id}/changes`; query `limit=1000`.
 - → `ChangedFile` (`path`, `type`, `node`); `PullRequestFile` — алиас.
 - Ошибки/лимиты: `/changes` в 5.10 не пейджингуется; нетерминальная страница,
   `truncated=true` или строк не меньше заявленного `limit` — ошибка (выдача может быть
   урезана).
 
-**`get_pull_request_diff(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:999`
+**`get_pull_request_diff(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1017`
 - REST: `GET .../pull-requests/{id}/diff` (весь PR) или `.../diff/{path}`; query
   `contextLines`, `whitespace=ignore-all`, `withComments=false`; `srcPath` — только вместе
   с `path`.
@@ -153,17 +157,17 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   `DeclaredTruncationError` (подкласс `AtlaWireError`); незаявленный серверный cap не
   детектируется.
 
-**`get_pull_request_diffs(base_url, repo, pr_id, *, token, paths, context=3, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1054`
+**`get_pull_request_diffs(base_url, repo, pr_id, *, token, paths, context=3, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1072`
 - REST: один `GET .../pull-requests/{id}/diff/{path}` на каждый файл, один session на батч.
 - → список в порядке запроса. Дубликаты, пустой список, не-строки и >100 путей —
   ошибка до запроса; поздний сбой не отдаёт частичный список.
 
-**`pr_compact(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:503`
+**`pr_compact(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:515`
 - REST: `GET .../pull-requests/{id}`; компактная проекция для отчётов.
 - → `{id, title, state, author, from, to, created, updated, reviewers_active, url}`
   фиксированного порядка; служебные `links`/`permittedOperations`/аватары отброшены.
 
-**`get_pull_request_diff_with_fallback(base_url, repo, pr_id, *, token, context=3, allow_http_loopback=False) -> PullRequestDiffFallback`** — `bitbucket.py:1112`
+**`get_pull_request_diff_with_fallback(base_url, repo, pr_id, *, token, context=3, allow_http_loopback=False) -> PullRequestDiffFallback`** — `bitbucket.py:1130`
 - REST: как `get_pull_request_diff` (весь PR); только при `DeclaredTruncationError` —
   `GET .../changes?limit=1000`, затем `GET .../diff/{path}` на каждый файл (с `srcPath`).
 - → `PullRequestDiffFallback` (`fallback`, `fallback_reason`, `diff`, `files[]` с
@@ -172,19 +176,19 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   усечения, дубли путей, нет `srcPath` у MOVE/COPY/RENAME, агрегат > 32 MiB — ошибка;
   снимок между запросами не гарантируется.
 
-**`get_pull_request_diff_text(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, allow_http_loopback=False) -> str`** — `bitbucket.py:1214`
+**`get_pull_request_diff_text(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, allow_http_loopback=False) -> str`** — `bitbucket.py:1232`
 - REST: тот же один запрос diff.
 - → читаемый unified-diff-подобный текст (не применяемый патч; без index/binary/rename
   маркеров), управляющие символы и bidi экранируются.
 - Ошибки/лимиты: наследует `get_pull_request_diff`; эхо токена в тексте — ошибка.
 
-**`list_pull_request_comments(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[PullRequestComment]`** — `bitbucket.py:1256`
+**`list_pull_request_comments(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[PullRequestComment]`** — `bitbucket.py:1274`
 - REST: `GET .../pull-requests/{id}/activities`; query `start`, `limit` (100).
 - → `PullRequestComment` (`id`, `author`, `path`, `line`, `text`, `created`); активности без
   `comment` пропускаются, ответы не разворачиваются.
 - Ошибки/лимиты: `max_pages`; битый комментарий/anchor.
 
-**`list_pull_request_commits(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1292`
+**`list_pull_request_commits(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1316`
 - REST: `GET .../pull-requests/{id}/commits`; query `start=0`, `limit=100`.
 - → `Commit` (`hash`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
   `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
@@ -192,7 +196,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   документирует для автора только `name` и `emailAddress`), `message`).
 - Ошибки/лимиты: `max_pages`; не-advancing `nextPageStart`.
 
-**`list_pull_requests(base_url, repo, *, token, state="OPEN", order=None, author=None, direction=None, role=None, participant=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[PullRequest]`** — `bitbucket.py:1323`
+**`list_pull_requests(base_url, repo, *, token, state="OPEN", order=None, author=None, direction=None, role=None, participant=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[PullRequest]`** — `bitbucket.py:1351`
 - REST: `GET .../pull-requests`; query `state`, `order` (если задан), `direction`
   (`INCOMING`/`OUTGOING`), `start`, `limit`; фильтр участников — `username.1` и `role.1`,
   которые всегда отправляются парой.
@@ -203,41 +207,41 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   пользователя из заголовка `X-AUSERNAME` одним bounded-запросом dashboard (маршрут не
   документирован); `participant` — готовый username и лишнего запроса не требует;
   `author` несовместим с `role`/`participant`; `limit` 1..1000.
-**`list_my_pull_requests(base_url, *, token, state="OPEN", role="AUTHOR", participant_status=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[MyPullRequest]`** — `bitbucket.py:1398`
+**`list_my_pull_requests(base_url, *, token, state="OPEN", role="AUTHOR", participant_status=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[MyPullRequest]`** — `bitbucket.py:1426`
 - REST: `GET /rest/api/1.0/dashboard/pull-requests`; query `state`, `role`,
   `participantStatus` (если задан), `start`, `limit`.
 - → `MyPullRequest` (`repo`, `id`, `title`, `state`, `author`, `reviewers_inactive`, `created`).
 - Ошибки/лимиты: `state` ALL запрещён; `role` ∈ AUTHOR/REVIEWER/PARTICIPANT;
   `participant_status` — до трёх значений UNAPPROVED/NEEDS_WORK/APPROVED.
 
-**`list_branches(base_url, repo, *, token, filter_text=None, max_pages=100, before_page=None, allow_http_loopback=False) -> list[Branch]`** — `bitbucket.py:1447`
+**`list_branches(base_url, repo, *, token, filter_text=None, max_pages=100, before_page=None, allow_http_loopback=False) -> list[Branch]`** — `bitbucket.py:1475`
 - REST: `GET .../branches`; query `filterText` (если непустой), `start`, `limit`.
 - → `Branch` (`name` из `displayId`, `id`, `commit`, `default`).
 - Ошибки/лимиты: `max_pages`; битые страницы; исключение `before_page` пробрасывается.
 
-**`get_branch(base_url, repo, name, *, token, max_pages=100, before_page=None, allow_http_loopback=False) -> Branch | None`** — `bitbucket.py:1482`
+**`get_branch(base_url, repo, name, *, token, max_pages=100, before_page=None, allow_http_loopback=False) -> Branch | None`** — `bitbucket.py:1513`
 - REST: тот же список веток с `filterText=<name>`.
 - → первая строка с точным `displayId == name`; `None` — полный успешный обход без совпадения.
 - Ошибки/лимиты: пустое имя; при ошибке `None` не возвращается.
 
-**`list_tags(base_url, repo, *, token, filter_text=None, order_by=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1537`
+**`list_tags(base_url, repo, *, token, filter_text=None, order_by=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1568`
 - REST: `GET .../tags`; query `filterText`, `orderBy` (если заданы), `start`, `limit`.
 - → сырые объекты тегов без проекции.
 - Ошибки/лимиты: `order_by` ∈ ALPHABETICAL/MODIFICATION; `limit` 1..1000; ровно `limit`
   строк доказывает только достижение потолка, не конец списка.
 
-**`list_tags_with_metadata(base_url, repo, *, token, filter_text=None, order_by=None, limit=25, max_pages=100, allow_http_loopback=False) -> TagListing`** — `bitbucket.py:1580`
+**`list_tags_with_metadata(base_url, repo, *, token, filter_text=None, order_by=None, limit=25, max_pages=100, allow_http_loopback=False) -> TagListing`** — `bitbucket.py:1611`
 - REST: как `list_tags`.
 - → `TagListing` (`tags`, `limit`, `complete`): `complete=True` только при терминальной
   странице и всех строках в пределах `limit`; `false` — тегов может быть больше.
 - Ошибки/лимиты: `totalCount` сервер 5.10 не отдаёт, поэтому полнота — это `complete`.
 
-**`get_tag(base_url, repo, name, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1626`
+**`get_tag(base_url, repo, name, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1657`
 - REST: `GET .../tags/{name}` (имя — slash-разделённый путь, сегменты кодируются по одному).
 - → сырой объект тега.
 - Ошибки/лимиты: небезопасное имя тега; один GET.
 
-**`list_commits(base_url, repo, *, token, at=None, path=None, author=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1653`
+**`list_commits(base_url, repo, *, token, at=None, path=None, author=None, limit=25, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1684`
 - REST: `GET .../commits`; query `until` (из `at`), `path` (если непустой), `start`, `limit`;
   `author` фильтруется на стороне клиента по точному git-имени (серверный фильтр 5.10 не
   документирован), поэтому читаются страницы до `limit` совпадений.
@@ -247,80 +251,80 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   документирует для автора только `name` и `emailAddress`), `message` — сырое сообщение).
 - Ошибки/лимиты: `limit` 1..1000; управляющие символы в `path`; `max_pages`.
 
-**`list_commits_with_metadata(base_url, repo, *, token, at=None, path=None, author=None, limit=25, max_pages=100, allow_http_loopback=False) -> CommitListing`** — `bitbucket.py:1699`
+**`list_commits_with_metadata(base_url, repo, *, token, at=None, path=None, author=None, limit=25, max_pages=100, allow_http_loopback=False) -> CommitListing`** — `bitbucket.py:1730`
 - REST: как `list_commits`.
 - → `CommitListing` (`commits`, `limit`, `complete`); `complete=True` — терминальная страница
   и все строки в пределах `limit`.
 - Ошибки/лимиты: как у `list_commits`; общего числа 5.10 не сообщает.
 
-**`get_commit(base_url, repo, sha, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1766`
+**`get_commit(base_url, repo, sha, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1797`
 - REST: `GET .../commits/{sha}`; query нет.
 - → сырой объект коммита.
 - Ошибки/лимиты: `sha` не 7..40 hex; `id` ответа не 40-hex или не начинается с запрошенного
   сокращения.
 
-**`list_commit_changes(base_url, repo, sha, *, token, max_pages=100, allow_http_loopback=False) -> list[ChangedFile]`** — `bitbucket.py:1798`
+**`list_commit_changes(base_url, repo, sha, *, token, max_pages=100, allow_http_loopback=False) -> list[ChangedFile]`** — `bitbucket.py:1829`
 - REST: `GET .../commits/{sha}/changes`; query `start`, `limit` (100).
 - → `ChangedFile` (`path`, `type`, `node`).
 - Ошибки/лимиты: `sha`; `truncated=true`; `max_pages`; серверный незаявленный cap не
   детектируется.
 
-**`get_commit_diff(base_url, repo, sha, *, token, paths=None, context=3, allow_http_loopback=False) -> dict[str, object] | list[dict[str, object]]`** — `bitbucket.py:1838`
+**`get_commit_diff(base_url, repo, sha, *, token, paths=None, context=3, allow_http_loopback=False) -> dict[str, object] | list[dict[str, object]]`** — `bitbucket.py:1872`
 - REST: `GET .../commits/{sha}/diff` или по одному `.../diff/{path}` на каждый путь; query
   `contextLines`, `whitespace=ignore-all`, `withComments=false`.
 - → сырой diff-объект; при `paths` — список объектов в порядке путей.
 - Ошибки/лимиты: `context` 0..100; не более 100 путей; небезопасный путь; объявленная
   обрезка — `DeclaredTruncationError`.
 
-**`get_commit_diff_text(base_url, repo, sha, *, token, paths=None, context=3, allow_http_loopback=False) -> str`** — `bitbucket.py:1882`
+**`get_commit_diff_text(base_url, repo, sha, *, token, paths=None, context=3, allow_http_loopback=False) -> str`** — `bitbucket.py:1916`
 - REST: запросы идентичны `get_commit_diff`.
 - → читаемый текст под одним заголовком коммита (не патч); пустой diff — явный маркер.
 - Ошибки/лимиты: как у `get_commit_diff`; эхо токена — ошибка.
 
-**`get_project(base_url, project_key, *, token, raw=False, allow_http_loopback=False) -> ProjectDetail | dict[str, object]`** — `bitbucket.py:1916`
+**`get_project(base_url, project_key, *, token, raw=False, allow_http_loopback=False) -> ProjectDetail | dict[str, object]`** — `bitbucket.py:1950`
 - REST: `GET /rest/api/1.0/projects/{projectKey}`; query нет.
 - → `ProjectDetail` (`key`, `name`, `description`, `public`, `type`); `raw=True` — сырой
   объект (`id`, `links`, неизвестные поля).
 - Ошибки/лимиты: `project_key` валидируется до сессии; один GET.
 
-**`get_repository(base_url, project_key, slug, *, token, raw=False, allow_http_loopback=False) -> RepositoryDetail | dict[str, object]`** — `bitbucket.py:1949`
+**`get_repository(base_url, project_key, slug, *, token, raw=False, allow_http_loopback=False) -> RepositoryDetail | dict[str, object]`** — `bitbucket.py:1983`
 - REST: `GET .../projects/{projectKey}/repos/{repositorySlug}`.
 - → `RepositoryDetail` (`slug`, `name`, `state`, `public`, `defaultBranch`; сервер 5.10 обычно
   не кладёт `defaultBranch` в объект репозитория, тогда `None`); `raw=True` — сырой объект.
 
-**`get_default_branch(base_url, project_key, slug, *, token, raw=False, allow_http_loopback=False) -> BranchDetail | dict[str, object] | None`** — `bitbucket.py:1982`
+**`get_default_branch(base_url, project_key, slug, *, token, raw=False, allow_http_loopback=False) -> BranchDetail | dict[str, object] | None`** — `bitbucket.py:2016`
 - REST: `GET .../branches/default`; query нет; документированный 204 (пустой репозиторий) → `None`.
 - → `BranchDetail` (`id`, `displayId`, `latestCommit`, `isDefault`); `raw=True` — сырой объект.
 
-**`get_repository_changes(base_url, project_key, slug, until, *, token, since=None, limit=None, max_pages=100, raw=False, allow_http_loopback=False) -> list[ChangedFile] | list[dict[str, object]]`** — `bitbucket.py:2015`
+**`get_repository_changes(base_url, project_key, slug, until, *, token, since=None, limit=None, max_pages=100, raw=False, allow_http_loopback=False) -> list[ChangedFile] | list[dict[str, object]]`** — `bitbucket.py:2049`
 - REST: `GET .../changes`; query `until` (обязателен), `since` (если задан), `start`, `limit`.
 - → `ChangedFile` (`path`, `type`, `node`) или сырые строки при `raw=True`.
 - Ошибки/лимиты: `until`/`since` — коммит или ref; `limit` 1..1000 или `None`; `max_pages`;
   курсор только из `nextPageStart`.
 
-**`list_commit_comments(base_url, project_key, slug, commit_id, *, token, path=None, limit=None, max_pages=100, raw=False, allow_http_loopback=False) -> list[CommitComment] | list[dict[str, object]]`** — `bitbucket.py:2063`
+**`list_commit_comments(base_url, project_key, slug, commit_id, *, token, path=None, limit=None, max_pages=100, raw=False, allow_http_loopback=False) -> list[CommitComment] | list[dict[str, object]]`** — `bitbucket.py:2097`
 - REST: `GET .../commits/{commitId}/comments`; query `path` (на живом 5.10 фактически
   обязателен), `start`, `limit`.
 - → `CommitComment` (`id`, `author`, `text`, `createdDate`) или сырые строки при `raw=True`.
 - Ошибки/лимиты: `commit_id` 7..40 hex; `limit` 1..1000 или `None`; `max_pages`.
 
-**`get_commit_comment(base_url, project_key, slug, commit_id, comment_id, *, token, raw=False, allow_http_loopback=False) -> CommitComment | dict[str, object]`** — `bitbucket.py:2112`
+**`get_commit_comment(base_url, project_key, slug, commit_id, comment_id, *, token, raw=False, allow_http_loopback=False) -> CommitComment | dict[str, object]`** — `bitbucket.py:2146`
 - REST: `GET .../commits/{commitId}/comments/{commentId}`; query нет.
 - → `CommitComment`; `raw=True` — сырой объект.
 - Ошибки/лимиты: `id` ответа должен совпасть с запрошенным; `commit_id` 7..40 hex.
 
-**`list_repository_participants(base_url, project_key, slug, *, token, max_pages=100, raw=False, allow_http_loopback=False) -> list[ParticipantRow] | list[dict[str, object]]`** — `bitbucket.py:2156`
+**`list_repository_participants(base_url, project_key, slug, *, token, max_pages=100, raw=False, allow_http_loopback=False) -> list[ParticipantRow] | list[dict[str, object]]`** — `bitbucket.py:2190`
 - REST: `GET .../participants` (без фильтров `direction`/`filter`/`role`).
 - → `ParticipantRow` (`name`, `displayName`, `role`); `role` заполняется только если сервер
   его прислал, иначе `None`; `raw=True` — сырые строки.
 - Ошибки/лимиты: пустой ответ — пустой список; `max_pages`.
 
-**`list_repository_forks(base_url, project_key, slug, *, token, max_pages=100, raw=False, allow_http_loopback=False) -> list[RepositoryLink] | list[dict[str, object]]`** — `bitbucket.py:2188`
+**`list_repository_forks(base_url, project_key, slug, *, token, max_pages=100, raw=False, allow_http_loopback=False) -> list[RepositoryLink] | list[dict[str, object]]`** — `bitbucket.py:2222`
 - REST: `GET .../forks` (только прямые форки).
 - → `RepositoryLink` (`slug`, `project`, `state`), `project` — плоский ключ (`PRJ`/`~user`);
   `raw=True` — сырые строки.
 
-**`get_related_repositories(base_url, project_key, slug, *, token, max_pages=100, raw=False, allow_http_loopback=False) -> list[RepositoryLink] | list[dict[str, object]]`** — `bitbucket.py:2215`
+**`get_related_repositories(base_url, project_key, slug, *, token, max_pages=100, raw=False, allow_http_loopback=False) -> list[RepositoryLink] | list[dict[str, object]]`** — `bitbucket.py:2249`
 - REST: `GET .../related`; возвращает список строк, как форки.
 - → `RepositoryLink` (`slug`, `project`, `state`); `raw=True` — сырые строки.
 
@@ -791,7 +795,7 @@ JQL-поиск для коротких строк фиксирует
 | `rows` | `jira.search_issues(base, "project = PLAT ORDER BY updated DESC", token=token, limit=50)` | проекция `IssueRow` (key, status, type, priority, assignee, updated, summary). |
 | `titles` | `jira.titles(base, ["PLAT-1", "PLAT-2"], token=token)` (`jira.py:977`) | `{key: summary}`, батчи по 50; кэша нет. |
 | `url` | `confluence.get_page_web_url(base, 7307751, token=token)` (`confluence.py:242`) | браузерный URL страницы; для задачи Jira URL не строится. |
-| `platform` | `нет функции` | реестра окружений нет; ближайшая — `http.normalize_base_url` (`http.py:135`). |
+| `platform` | `нет функции` | реестра окружений нет; ближайшая — `http.normalize_base_url` (`http.py:147`). |
 
 Итого «нет функции»: **2** (`page_storage`, `platform`); `url` закрыт только для страниц
 Confluence, `titles` и `jql` закрыты.

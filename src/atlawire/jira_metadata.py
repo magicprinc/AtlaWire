@@ -63,7 +63,7 @@ def get_edit_meta(
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/{_API}/issue/{key}/editmeta", params={}
         )
@@ -93,7 +93,7 @@ def get_create_meta(
     params = {"expand": _CREATE_META_EXPAND}
     if project is not None:
         params["projectKeys"] = project
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/{_API}/issue/createmeta", params=params
         )
@@ -131,7 +131,7 @@ def get_transition_fields(
     params = {"expand": _TRANSITION_EXPAND}
     if transition_id is not None:
         params["transitionId"] = transition_id
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         document = get_json_object(
             session, f"{base}/{_API}/issue/{key}/transitions", params=params
         )

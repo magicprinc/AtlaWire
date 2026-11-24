@@ -104,7 +104,7 @@ def search_code(
     effective = _effective_query(query, scope_project, scope_slug)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}/rest/search/latest/search"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         rows = _search_pages(
             session,
             url,

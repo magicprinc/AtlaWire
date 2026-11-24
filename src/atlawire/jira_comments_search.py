@@ -156,7 +156,7 @@ def find_author_comments(
             allow_http_loopback=allow_http_loopback,
         )
     query = _build_jql(days, project)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="jira") as session:
         return _collect(
             session,
             base,

@@ -616,6 +616,9 @@ def _operation_json_object(raw: str) -> dict[str, object]:
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
+    "--limit", type=click.IntRange(min=1), default=None, help="Stop after N rows."
+)
+@click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
 )
 @click.option(
@@ -626,10 +629,11 @@ def repos(
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
+    limit: int | None,
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
-    """List repositories in a Bitbucket project."""
+    """List repositories in a Bitbucket project, up to --limit rows when given."""
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
@@ -638,6 +642,7 @@ def repos(
             base_url,
             project,
             token=token,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
@@ -659,6 +664,9 @@ def repos(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
+    "--limit", type=click.IntRange(min=1), default=None, help="Stop after N rows."
+)
+@click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
 )
 @click.option(
@@ -668,10 +676,11 @@ def projects(
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
+    limit: int | None,
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
-    """List visible projects."""
+    """List visible projects, up to --limit rows when given."""
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
@@ -679,6 +688,7 @@ def projects(
         rows = list_projects(
             base_url,
             token=token,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
@@ -1710,6 +1720,9 @@ def repo_search_command(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
+    "--limit", type=click.IntRange(min=1), default=None, help="Stop after N rows."
+)
+@click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
 )
 @click.option(
@@ -1721,10 +1734,11 @@ def branches(
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
+    limit: int | None,
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
-    """List repository branches in server order."""
+    """List repository branches in server order, up to --limit rows when given."""
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
@@ -1734,6 +1748,7 @@ def branches(
             repo,
             token=token,
             filter_text=filter_text,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
@@ -1880,6 +1895,9 @@ def commit_command(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
+    "--limit", type=click.IntRange(min=1), default=None, help="Stop after N rows."
+)
+@click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
 )
 @click.option(
@@ -1891,6 +1909,7 @@ def commit_changes_command(
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
+    limit: int | None,
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
@@ -1904,6 +1923,7 @@ def commit_changes_command(
             repo,
             sha,
             token=token,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
@@ -2130,6 +2150,9 @@ def attachment_get_command(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of plain paths."
 )
 @click.option(
+    "--limit", type=click.IntRange(min=1), default=None, help="Stop after N paths."
+)
+@click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
 )
 @click.option(
@@ -2141,6 +2164,7 @@ def files_command(
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
+    limit: int | None,
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
@@ -2154,6 +2178,7 @@ def files_command(
             repo,
             token=token,
             at=at,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
@@ -2172,6 +2197,9 @@ def files_command(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
+    "--limit", type=click.IntRange(min=1), default=None, help="Stop after N entries."
+)
+@click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
 )
 @click.option(
@@ -2184,6 +2212,7 @@ def ls_command(
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
+    limit: int | None,
     max_pages: int,
     allow_http_loopback: bool,
 ) -> None:
@@ -2198,6 +2227,7 @@ def ls_command(
             path,
             token=token,
             at=at,
+            limit=limit,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
         )
@@ -2465,6 +2495,7 @@ def _run_pr_list_action(
     token: str,
     as_json: bool,
     page_limit: int,
+    row_limit: int | None,
     allow_http_loopback: bool,
 ) -> None:
     """Read and print one paged pull request list (comments or commits)."""
@@ -2474,6 +2505,7 @@ def _run_pr_list_action(
             repo,
             pr_id,
             token=token,
+            limit=row_limit,
             max_pages=page_limit,
             allow_http_loopback=allow_http_loopback,
         )
@@ -2484,6 +2516,7 @@ def _run_pr_list_action(
         repo,
         pr_id,
         token=token,
+        limit=row_limit,
         max_pages=page_limit,
         allow_http_loopback=allow_http_loopback,
     )
@@ -2499,6 +2532,7 @@ def _run_pr_action(
     token: str,
     as_json: bool,
     page_limit: int,
+    row_limit: int | None,
     context: int,
     path: str | None,
     source_path: str | None,
@@ -2543,6 +2577,7 @@ def _run_pr_action(
             token=token,
             as_json=as_json,
             page_limit=page_limit,
+            row_limit=row_limit,
             allow_http_loopback=allow_http_loopback,
         )
 
@@ -2633,6 +2668,12 @@ def _run_pr_file_action(
     help="Maximum comment or commit pages (1-1000; default 100).",
 )
 @click.option(
+    "--limit",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Stop after N comments or commits (list actions only).",
+)
+@click.option(
     "--context",
     type=click.IntRange(0, 100),
     default=None,
@@ -2656,6 +2697,7 @@ def pr(
     as_json: bool,
     side: str | None,
     max_pages: int | None,
+    limit: int | None,
     context: int | None,
     source_path: str | None,
     allow_http_loopback: bool,
@@ -2663,8 +2705,8 @@ def pr(
     """Get one pull request, its changed files, comments, commits, diff, or one file.
 
     The optional third argument is "show" (default raw JSON), "files",
-    "comments", "commits", "diff", or "file". "--max-pages" applies to
-    "comments" and "commits"; "--context" applies only to "diff"; PATH selects
+    "comments", "commits", "diff", or "file". "--max-pages" and "--limit" apply
+    to "comments" and "commits"; "--context" applies only to "diff"; PATH selects
     one diff file with "diff" and is required with "file"; "--source-path"
     applies only to a "diff" with PATH.
     """
@@ -2700,6 +2742,7 @@ def pr(
             token=token,
             as_json=as_json,
             page_limit=100 if max_pages is None else max_pages,
+            row_limit=limit,
             context=3 if context is None else context,
             path=path,
             source_path=source_path,

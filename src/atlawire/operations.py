@@ -1985,7 +1985,7 @@ def read_operation(
         raise _invalid("This operation requires the library transport.", operation)
     else:
         status = None
-        with bearer_session(token) as session:
+        with bearer_session(token, product=operation.product) as session:
             if operation.kind == "json":
                 payload = get_json_any(session, url, params=params)
             elif operation.kind == "array":

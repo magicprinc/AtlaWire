@@ -228,7 +228,7 @@ def get_page(
     requested_id = page_id(page_id_or_url)
     requested_expand = _page_expand(expand)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         page = get_json_object(
             session,
             f"{base}/rest/api/content/{requested_id}",
@@ -489,7 +489,7 @@ def get_page_history(
     """
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         return get_json_object(
             session,
             f"{base}{_HISTORY_PATH.format(id=requested_id)}",
@@ -518,7 +518,7 @@ def get_page_version(
     _validate_requested_version(version)
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         page = get_json_object(
             session,
             f"{base}/rest/api/content/{requested_id}",
@@ -610,7 +610,7 @@ def search_cql_with_metadata(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return ContentSearchMetadata(rows=[], truncated=False, total=None, next=None)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         collected = _read_rows(
             session,
             f"{base}{_SEARCH_PATH}",
@@ -647,7 +647,7 @@ def list_spaces(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return []
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         collected = _read_rows(
             session,
             f"{base}{_SPACE_PATH}",
@@ -678,7 +678,7 @@ def get_space(
     """
     requested_key = _validated_space_key(space_key)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         value = get_json_object(
             session,
             f"{base}{_SPACE_PATH}/{requested_key}",
@@ -710,7 +710,7 @@ def list_space_content(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return ContentRows(rows=[], truncated=False)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         if requested_type is None:
             return _read_all_space_content(session, base, requested_key, limit)
         return _read_typed_space_content(
@@ -743,7 +743,7 @@ def list_children(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return []
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         collected = _read_rows(
             session,
             f"{base}{_CHILD_PATH.format(id=requested_id)}",
@@ -784,7 +784,7 @@ def list_children_with_metadata(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if limit == 0:
         return ChildRows(rows=[], truncated=False, total=None)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         collected = _read_rows(
             session,
             f"{base}{_CHILD_PATH.format(id=requested_id)}",
@@ -992,7 +992,7 @@ def _read_content_page(
     _validate_limit(limit, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX)
     requested_id = page_id(page_id_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="confluence") as session:
         return get_json_object(
             session,
             f"{base}{path.format(id=requested_id)}",

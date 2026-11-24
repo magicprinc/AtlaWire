@@ -56,7 +56,11 @@ class AtlaWireError(Exception):
     structured attributes instead of parsing text:
 
     * ``product`` -- ``"jira"``, ``"confluence"`` or ``"bitbucket"`` when known.
-    * ``operation`` -- the registry operation ID when known.
+      Typed product calls always fill it; a registry read fills it from the
+      operation.
+    * ``operation`` -- the registry operation ID. It is filled only by a read
+      that goes through the operation registry; a typed function has no
+      operation ID, so it stays ``None`` there.
     * ``category`` -- one value of ``ERROR_CATEGORIES``, or ``None`` when the
       failure could not be classified without guessing.
     * ``http_status`` -- the real status of an arrived response; never inferred.
@@ -101,13 +105,21 @@ class _PolicySession(requests.Session):
     value instead of rewriting every call site. ``send`` is the single funnel
     [requests.Session.request][requests.Session.request] and the redirect
     machinery pass through, so the default also covers followed redirects.
+
+    ``product`` names the Atlassian product this session reads, so a failure
+    raised deep in the shared transport can report the product without every
+    helper passing it down by hand.
     """
 
     default_timeout: float | None
+    product: str | None
 
-    def __init__(self, *, default_timeout: float | None = None) -> None:
+    def __init__(
+        self, *, default_timeout: float | None = None, product: str | None = None
+    ) -> None:
         super().__init__()
         self.default_timeout = default_timeout
+        self.product = product
 
     def send(
         self, request: requests.PreparedRequest, **kwargs: object
@@ -157,6 +169,7 @@ def new_session(
     follow_redirects: bool = False,
     trust_env: bool = False,
     timeout: float | None = None,
+    product: str | None = None,
     allow_http_loopback: bool = False,
 ) -> requests.Session:
     """Create a transport session for ``base_url``; the caller must close it.
@@ -190,13 +203,21 @@ def new_session(
     )
 
 
-def bearer_session(token: str) -> requests.Session:
+def bearer_session(token: str, *, product: str | None = None) -> requests.Session:
     """Create a session that the caller must close.
 
     The session sends the bearer token, ignores ambient netrc/proxy settings,
-    and never follows or pre-reads a redirect response.
+    and never follows or pre-reads a redirect response. ``product`` is optional
+    metadata: when given, every failure raised by this session's shared readers
+    reports it in ``AtlaWireError.product``.
     """
-    return _new_session(token, follow_redirects=False, trust_env=False, timeout=None)
+    return _new_session(
+        token,
+        follow_redirects=False,
+        trust_env=False,
+        timeout=None,
+        product=product,
+    )
 
 
 def _new_session(
@@ -205,14 +226,15 @@ def _new_session(
     follow_redirects: bool,
     trust_env: bool,
     timeout: float | None,
+    product: str | None = None,
 ) -> requests.Session:
     """Build the one session policy shared by the public factories."""
     if token is not None and not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
         raise AtlaWireError("Missing or invalid bearer token.", category="credentials")
     session: _PolicySession = (
-        _PolicySession(default_timeout=timeout)
+        _PolicySession(default_timeout=timeout, product=product)
         if follow_redirects
-        else _NoRedirectSession(default_timeout=timeout)
+        else _NoRedirectSession(default_timeout=timeout, product=product)
     )
     session.trust_env = trust_env
     headers = {"Accept": "application/json"}
@@ -220,6 +242,12 @@ def _new_session(
         headers["Authorization"] = f"Bearer {token}"
     session.headers.update(headers)
     return session
+
+
+def _session_product(session: object) -> str | None:
+    """Return the product a session was created for, when it declares one."""
+    product = getattr(session, "product", None)
+    return product if isinstance(product, str) and product else None
 
 
 def _reject_constant(_: str) -> float:
@@ -233,7 +261,9 @@ def _finite_float(value: str) -> float:
     return number
 
 
-def _check_status(status: int, *, method: str | None = None) -> None:
+def _check_status(
+    status: int, *, method: str | None = None, product: str | None = None
+) -> None:
     """Apply the shared read-only status policy without echoing the request.
 
     A 206 carries only part of a representation, so it is never a successful
@@ -245,6 +275,7 @@ def _check_status(status: int, *, method: str | None = None) -> None:
             category="http",
             http_status=status,
             method=method,
+            product=product,
         )
     if status == 401:
         raise AtlaWireError(
@@ -252,6 +283,7 @@ def _check_status(status: int, *, method: str | None = None) -> None:
             category="http",
             http_status=status,
             method=method,
+            product=product,
         )
     if status == 403:
         raise AtlaWireError(
@@ -259,6 +291,7 @@ def _check_status(status: int, *, method: str | None = None) -> None:
             category="http",
             http_status=status,
             method=method,
+            product=product,
         )
     if status == 206:
         raise AtlaWireError(
@@ -266,6 +299,7 @@ def _check_status(status: int, *, method: str | None = None) -> None:
             category="http",
             http_status=status,
             method=method,
+            product=product,
         )
     if not 200 <= status < 300:
         raise AtlaWireError(
@@ -273,6 +307,7 @@ def _check_status(status: int, *, method: str | None = None) -> None:
             category="http",
             http_status=status,
             method=method,
+            product=product,
         )
 
 
@@ -463,7 +498,11 @@ def _get_json(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code, method="GET")
+            _check_status(
+                response.status_code,
+                method="GET",
+                product=_session_product(session),
+            )
             if allow_no_content and response.status_code == 204:
                 return _NO_CONTENT
             payload = _read_limited(
@@ -474,12 +513,14 @@ def _get_json(
             "Request timed out.",
             category="transport",
             method="GET",
+            product=_session_product(session),
         ) from None
     except requests.RequestException:
         raise AtlaWireError(
             _TRANSPORT_MESSAGE,
             category="transport",
             method="GET",
+            product=_session_product(session),
         ) from None
     decoded = _decode_json(payload, token=_bearer_token(session))
     return decoded
@@ -542,7 +583,11 @@ def post_json_object(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code, method="POST")
+            _check_status(
+                response.status_code,
+                method="POST",
+                product=_session_product(session),
+            )
             data = _read_limited(
                 response, limit=_JSON_LIMIT, message=_JSON_LIMIT_MESSAGE
             )
@@ -551,12 +596,14 @@ def post_json_object(
             "Request timed out.",
             category="transport",
             method="POST",
+            product=_session_product(session),
         ) from None
     except requests.RequestException:
         raise AtlaWireError(
             _TRANSPORT_MESSAGE,
             category="transport",
             method="POST",
+            product=_session_product(session),
         ) from None
     decoded = _decode_json(data, token=_bearer_token(session))
     if not isinstance(decoded, dict):
@@ -629,7 +676,11 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code, method="GET")
+            _check_status(
+                response.status_code,
+                method="GET",
+                product=_session_product(session),
+            )
             _check_text_type(response.headers.get("Content-Type"))
             payload = read_encoded_limited(
                 response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
@@ -639,12 +690,14 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
             "Request timed out.",
             category="transport",
             method="GET",
+            product=_session_product(session),
         ) from None
     except requests.RequestException:
         raise AtlaWireError(
             _TRANSPORT_MESSAGE,
             category="transport",
             method="GET",
+            product=_session_product(session),
         ) from None
     text = _decode_utf8_text(payload)
     _reject_token_echo(session, text)

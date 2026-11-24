@@ -281,9 +281,9 @@ def test_repository_scan_opens_one_session(server, monkeypatch):
     counter = {"sessions": 0}
     real = repo_grep.bearer_session
 
-    def counting(token):
+    def counting(token, **kwargs):
         counter["sessions"] += 1
-        return real(token)
+        return real(token, **kwargs)
 
     monkeypatch.setattr(repo_grep, "bearer_session", counting)
     monkeypatch.setattr(

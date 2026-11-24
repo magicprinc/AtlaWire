@@ -245,7 +245,7 @@ def _validate_token(token: object) -> None:
             category="credentials",
             product="bitbucket",
         )
-    bearer_session(token).close()
+    bearer_session(token, product="bitbucket").close()
 
 
 def _repository_targets(

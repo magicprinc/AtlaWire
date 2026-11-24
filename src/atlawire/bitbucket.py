@@ -317,10 +317,15 @@ def list_projects(
     base_url: str,
     *,
     token: str,
+    limit: int | None = None,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
 ) -> list[Project]:
-    """List visible projects in server order or raise without a partial list."""
+    """List visible projects in server order or raise without a partial list.
+
+    ``limit`` caps returned rows and stops the page walk once it is reached;
+    ``None`` keeps the full walk.
+    """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if (
         not isinstance(max_pages, int)
@@ -328,9 +333,10 @@ def list_projects(
         or not 1 <= max_pages <= 1000
     ):
         raise AtlaWireError("The page limit must be between 1 and 1000.")
+    _check_row_limit(limit)
     url = f"{base}/rest/api/1.0/projects"
-    with bearer_session(token) as session:
-        return _read_pages(session, url, max_pages, project=_project)
+    with bearer_session(token, product="bitbucket") as session:
+        return _read_pages(session, url, max_pages, project=_project, limit=limit)
 
 
 def list_repositories(
@@ -338,18 +344,24 @@ def list_repositories(
     project: str,
     *,
     token: str,
+    limit: int | None = None,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
 ) -> list[Repository]:
-    """List repositories in server order or raise without returning a partial list."""
+    """List repositories in server order or raise without returning a partial list.
+
+    ``limit`` caps returned rows and stops the page walk once it is reached;
+    ``None`` keeps the full walk.
+    """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if not _PROJECT_KEY.fullmatch(project):
         raise AtlaWireError("Expected a Bitbucket project key or ~user project.")
     if not 1 <= max_pages <= 1000:
         raise AtlaWireError("The page limit must be between 1 and 1000.")
+    _check_row_limit(limit)
     url = f"{base}/rest/api/1.0/projects/{project}/repos"
-    with bearer_session(token) as session:
-        return _read_pages(session, url, max_pages, project=_repository)
+    with bearer_session(token, product="bitbucket") as session:
+        return _read_pages(session, url, max_pages, project=_repository, limit=limit)
 
 
 def list_all_repositories(
@@ -382,7 +394,7 @@ def list_all_repositories(
     url = f"{base}/rest/api/1.0/repos"
     rows: list[dict[str, object]] = []
     cursor = start
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         for _ in range(max_pages):
             page = get_json_object(
                 session, url, params={"start": cursor, "limit": limit}
@@ -436,7 +448,7 @@ def find_repositories(
     _validate_row_limit(limit)
     _validate_page_limit(max_pages)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _find_in_projects(
             session,
             f"{base}/rest/api/1.0/projects",
@@ -464,7 +476,7 @@ def get_pull_request(
     _, url, identifier = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, url, params={})
     _validate_pull_request(value, identifier)
     return value
@@ -496,7 +508,7 @@ def get_pull_request_merge_status(
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return get_json_object(session, f"{url}/merge", params={})
 
 
@@ -576,7 +588,7 @@ def get_repository_file(
     segments = _file_segments(path)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     project, slug = _split_repo(repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _read_raw_file_text(
             session,
             _raw_file_url(base, project, slug, segments),
@@ -672,7 +684,7 @@ def get_repository_archive(
         f"{base}/rest/api/1.0/projects/{quote(project_key, safe='')}"
         f"/repos/{quote(repository_slug, safe='')}/archive"
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         try:
             with session.get(
                 url,
@@ -682,7 +694,7 @@ def get_repository_archive(
                 allow_redirects=False,
                 stream=True,
             ) as response:
-                _check_status(response.status_code, method="GET")
+                _check_status(response.status_code, method="GET", product="bitbucket")
                 if max_bytes is None:
                     limit = _ARCHIVE_LIMIT_UNBOUNDED
                     message = "The repository archive exceeds the byte limit."
@@ -745,7 +757,7 @@ def get_file_blame(
     params["noContent"] = "true"
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         values = get_json_array(session, _browse_url(url, segments), params=params)
     return [_blame_line(number, value) for number, value in enumerate(values, start=1)]
 
@@ -756,6 +768,7 @@ def list_repository_files(
     *,
     token: str,
     at: str | None = None,
+    limit: int | None = None,
     max_pages: int = 100,
     before_page: Callable[[], None] | None = None,
     allow_http_loopback: bool = False,
@@ -774,16 +787,18 @@ def list_repository_files(
     an in-flight request.
     """
     _validate_page_limit(max_pages)
+    _check_row_limit(limit)
     params = _revision_params(at)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _read_pages(
             session,
             f"{url}/files",
             max_pages,
             project=_repository_file_path,
             params=params,
+            limit=limit,
             before_page=before_page,
         )
 
@@ -795,6 +810,7 @@ def list_directory(
     *,
     token: str,
     at: str | None = None,
+    limit: int | None = None,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
 ) -> list[DirectoryEntry]:
@@ -811,17 +827,19 @@ def list_directory(
     link, or URL is reconstructed or followed.
     """
     _validate_page_limit(max_pages)
+    _check_row_limit(limit)
     segments = _directory_segments(path)
     params = _revision_params(at)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _read_pages(
             session,
             _browse_url(url, segments),
             max_pages,
             project=_directory_entry,
             params=params,
+            limit=limit,
             transform=_children_envelope,
         )
 
@@ -883,7 +901,7 @@ def get_last_modified(
         revision = commit
     else:
         revision = _revision(at)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         try:
             return get_json_object(
                 session, f"{url}/last-modified{suffix}", params={"at": revision}
@@ -931,7 +949,7 @@ def get_pull_request_file(
     base, url, identifier = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, url, params={})
         _validate_pull_request(value, identifier)
         project, slug, commit = _selected_file_ref(value, selected_side)
@@ -970,7 +988,7 @@ def list_pull_request_files(
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         page = get_json_object(
             session, f"{url}/changes", params={"limit": _CHANGES_LIMIT}
         )
@@ -989,7 +1007,7 @@ def _pull_request_fallback_changes(
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         page = get_json_object(
             session, f"{url}/changes", params={"limit": _CHANGES_LIMIT}
         )
@@ -1045,7 +1063,7 @@ def get_pull_request_diff(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
     target, params = _pull_request_diff_request(url, context, path, source_path)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, target, params=params)
     _validate_diff(value, subject="pull request")
     return value
@@ -1101,7 +1119,7 @@ def _pull_request_diff_paths(
         seen.add(path)
         targets.append(_pull_request_diff_request(url, context, path, None))
     results: list[dict[str, object]] = []
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         for target, params in targets:
             value = get_json_object(session, target, params=params)
             _validate_diff(value, subject="pull request")
@@ -1259,6 +1277,7 @@ def list_pull_request_comments(
     pr_id: str | int,
     *,
     token: str,
+    limit: int | None = None,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
 ) -> list[PullRequestComment]:
@@ -1283,9 +1302,14 @@ def list_pull_request_comments(
         or not 1 <= max_pages <= 1000
     ):
         raise AtlaWireError("The page limit must be between 1 and 1000.")
-    with bearer_session(token) as session:
+    _check_row_limit(limit)
+    with bearer_session(token, product="bitbucket") as session:
         return _read_pages(
-            session, f"{url}/activities", max_pages, project=_pull_request_comment
+            session,
+            f"{url}/activities",
+            max_pages,
+            project=_pull_request_comment,
+            limit=limit,
         )
 
 
@@ -1295,6 +1319,7 @@ def list_pull_request_commits(
     pr_id: str | int,
     *,
     token: str,
+    limit: int | None = None,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
 ) -> list[Commit]:
@@ -1313,11 +1338,14 @@ def list_pull_request_commits(
     without returning partial rows.
     """
     _validate_page_limit(max_pages)
+    _check_row_limit(limit)
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    with bearer_session(token) as session:
-        return _read_pages(session, f"{url}/commits", max_pages, project=_commit)
+    with bearer_session(token, product="bitbucket") as session:
+        return _read_pages(
+            session, f"{url}/commits", max_pages, project=_commit, limit=limit
+        )
 
 
 def list_pull_requests(
@@ -1378,7 +1406,7 @@ def list_pull_requests(
     participant_name, participant_role = _participant_filter(author, participant, role)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_repository_url(base, repo)}/pull-requests"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         if participant_role is not None and participant_name is None:
             participant_name = _authenticated_username(session, base)
         if participant_name is not None:
@@ -1433,7 +1461,7 @@ def list_my_pull_requests(
     params = _dashboard_params(state, role, participant_status)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{base}{_DASHBOARD_PULL_REQUESTS_PATH}"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _read_pages(
             session,
             url,
@@ -1450,6 +1478,7 @@ def list_branches(
     *,
     token: str,
     filter_text: str | None = None,
+    limit: int | None = None,
     max_pages: int = 100,
     before_page: Callable[[], None] | None = None,
     allow_http_loopback: bool = False,
@@ -1465,16 +1494,18 @@ def list_branches(
     exception.
     """
     _validate_page_limit(max_pages)
+    _check_row_limit(limit)
     params = _branch_filter(filter_text)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _read_pages(
             session,
             f"{url}/branches",
             max_pages,
             project=_branch,
             params=params,
+            limit=limit,
             before_page=before_page,
         )
 
@@ -1611,7 +1642,7 @@ def list_tags_with_metadata(
     params = _tag_params(filter_text, order_by)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_repository_url(base, repo)}/tags"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         rows, complete = _read_pages_result(
             session,
             url,
@@ -1644,7 +1675,7 @@ def get_tag(
     segments = _tag_segments(name)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return get_json_object(
             session, f"{url}/tags/{_encoded_path(segments)}", params={}
         )
@@ -1751,7 +1782,7 @@ def list_commits_with_metadata(
     params = _commit_params(at, path)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _repository_url(base, repo)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         rows, complete = _read_pages_result(
             session,
             f"{url}/commits",
@@ -1789,7 +1820,7 @@ def get_commit(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     requested = _commit_id(sha)
     url = f"{_repository_url(base, repo)}/commits/{requested}"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, url, params={})
     _validate_commit_response(value, requested)
     return value
@@ -1801,6 +1832,7 @@ def list_commit_changes(
     sha: str,
     *,
     token: str,
+    limit: int | None = None,
     max_pages: int = 100,
     allow_http_loopback: bool = False,
 ) -> list[ChangedFile]:
@@ -1822,15 +1854,17 @@ def list_commit_changes(
     detect that case.
     """
     _validate_page_limit(max_pages)
+    _check_row_limit(limit)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     commit = _commit_id(sha)
     url = f"{_repository_url(base, repo)}/commits/{commit}/changes"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         return _read_pages(
             session,
             url,
             max_pages,
             project=_changed_file,
+            limit=limit,
             transform=_commit_changes_page,
         )
 
@@ -1868,7 +1902,7 @@ def get_commit_diff(
     commit = _commit_id(sha)
     url = f"{_repository_url(base, repo)}/commits/{commit}/diff"
     params = _diff_params(context)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         if targets is None:
             value = get_json_object(session, url, params=params)
             _validate_diff(value, subject="commit")
@@ -1939,7 +1973,7 @@ def get_project(
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _project_url(base, project_key)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, url, params={})
     if raw:
         return value
@@ -1972,7 +2006,7 @@ def get_repository(
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = _scoped_repository_url(base, project_key, slug)
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, url, params={})
     if raw:
         return value
@@ -2003,7 +2037,7 @@ def get_default_branch(
     """
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_scoped_repository_url(base, project_key, slug)}/branches/default"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object_allow_no_content(session, url, params={})
     if value is None:
         return None
@@ -2050,7 +2084,7 @@ def get_repository_changes(
     floor = _row_limit(limit, "change")
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_scoped_repository_url(base, project_key, slug)}/changes"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         if raw:
             return _read_pages(
                 session, url, max_pages, project=_dict_row, params=params, limit=floor
@@ -2099,7 +2133,7 @@ def list_commit_comments(
         params["path"] = selected_path
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_scoped_repository_url(base, project_key, slug)}/commits/{commit}/comments"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         if raw:
             return _read_pages(
                 session, url, max_pages, project=_dict_row, params=params, limit=floor
@@ -2139,7 +2173,7 @@ def get_commit_comment(
         f"{_scoped_repository_url(base, project_key, slug)}"
         f"/commits/{commit}/comments/{identifier}"
     )
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, url, params={})
     returned = value.get("id")
     if (
@@ -2179,7 +2213,7 @@ def list_repository_participants(
     _validate_page_limit(max_pages)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     url = f"{_scoped_repository_url(base, project_key, slug)}/participants"
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         if raw:
             return _read_pages(session, url, max_pages, project=_dict_row)
         return _read_pages(session, url, max_pages, project=_participant_row)
@@ -2295,7 +2329,7 @@ def _read_repository_links(
     url: str, token: str, max_pages: int, raw: bool
 ) -> list[RepositoryLink] | list[dict[str, object]]:
     """Прочитать paged-список форков или связанных репозиториев."""
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         if raw:
             return _read_pages(session, url, max_pages, project=_dict_row)
         return _read_pages(session, url, max_pages, project=_repository_link)
@@ -2730,7 +2764,7 @@ def _read_raw_file_text(
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code, method="GET")
+            _check_status(response.status_code, method="GET", product="bitbucket")
             _check_raw_file_media_type(response.headers.get("Content-Type"))
             payload = read_encoded_limited(
                 response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
@@ -2899,7 +2933,7 @@ def _authenticated_username(session: requests.Session, base: str) -> str:
             allow_redirects=False,
             stream=True,
         ) as response:
-            _check_status(response.status_code, method="GET")
+            _check_status(response.status_code, method="GET", product="bitbucket")
             value = response.headers.get("X-AUSERNAME")
     except requests.Timeout:
         raise AtlaWireError(
@@ -3105,6 +3139,14 @@ def _change_path(value: object) -> str:
     if not isinstance(name, str) or not name:
         raise AtlaWireError(invalid)
     return name
+
+
+def _check_row_limit(value: int | None) -> None:
+    """Accept ``None`` or a positive row cap; reject a bool or a non-positive one."""
+    if value is None:
+        return
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise AtlaWireError("The row limit must be a positive integer.")
 
 
 def _repository_file_path(value: object) -> str:

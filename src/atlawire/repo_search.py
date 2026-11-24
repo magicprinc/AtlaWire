@@ -566,7 +566,7 @@ def _scan_files(
     rows: list[RepoSearchRow] = []
     scanned = 0
     bytes_used = 0
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         for name in selected:
             if _remaining(deadline) is None:
                 return _outcome(rows, scanned, eligible, bytes_used, True, file_capped)

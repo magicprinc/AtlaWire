@@ -165,7 +165,7 @@ def _confluence_check(
 ) -> IdentityCheck:
     """Validate one pair, then read the documented current user."""
     resolved = _target("Confluence", target, allow_http_loopback)
-    with bearer_session(resolved.token) as session:
+    with bearer_session(resolved.token, product="confluence") as session:
         user = get_json_object(
             session,
             f"{resolved.base_url}{CONFLUENCE_CURRENT_USER_PATH}",

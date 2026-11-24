@@ -386,7 +386,7 @@ def _scan(
     scanned = 0
     # One session for the whole repository scan: a per-file session would open a
     # new connection pool for every file in a bounded fanout.
-    with bearer_session(token) as session:
+    with bearer_session(token, product="bitbucket") as session:
         for index, name in enumerate(names):
             if len(hits) >= limit:
                 return hits, scanned, "truncated"
