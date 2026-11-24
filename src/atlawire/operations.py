@@ -1596,13 +1596,26 @@ _OPERATIONS: dict[str, _Operation] = {
 
 
 def _manifest_entries() -> list[dict[str, object]]:
-    """Load the generated read manifest, or nothing if it is unusable."""
+    """Load the generated read manifest; a broken package is a fatal error.
+
+    Falling back to an empty list would silently shrink the advertised registry
+    from 202 operations to the hand-written remainder, so a missing or malformed
+    packaged manifest is reported instead.
+    """
     try:
         document = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
     except OSError, ValueError:
-        return []
-    entries = document.get("operations")
-    return entries if isinstance(entries, list) else []
+        raise AtlaWireError(
+            "The packaged read manifest is missing or invalid.",
+            category="validation",
+        ) from None
+    entries = document.get("operations") if isinstance(document, dict) else None
+    if not isinstance(entries, list):
+        raise AtlaWireError(
+            "The packaged read manifest is missing or invalid.",
+            category="validation",
+        ) from None
+    return entries
 
 
 def _manifest_operation(entry: dict[str, object]) -> _Operation | None:

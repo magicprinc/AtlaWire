@@ -1,20 +1,23 @@
 """Build the runtime read manifest from the versioned endpoint mappings.
 
-The mapping files are analysis artifacts under `.planning/`; this script turns
-them into one compact, reviewed runtime list. Run it from the repository root:
+The mapping files are analysis artifacts under `.development/<product>/`; this
+script turns them into one compact, reviewed runtime list. Run it from the
+repository root:
 
     C:/Python315/python.exe -B tools/build_read_manifest.py
+    C:/Python315/python.exe -B tools/build_read_manifest.py --check
 
 It writes `src/atlawire/manifest.json`. Binary, text and plugin-only endpoints
 are reported as deferred with the reason instead of being silently dropped.
 """
 
+import argparse
 import json
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MAPPINGS = ROOT / ".planning" / "2026-11-22-read-only-rest-and-bbk-parity"
+MAPPINGS = ROOT / ".development"
 OUTPUT = ROOT / "src" / "atlawire" / "manifest.json"
 
 # Endpoints whose body is not JSON, or which the core reference does not
@@ -72,7 +75,7 @@ def load_rows() -> list[tuple[str, dict[str, object]]]:
     )
     rows: list[tuple[str, dict[str, object]]] = []
     for product, name, key, _version in sources:
-        document = json.loads((MAPPINGS / name).read_text(encoding="utf-8"))
+        document = json.loads((MAPPINGS / product / name).read_text(encoding="utf-8"))
         for row in document[key]:
             rows.append((product, row))
     return rows
@@ -143,7 +146,8 @@ def _arguments(path: str) -> list[dict[str, object]]:
     ]
 
 
-def main() -> int:
+def build_document() -> tuple[dict[str, object], list[dict[str, str]], list[str]]:
+    """Return the manifest document and its deferred/renamed diagnostics."""
     rows = load_rows()
     operations: dict[str, dict[str, object]] = {}
     deferred: list[dict[str, str]] = []
@@ -155,7 +159,11 @@ def main() -> int:
         status = str(row.get("status", "")).lower()
         if status == "uncertain":
             deferred.append(
-                {"product": product, "path": path, "reason": "documented inconsistently"}
+                {
+                    "product": product,
+                    "path": path,
+                    "reason": "documented inconsistently",
+                }
             )
             continue
         if method == "POST":
@@ -191,15 +199,52 @@ def main() -> int:
             "arguments": _arguments(path),
         }
 
-    document = {
+    document: dict[str, object] = {
         "schema": "atlawire-read-manifest/v1",
         "source": "versioned endpoint mappings",
         "operations": [operations[key] for key in sorted(operations)],
         "deferred": deferred,
     }
-    OUTPUT.write_text(
-        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    return document, deferred, duplicates
+
+
+def render(document: dict[str, object]) -> str:
+    """Return the exact committed on-disk text for one manifest document."""
+    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=OUTPUT,
+        help="Manifest path to write or check.",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail if the committed manifest differs from the regenerated one.",
+    )
+    args = parser.parse_args(argv)
+
+    document, deferred, duplicates = build_document()
+    rendered = render(document)
+    if args.check:
+        try:
+            current = args.output.read_text(encoding="utf-8")
+        except OSError:
+            print(f"manifest missing: {args.output}")
+            return 1
+        if current != rendered:
+            print(f"manifest outdated: {args.output}")
+            return 1
+        print("manifest current")
+    else:
+        args.output.write_text(rendered, encoding="utf-8")
+
+    operations = document["operations"]
+    assert isinstance(operations, list)
     print(f"operations: {len(operations)}")
     print(f"deferred: {len(deferred)}")
     for item in deferred:
