@@ -307,16 +307,18 @@ def _run(request: dict[str, object], timeout_s: float) -> bytes:
     except OSError:
         raise HelperFailure from None
     stdout = b""
+    cleaned = False
     try:
         try:
             stdout, _ = process.communicate(payload, timeout=timeout_s)
         except subprocess.TimeoutExpired:
             _stop_helper(process)
+            cleaned = True
             raise RegexTimeout from None
         except (OSError, ValueError):
             raise HelperFailure from None
     finally:
-        if process.poll() is None:
+        if not cleaned and process.poll() is None:
             _stop_helper(process)
     if process.returncode == _INVALID_REGEX_EXIT:
         raise InvalidRegex
@@ -342,6 +344,12 @@ def _stop_helper(process: subprocess.Popen) -> None:
         process.wait(timeout=_KILL_WAIT_SECONDS)
     except subprocess.TimeoutExpired:
         pass
+    for stream in (process.stdin, process.stdout, process.stderr):
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass
 
 
 def _helper_environment() -> dict[str, str]:

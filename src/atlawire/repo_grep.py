@@ -347,7 +347,7 @@ def _scan(
     """
     hits: list[GrepHit] = []
     scanned = 0
-    for name in names:
+    for index, name in enumerate(names):
         if len(hits) >= limit:
             return hits, scanned, "truncated"
         if _remaining_budget(deadline) is None:
@@ -363,7 +363,9 @@ def _scan(
             )
         except AtlaWireError as exc:
             raise AtlaWireError(
-                f"Repository grep aborted without a result: {exc}"
+                f"Repository grep aborted without a result: {exc}",
+                category=exc.category,
+                http_status=exc.http_status,
             ) from None
         lines = _split_lines(text)
         remaining = _remaining_budget(deadline)
@@ -376,7 +378,9 @@ def _scan(
                 text,
                 pattern,
                 ignore_case=ignore_case,
-                limit=hit_budget,
+                # One extra match distinguishes "exactly at the cap" from
+                # "there is at least one more".
+                limit=hit_budget + 1,
                 timeout_s=timeout_s,
                 line_count=len(lines),
             )
@@ -393,6 +397,9 @@ def _scan(
                 "Repository regex evaluation failed; no result was produced."
             ) from None
         scanned += 1
+        more_than_budget = len(numbers) > hit_budget
+        if more_than_budget:
+            numbers = numbers[:hit_budget]
         for number in numbers:
             line = lines[number - 1]
             hits.append(
@@ -403,8 +410,15 @@ def _scan(
                     text_truncated=len(line) > HIT_TEXT_LIMIT,
                 )
             )
-        if len(numbers) == hit_budget:
+        if more_than_budget:
             return hits, scanned, "truncated"
+        if len(hits) >= limit:
+            # Reaching the cap exactly on the last eligible file is complete.
+            return (
+                hits,
+                scanned,
+                ("complete" if index == len(names) - 1 else "truncated"),
+            )
     return hits, scanned, "complete"
 
 

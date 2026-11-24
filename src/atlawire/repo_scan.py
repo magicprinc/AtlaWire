@@ -38,6 +38,7 @@ from concurrent.futures import (
 from typing import TypedDict
 
 from atlawire.bitbucket import (
+    PageLimitError,
     list_projects,
     list_repositories,
     list_repository_files,
@@ -54,7 +55,6 @@ _INVALID_EXTENSION = "The file extension must be non-empty text such as .py."
 _INVALID_WORKERS = "The worker count must be between 1 and 8."
 _INVALID_PAGE_LIMIT = "The page limit must be between 1 and 1000."
 _INVALID_PROJECT = "Expected a Bitbucket project key or ~user project."
-_PAGE_LIMIT_MESSAGE = "Bitbucket page limit reached; increase --max-pages."
 
 
 class ExtensionMatch(TypedDict):
@@ -313,11 +313,11 @@ def _repository_targets(
 def _is_page_limit_error(exc: BaseException) -> bool:
     """Tell the shared readers' page-budget stop from a real failure.
 
-    Only the fixed page-budget message becomes a partial report; transport,
+    Only the dedicated page-budget stop becomes a partial report; transport,
     validation, and server errors must keep propagating so a partial inventory
-    never hides them.
+    never hides them. The exception type is the contract, not its message text.
     """
-    return isinstance(exc, AtlaWireError) and str(exc) == _PAGE_LIMIT_MESSAGE
+    return isinstance(exc, PageLimitError)
 
 
 def _scan_targets(

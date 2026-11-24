@@ -223,7 +223,7 @@ def federated_search(
     budget = _ReadBudget(READ_BUDGET)
     merged = _collect(queries, targets, errors, limit, allow_http_loopback, budget)
     if merged.completed == 0:
-        if budget.refused:
+        if budget.refused and not errors:
             raise AtlaWireError(
                 "Federated search read budget was exhausted before any product "
                 "answered; nothing was returned."

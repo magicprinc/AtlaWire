@@ -23,6 +23,15 @@ from atlawire.http import (
     reject_credential_echo,
 )
 
+
+class PageLimitError(AtlaWireError):
+    """A bounded page walk stopped at its configured request budget.
+
+    The dedicated type lets a caller that intentionally reports a partial
+    result recognize this stop without matching diagnostic text.
+    """
+
+
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _FILE_UNSAFE = re.compile(r"[\\\x00-\x1f\x7f-\x9f\ud800-\udfff]")
@@ -398,7 +407,7 @@ def list_all_repositories(
             if last:
                 return rows
             cursor = _next_page_start(page, cursor)
-    raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+    raise PageLimitError("Bitbucket page limit reached; increase --max-pages.")
 
 
 def find_repositories(
@@ -2205,7 +2214,7 @@ def _find_in_projects(
 
     def take_pages() -> int:
         if remaining <= 0:
-            raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+            raise PageLimitError("Bitbucket page limit reached; increase --max-pages.")
         return remaining
 
     def spent_page() -> None:
@@ -3424,7 +3433,7 @@ def _read_pages_result[RowT](
         if last:
             return rows, True
         start = _next_page_start(page, start)
-    raise AtlaWireError("Bitbucket page limit reached; increase --max-pages.")
+    raise PageLimitError("Bitbucket page limit reached; increase --max-pages.")
 
 
 def _check_page_echo(page: dict[str, object], *, start: int, rows: int) -> None:
