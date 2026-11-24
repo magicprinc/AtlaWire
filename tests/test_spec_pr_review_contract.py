@@ -6,12 +6,52 @@ from click.testing import CliRunner
 from atlawire.cli import cli
 from atlawire.http import AtlaWireError
 from atlawire.pr_review import (
+    _FileFacts,
     _capped,
+    _counts_complete,
     _no_diff_checks,
     _partial_reasons,
     _render_symbols_markdown,
     parse_pr_link,
 )
+
+
+def _facts(*, source=None, destination=None):
+    return _FileFacts(0, 0, 0, False, (), (), source, destination)
+
+
+def test_counts_complete_accepts_matching_files():
+    rows = [{"path": "A.java"}]
+
+    assert _counts_complete(rows, {"A.java": _facts(destination="A.java")}, {}) is True
+
+
+def test_counts_complete_rejects_a_listed_file_missing_from_the_diff():
+    rows = [{"path": "A.java"}, {"path": "B.java"}]
+
+    assert (
+        _counts_complete(rows, {"A.java": _facts(destination="A.java")}, {}) is False
+    )
+
+
+def test_counts_complete_rejects_a_diff_entry_missing_from_the_list():
+    rows = [{"path": "A.java"}]
+    diff = {
+        "A.java": _facts(destination="A.java"),
+        "B.java": _facts(destination="B.java"),
+    }
+
+    assert _counts_complete(rows, diff, {}) is False
+
+
+def test_counts_complete_rejects_a_diff_with_no_listed_rows():
+    assert _counts_complete([], {"A.java": _facts(destination="A.java")}, {}) is False
+
+
+def test_counts_complete_accepts_a_delete_listed_by_source_path():
+    rows = [{"path": "A.java"}]
+
+    assert _counts_complete(rows, {}, {"A.java": _facts(source="A.java")}) is True
 
 
 def test_parse_pr_link_accepts_a_normal_url():

@@ -80,6 +80,9 @@ PACKET_LIMITATIONS = (
     "A ref without repository metadata falls back to the pull request "
     "repository for file links and heuristic source reads.",
     "An unflagged Bitbucket diff response is not proven complete.",
+    "Diff-derived line numbers are matched against source read at the refs "
+    "captured before the diff; a push between those reads can misattribute a "
+    "symbol or its javadoc state.",
     "profile.partial=False means no known omission was detected in requested "
     "material; it is not a proof of snapshot or diff completeness.",
 )
@@ -594,9 +597,8 @@ def _build_packet(
         include_diff=include_diff,
     )
     if include_diff:
-        diff_section["counts_complete"] = all(
-            row["lines_source"] in {LINES_FROM_DIFF, LINES_DIFF_NO_HUNKS}
-            for row in all_file_rows
+        diff_section["counts_complete"] = _counts_complete(
+            all_file_rows, by_destination, by_source
         )
     all_commit_rows = [_commit_row(row) for row in commits]
     description, description_truncated = _bounded(
@@ -989,6 +991,26 @@ def _file_row(
             exists_before=change_type != "ADD",
             exists_after=change_type != "DELETE",
         ),
+    )
+
+
+def _counts_complete(
+    file_rows: Sequence[PrReviewFile],
+    by_destination: dict[str, _FileFacts],
+    by_source: dict[str, _FileFacts],
+) -> bool:
+    """Return whether the changed list and the diff describe the same files.
+
+    Both directions matter: a listed file with no diff entry has unknown line
+    counts, and a diff entry with no listed row means the pull request changed
+    between the two reads, so the per-file counts cannot be reconciled.
+    """
+    listed = {row["path"] for row in file_rows}
+    if set(by_destination) - listed:
+        return False
+    return all(
+        row["path"] in by_destination or row["path"] in by_source
+        for row in file_rows
     )
 
 
@@ -1719,12 +1741,16 @@ def _changed_symbols(
             required.append(before_path)
         if entry["type"] != "DELETE":
             required.append(after_path)
-        if not all(
-            _claim_attempt(item, attempted, not_analyzed)
-            for item in required
-        ):
+        # Claim every distinct path in one step: claiming one side and then
+        # failing the other would reserve a slot that is never read.
+        distinct = list(dict.fromkeys(required))
+        new_claims = [item for item in distinct if item not in attempted]
+        if len(attempted) + len(new_claims) > HEURISTIC_FILE_LIMIT:
+            for item in new_claims:
+                _add_unique(not_analyzed, item, FILES_NOT_ANALYZED_LIMIT)
             _add_unique(not_analyzed, path, FILES_NOT_ANALYZED_LIMIT)
             continue
+        attempted.update(new_claims)
         before: list[_Member] = []
         after: list[_Member] = []
         before_ok = entry["type"] == "ADD"

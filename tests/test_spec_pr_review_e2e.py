@@ -51,6 +51,18 @@ def server(tmp_path):
                     "size": 12,
                     "limit": 1000,
                 }
+            elif path == f"{BASE}/diff":
+                # The diff names one file the changed list does not carry: a
+                # push landed between the two reads.
+                body = {
+                    "diffs": [
+                        {
+                            "source": "src/extra/Unlisted.java",
+                            "destination": "src/extra/Unlisted.java",
+                            "hunks": [],
+                        }
+                    ]
+                }
             else:
                 self.send_error(404)
                 return
@@ -118,6 +130,33 @@ def test_pr_review_no_diff_reports_the_shortened_test_name_list(server):
     assert len(packet["checks"]["test_names"]) == 10
     assert any(
         "test_names" in reason for reason in packet["profile"]["partial_reasons"]
+    )
+    assert packet["profile"]["partial"] is True
+
+
+def test_pr_review_flags_a_diff_file_missing_from_the_changed_list(server):
+    base, credentials = server
+    result = _run(
+        [
+            "pr-review",
+            "PRJ/widgets",
+            "5",
+            "--base-url",
+            base,
+            "--token-from-env",
+            "--allow-http-loopback",
+            "--json",
+        ],
+        base=base,
+        credentials=credentials,
+    )
+
+    assert result.returncode == 0, result.stderr
+    packet = json.loads(result.stdout)
+    assert packet["diff"]["counts_complete"] is False
+    assert any(
+        "no matching diff entry" in reason
+        for reason in packet["profile"]["partial_reasons"]
     )
     assert packet["profile"]["partial"] is True
 
