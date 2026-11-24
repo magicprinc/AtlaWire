@@ -1857,6 +1857,12 @@ def commit_diff_command(
 @click.option(
     "--at", default=None, help="Revision to read; omit for the default branch."
 )
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print one JSON object with the receipt and text instead of raw bytes.",
+)
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
 @click.option(
@@ -1866,11 +1872,17 @@ def file_command(
     repo: str,
     path: str,
     at: str | None,
+    as_json: bool,
     base_url: str | None,
     token_from_env: bool,
     allow_http_loopback: bool,
 ) -> None:
-    """Print one Bitbucket repository file exactly as stored."""
+    """Print one Bitbucket repository file exactly as stored.
+
+    Without --at the server's default branch is read, like ``files`` and ``ls``.
+    ``--json`` prints ``{path, at, bytes, sha256, text}`` instead of the exact
+    bytes; ``at`` is null when the default branch was used.
+    """
     base_url, token = _product_base_url_and_token(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
@@ -1885,6 +1897,18 @@ def file_command(
         )
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
+    if as_json:
+        payload = text.encode("utf-8")
+        receipt = {
+            "path": path,
+            "at": at,
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "text": text,
+        }
+        reject_credential_echo(receipt, tokens=(token,))
+        click.echo(json.dumps(receipt))
+        return
     _write_exact_text(text)
 
 
@@ -3598,6 +3622,12 @@ def related_repos(
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
 @click.option("--markdown", is_flag=True, help="Print Markdown instead of JSON.")
 @click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print JSON (the default); cannot be combined with Markdown.",
+)
+@click.option(
     "--wiki",
     is_flag=True,
     help="Render Jira wiki markup as Markdown (implies --markdown).",
@@ -3638,6 +3668,7 @@ def issue(
     base_url: str | None,
     token_from_env: bool,
     markdown: bool,
+    as_json: bool,
     wiki: bool,
     expand: str | None,
     fields: str | None,
@@ -3652,7 +3683,10 @@ def issue(
     verbatim as the expand query parameter; without it the issue is read with
     rendered fields as before. ``--fields``, ``--properties``, ``--update-history``
     and ``--fail-fast`` map to the remaining documented get-issue query parameters.
+    ``--json`` selects the default JSON output and refuses --markdown/--wiki.
     """
+    if as_json and (markdown or wiki):
+        raise click.UsageError("Use --json or --markdown/--wiki, not both.")
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
@@ -5169,6 +5203,12 @@ def children(
 )
 @click.option("--markdown", is_flag=True, help="Print Markdown instead of JSON.")
 @click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print JSON (the default); cannot be combined with another format.",
+)
+@click.option(
     "--expand",
     default=None,
     help=(
@@ -5185,6 +5225,7 @@ def page(
     token_from_env: bool,
     storage: bool,
     markdown: bool,
+    as_json: bool,
     expand: str | None,
     allow_http_loopback: bool,
 ) -> None:
@@ -5193,10 +5234,13 @@ def page(
     ``--expand`` prints the raw, unprojected page document with exactly the
     given expansion list, so it cannot be combined with --markdown or --storage,
     which need the default body expansion. Without it the validated JSON,
-    Markdown, or storage output is unchanged.
+    Markdown, or storage output is unchanged. ``--json`` selects the default
+    JSON output and refuses --markdown/--storage.
     """
     if markdown and storage:
         raise click.UsageError("Use --markdown or --storage/--html, not both.")
+    if as_json and (markdown or storage):
+        raise click.UsageError("Use --json or --markdown/--storage, not both.")
     if expand is not None and (markdown or storage):
         raise click.UsageError("Use --expand without --markdown or --storage.")
     base_url, token = _product_base_url_and_token(
@@ -5551,6 +5595,12 @@ def page_version(
 
 @cli.command("page-url")
 @click.argument("page_id_or_url")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print {\"url\": ...} instead of the bare URL.",
+)
 @click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
 @click.option(
@@ -5558,6 +5608,7 @@ def page_version(
 )
 def page_url(
     page_id_or_url: str,
+    as_json: bool,
     base_url: str | None,
     token_from_env: bool,
     allow_http_loopback: bool,
@@ -5567,6 +5618,7 @@ def page_url(
     The URL uses the configured base URL and context path. A safe
     context-relative ``_links.webui`` path is preferred; a missing or unsafe
     link falls back to the deterministic page-id URL. Links are never followed.
+    ``--json`` wraps the same URL in one object.
     """
     base_url, token = _product_base_url_and_token(
         "confluence", base_url, token_from_env, allow_http_loopback
@@ -5581,7 +5633,7 @@ def page_url(
         reject_credential_echo(url, tokens=(token,))
     except AtlaWireError as exc:
         raise click.ClickException(str(exc)) from None
-    click.echo(url)
+    click.echo(json.dumps({"url": url}) if as_json else url)
 
 
 # BBK exposed a one-shot `selftest` for all three products. AtlaWire already
@@ -5596,6 +5648,36 @@ cli.add_command(
         help="Check authentication for all three products (same probe as whoami).",
     )
 )
+
+
+_JSON_FLAG_EXCEPTIONS = frozenset({"attachment-get"})
+
+
+def _register_json_output_flags(group: click.Group) -> int:
+    """Give every JSON-printing command a ``--json`` flag, exactly once.
+
+    The flag is output-mode symmetry: where JSON is already the only output it
+    changes nothing, and a command that selects between modes defines the flag
+    itself so it can refuse a conflicting combination. ``attachment-get`` is the
+    one exception: its ``--base64``/``--out`` pair already selects JSON output
+    and is mutually exclusive, so a third flag would be ambiguous.
+    """
+    added = 0
+    for name, command in group.commands.items():
+        if name in _JSON_FLAG_EXCEPTIONS:
+            continue
+        if any("--json" in param.opts for param in command.params):
+            continue
+        command.params.append(
+            click.Option(
+                ["--json"],
+                is_flag=True,
+                expose_value=False,
+                help="Print JSON (the default).",
+            )
+        )
+        added += 1
+    return added
 
 
 def _register_alias(
@@ -5652,6 +5734,10 @@ _register_alias(
     fixed={"action": "comments"},
     help_text="Print a pull request's comments (alias of pr REPO ID comments).",
 )
+
+# Added after the aliases: their parameters are copied at registration time and
+# every alias origin already defines --json itself.
+_register_json_output_flags(cli)
 
 
 def main() -> None:
