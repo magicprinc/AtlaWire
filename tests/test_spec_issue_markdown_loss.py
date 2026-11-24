@@ -114,15 +114,15 @@ def test_user_mention_keeps_a_non_latin_account_name():
     assert "Иван Петров (иван.петров)" in markdown
 
 
-def test_plain_link_keeps_its_label_and_not_its_destination():
+def test_plain_link_keeps_its_label_and_an_inert_destination():
     markdown = _render(
         '<p>See <a href="https://jira.example/browse/PLAT-1">PLAT-1</a> and '
         '<a href="https://example.com/x">the site</a>.</p>'
     )
 
-    assert "PLAT-1" in markdown
-    assert "the site" in markdown
-    assert "browse/PLAT-1" not in markdown
+    assert "PLAT-1 (https://jira.example/browse/PLAT-1)" in markdown
+    assert "the site (https://example.com/x)" in markdown
+    assert "](" not in markdown
 
 
 def test_table_keeps_every_cell_text():

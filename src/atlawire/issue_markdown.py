@@ -1,12 +1,13 @@
 """Render a fetched Jira issue as Markdown without extra network or file effects.
 
 The default renderer converts only the HTML that Jira already returned in
-``renderedFields``. It keeps link labels and image alt text but drops link and
-image destinations, and escapes text that could otherwise become active
-Markdown or HTML. An image without alt text has no visible text at all, so its
-source is kept as inert, labelled literal text instead of vanishing, and a
-rendered user mention keeps its account name next to the display name. Neither
-becomes an active link or image. This is a readability measure, not a general
+``renderedFields``. It keeps link labels and destinations as inert
+``label (url)`` text, image alt text, and escapes text that could otherwise
+become active Markdown or HTML. An image without alt text has no visible text
+at all, so its source is kept as inert, labelled literal text instead of
+vanishing, and a rendered user mention keeps its account name next to the
+display name. No destination becomes an active link or image: nothing is
+fetched and nothing is clickable. This is a readability measure, not a general
 HTML sanitizer. Rendered comment bodies are used only for unambiguous ids; raw
 descriptions or comments use a literal fenced text block. C0/C1 controls are
 shown as visible escape sequences instead of raw bytes.
@@ -27,6 +28,7 @@ from urllib.parse import unquote
 
 from atlawire._markdown import (
     SafeMarkdownConverter,
+    collapse_blank_lines,
     convert_html,
     escape_controls,
     fenced_block,
@@ -189,6 +191,15 @@ class _IssueMarkdownConverter(SafeMarkdownConverter):
             return _user_mention(text, username)
         if text.startswith(_IMAGE_REFERENCE_PREFIX):
             return _linked_image(text, attrs)
+        href = attrs.get("href")
+        if isinstance(href, str) and href.strip():
+            destination = escape_controls(href.strip())
+            shown = inline(text).strip()
+            # Keep the destination as inert text: no ``](`` syntax, so the
+            # result is never an active link, but the fact is not lost.
+            if shown and shown != destination:
+                return f"{shown} ({destination})"
+            return destination
         return text
 
 
@@ -736,4 +747,4 @@ def render_issue_markdown(issue: dict[str, object], *, use_wiki: bool = False) -
         blocks.extend(("## Description", description))
 
     blocks.extend(_comment_blocks(fields, rendered_fields, use_wiki))
-    return escape_controls("\n\n".join(blocks) + "\n")
+    return escape_controls(collapse_blank_lines("\n\n".join(blocks)) + "\n")

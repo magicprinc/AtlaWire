@@ -23,6 +23,7 @@ from bs4 import Tag
 
 from atlawire._markdown import (
     SafeMarkdownConverter,
+    collapse_blank_lines,
     convert_html,
     fenced_block,
     inline,
@@ -420,4 +421,4 @@ def render_page_markdown(page: dict[str, object]) -> str:
         return _literal_fallback(heading, _RECURSION_FALLBACK, source)
     if not rendered:
         return heading + "\n"
-    return heading + "\n\n" + rendered + "\n"
+    return collapse_blank_lines(heading + "\n\n" + rendered) + "\n"

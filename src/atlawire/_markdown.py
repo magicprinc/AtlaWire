@@ -24,6 +24,9 @@ _ESCAPED_CONTROLS = re.compile(
 _MARKDOWN_SPECIALS = re.compile(r"([\\`*_\[\]<>~&|()])")
 _ORDERED_MARKER = re.compile(r"([0-9]{1,9})([.)])(?=\s|$)")
 _BACKTICKS = re.compile(r"`+")
+# A fenced code block opener or closer (CommonMark: up to three spaces, then a
+# run of at least three backticks or tildes).
+_FENCE_LINE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
 class SafeMarkdownConverter(MarkdownConverter):
@@ -98,6 +101,35 @@ def fenced_block(content: str, info: str = "") -> str:
     fence = "`" * max(3, longest + 1)
     body = content if content.endswith("\n") else content + "\n"
     return f"{fence}{info}\n{body}{fence}"
+
+
+def collapse_blank_lines(text: str) -> str:
+    """Fold each run of blank lines outside fenced code to one blank line.
+
+    Blank lines inside a fence are content and are preserved byte for byte. The
+    collapse removes only formatting noise: Markdown needs one blank line
+    between blocks, so a longer run costs tokens without carrying information.
+    """
+    lines = text.split("\n")
+    out: list[str] = []
+    fence: str | None = None
+    blank = False
+    for line in lines:
+        match = _FENCE_LINE.match(line)
+        if match is not None:
+            marker = match.group(1)
+            if fence is None:
+                fence = marker
+            elif marker[0] == fence[0] and len(marker) >= len(fence):
+                fence = None
+        if fence is None and not line.strip():
+            if blank:
+                continue
+            blank = True
+        else:
+            blank = False
+        out.append(line)
+    return "\n".join(out)
 
 
 def convert_html(html: str, converter: MarkdownConverter) -> str | None:
