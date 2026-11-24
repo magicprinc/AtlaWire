@@ -58,13 +58,13 @@ from typing import Literal, TypedDict
 
 from atlawire import regex_helper
 from atlawire.bitbucket import (
+    _read_repository_file_in_session,
     get_branch,
     get_commit,
-    get_repository_file,
     get_tag,
     list_repository_files,
 )
-from atlawire.http import AtlaWireError, normalize_base_url
+from atlawire.http import AtlaWireError, bearer_session, normalize_base_url
 from atlawire.operations import read_operation
 
 GREP_LIMIT_MIN = 1
@@ -384,78 +384,82 @@ def _scan(
     """
     hits: list[GrepHit] = []
     scanned = 0
-    for index, name in enumerate(names):
-        if len(hits) >= limit:
-            return hits, scanned, "truncated"
-        if _remaining_budget(deadline) is None:
-            return hits, scanned, "timeout"
-        try:
-            text = get_repository_file(
-                base_url,
-                repo,
-                name,
-                token=token,
-                at=commit,
-                allow_http_loopback=allow_http_loopback,
-            )
-        except AtlaWireError as exc:
-            raise AtlaWireError(
-                f"Repository grep aborted without a result: {exc}",
-                category=exc.category,
-                http_status=exc.http_status,
-            ) from None
-        lines = _split_lines(text)
-        remaining = _remaining_budget(deadline)
-        if remaining is None:
-            return hits, scanned, "timeout"
-        hit_budget = limit - len(hits)
-        timeout_s = min(regex_timeout_s, remaining)
-        try:
-            numbers = _match_line_numbers(
-                text,
-                pattern,
-                ignore_case=ignore_case,
-                # One extra match distinguishes "exactly at the cap" from
-                # "there is at least one more".
-                limit=hit_budget + 1,
-                timeout_s=timeout_s,
-                line_count=len(lines),
-            )
-        except _HelperTimeout:
-            if timeout_s < regex_timeout_s:
+    # One session for the whole repository scan: a per-file session would open a
+    # new connection pool for every file in a bounded fanout.
+    with bearer_session(token) as session:
+        for index, name in enumerate(names):
+            if len(hits) >= limit:
+                return hits, scanned, "truncated"
+            if _remaining_budget(deadline) is None:
                 return hits, scanned, "timeout"
-            raise AtlaWireError(
-                "Repository regex evaluation timed out; no result was produced."
-            ) from None
-        except _HelperInvalidRegex:
-            raise AtlaWireError("The repository regex is invalid.") from None
-        except _HelperFailure:
-            raise AtlaWireError(
-                "Repository regex evaluation failed; no result was produced."
-            ) from None
-        scanned += 1
-        more_than_budget = len(numbers) > hit_budget
-        if more_than_budget:
-            numbers = numbers[:hit_budget]
-        for number in numbers:
-            line = lines[number - 1]
-            hits.append(
-                GrepHit(
-                    file=name,
-                    line=number,
-                    text=line[:HIT_TEXT_LIMIT],
-                    text_truncated=len(line) > HIT_TEXT_LIMIT,
+            try:
+                text = _read_repository_file_in_session(
+                    session,
+                    base_url,
+                    repo,
+                    name,
+                    token=token,
+                    at=commit,
+                    allow_http_loopback=allow_http_loopback,
                 )
-            )
-        if more_than_budget:
-            return hits, scanned, "truncated"
-        if len(hits) >= limit:
-            # Reaching the cap exactly on the last eligible file is complete.
-            return (
-                hits,
-                scanned,
-                ("complete" if index == len(names) - 1 else "truncated"),
-            )
+            except AtlaWireError as exc:
+                raise AtlaWireError(
+                    f"Repository grep aborted without a result: {exc}",
+                    category=exc.category,
+                    http_status=exc.http_status,
+                ) from None
+            lines = _split_lines(text)
+            remaining = _remaining_budget(deadline)
+            if remaining is None:
+                return hits, scanned, "timeout"
+            hit_budget = limit - len(hits)
+            timeout_s = min(regex_timeout_s, remaining)
+            try:
+                numbers = _match_line_numbers(
+                    text,
+                    pattern,
+                    ignore_case=ignore_case,
+                    # One extra match distinguishes "exactly at the cap" from
+                    # "there is at least one more".
+                    limit=hit_budget + 1,
+                    timeout_s=timeout_s,
+                    line_count=len(lines),
+                )
+            except _HelperTimeout:
+                if timeout_s < regex_timeout_s:
+                    return hits, scanned, "timeout"
+                raise AtlaWireError(
+                    "Repository regex evaluation timed out; no result was produced."
+                ) from None
+            except _HelperInvalidRegex:
+                raise AtlaWireError("The repository regex is invalid.") from None
+            except _HelperFailure:
+                raise AtlaWireError(
+                    "Repository regex evaluation failed; no result was produced."
+                ) from None
+            scanned += 1
+            more_than_budget = len(numbers) > hit_budget
+            if more_than_budget:
+                numbers = numbers[:hit_budget]
+            for number in numbers:
+                line = lines[number - 1]
+                hits.append(
+                    GrepHit(
+                        file=name,
+                        line=number,
+                        text=line[:HIT_TEXT_LIMIT],
+                        text_truncated=len(line) > HIT_TEXT_LIMIT,
+                    )
+                )
+            if more_than_budget:
+                return hits, scanned, "truncated"
+            if len(hits) >= limit:
+                # Reaching the cap exactly on the last eligible file is complete.
+                return (
+                    hits,
+                    scanned,
+                    ("complete" if index == len(names) - 1 else "truncated"),
+                )
     return hits, scanned, "complete"
 
 

@@ -153,6 +153,16 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   `DeclaredTruncationError` (подкласс `AtlaWireError`); незаявленный серверный cap не
   детектируется.
 
+**`get_pull_request_diffs(base_url, repo, pr_id, *, token, paths, context=3, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1054`
+- REST: один `GET .../pull-requests/{id}/diff/{path}` на каждый файл, один session на батч.
+- → список в порядке запроса. Дубликаты, пустой список, не-строки и >100 путей —
+  ошибка до запроса; поздний сбой не отдаёт частичный список.
+
+**`pr_compact(base_url, repo, pr_id, *, token, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:503`
+- REST: `GET .../pull-requests/{id}`; компактная проекция для отчётов.
+- → `{id, title, state, author, from, to, created, updated, reviewers_active, url}`
+  фиксированного порядка; служебные `links`/`permittedOperations`/аватары отброшены.
+
 **`get_pull_request_diff_with_fallback(base_url, repo, pr_id, *, token, context=3, allow_http_loopback=False) -> PullRequestDiffFallback`** — `bitbucket.py:974`
 - REST: как `get_pull_request_diff` (весь PR); только при `DeclaredTruncationError` —
   `GET .../changes?limit=1000`, затем `GET .../diff/{path}` на каждый файл (с `srcPath`).
@@ -333,6 +343,12 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - Ошибки/лимиты: битый ID/ссылка; не-объект; страница не того типа; выбранный `body`
   без storage; один объект.
 
+**`get_page_storage(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> str`** — `confluence.py:362`
+- REST: `GET /rest/api/content/{id}` (через `get_page`); сырой storage XHTML одной функцией.
+**`get_page_title(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> str`** — `confluence.py:389`
+**`get_page_markdown(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> str`** — `confluence.py:406`
+- REST: тот же один GET; Markdown через `render_page_markdown`, без второго запроса.
+
 **`get_page_web_url(base_url, page_id_or_url, *, token, allow_http_loopback=False) -> str`** — `confluence.py:241`
 - REST: `GET /rest/api/content/{id}` (через `get_page`); отдаёт `base_url` + `_links.webui`
   либо fallback `/pages/viewpage.action?pageId={id}`.
@@ -439,6 +455,12 @@ JQL-поиск для коротких строк фиксирует
 - → сырой JSON задачи (`fields` + `renderedFields`, неизвестные поля сохраняются; Markdown нет).
 - Ошибки/лимиты: ключ не `[A-Z][A-Z0-9_]*-[0-9]+`/URL; ответ без `key`/`fields`; после move
   допустим другой ключ — проверяется синтаксис; один GET.
+
+**`issue_url(base_url, key_or_url) -> str`** — `jira.py:245`
+- Без запроса: `{base}/browse/{KEY}`; context path сохраняется, URL из аргумента не используется.
+**`get_issue_markdown(base_url, key_or_url, *, token, use_wiki=False, allow_http_loopback=False) -> str`** — `jira.py:258`
+- REST: один `GET /rest/api/2/issue/{key}` с `renderedFields`; Markdown через
+  `render_issue_markdown`, без второго запроса.
 
 **`get_issue_worklogs(base_url, key_or_url, *, token, allow_http_loopback=False) -> dict[str, object]`** — `jira.py:244`
 - REST: `GET /rest/api/2/issue/{key}/worklog`; query нет.

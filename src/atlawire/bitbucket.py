@@ -500,6 +500,51 @@ def get_pull_request_merge_status(
         return get_json_object(session, f"{url}/merge", params={})
 
 
+def pr_compact(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> dict[str, object]:
+    """Return a compact pull request projection for reports and agents.
+
+    One ``GET`` reads the pull request through
+    [get_pull_request][atlawire.bitbucket.get_pull_request]; the result keeps the
+    stable fields and drops service metadata such as ``links``,
+    ``permittedOperations`` and avatars. Field order is fixed.
+    """
+    value = get_pull_request(
+        base_url, repo, pr_id, token=token, allow_http_loopback=allow_http_loopback
+    )
+    base, _, identifier = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    row = _pull_request(value)
+    created = value.get("createdDate")
+    if created is not None and (
+        not isinstance(created, int) or isinstance(created, bool) or created < 0
+    ):
+        raise AtlaWireError("Invalid fields in a Bitbucket pull request.")
+    project, slug = _split_repo(repo)
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "state": row["state"],
+        "author": row["author"],
+        "from": row["from"],
+        "to": row["to"],
+        "created": created,
+        "updated": row["updated"],
+        "reviewers_active": _active_reviewers(value),
+        "url": (
+            f"{base}/projects/{quote(project, safe='')}"
+            f"/repos/{quote(slug, safe='')}/pull-requests/{identifier}"
+        ),
+    }
+
+
 def get_repository_file(
     base_url: str,
     repo: str,
@@ -538,6 +583,35 @@ def get_repository_file(
             params=params,
             token=token,
         )
+
+
+def _read_repository_file_in_session(
+    session: requests.Session,
+    base_url: str,
+    repo: str,
+    path: str,
+    *,
+    token: str,
+    at: str | None = None,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Read one repository file through a caller-owned session.
+
+    Validation, destination and body rules are exactly those of
+    [get_repository_file][atlawire.bitbucket.get_repository_file]; only session
+    ownership differs. The caller keeps one session for a bounded multi-file
+    read, so a per-file scan does not open a new connection pool each time.
+    """
+    params = _revision_params(at)
+    segments = _file_segments(path)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    project, slug = _split_repo(repo)
+    return _read_raw_file_text(
+        session,
+        _raw_file_url(base, project, slug, segments),
+        params=params,
+        token=token,
+    )
 
 
 def get_repository_archive(
@@ -962,6 +1036,9 @@ def get_pull_request_diff(
     This validates declared flags only; it cannot prove that an unflagged
     stream was complete, and unknown metadata is not scanned for truncation.
     Sources and links carried by the object are never fetched.
+
+    Use [get_pull_request_diffs][atlawire.bitbucket.get_pull_request_diffs] when
+    several files are needed in one call.
     """
     _diff_context(context)
     _, url, _ = _pull_request_target(
@@ -972,6 +1049,64 @@ def get_pull_request_diff(
         value = get_json_object(session, target, params=params)
     _validate_diff(value, subject="pull request")
     return value
+
+
+def get_pull_request_diffs(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    paths: Sequence[str],
+    context: int = 3,
+    allow_http_loopback: bool = False,
+) -> list[dict[str, object]]:
+    """Read several per-file pull request diffs in one call.
+
+    One fixed ``/diff/{path}`` GET is sent per entry and the results are
+    returned in request order. Duplicates, an empty sequence, non-string
+    entries and more than [_COMMIT_DIFF_PATH_MAX][atlawire.bitbucket] entries
+    are rejected before any request. One session serves the whole batch; any
+    later failure raises without returning a partial list.
+    """
+    _diff_context(context)
+    _, url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    return _pull_request_diff_paths(url, context, paths, token)
+
+
+def _pull_request_diff_paths(
+    url: str,
+    context: int,
+    paths: Sequence[str],
+    token: str,
+) -> list[dict[str, object]]:
+    """Read one validated per-path diff per entry, in request order."""
+    if not isinstance(paths, Sequence) or isinstance(paths, (str, bytes)):
+        raise AtlaWireError("Expected pull request diff paths as a sequence.")
+    if not paths:
+        raise AtlaWireError("Expected at least one pull request diff path.")
+    if len(paths) > _COMMIT_DIFF_PATH_MAX:
+        raise AtlaWireError(
+            f"At most {_COMMIT_DIFF_PATH_MAX} pull request diff paths are supported."
+        )
+    targets: list[tuple[str, dict[str, str | int]]] = []
+    seen: set[str] = set()
+    for path in paths:
+        if not isinstance(path, str):
+            raise AtlaWireError("Expected pull request diff paths as strings.")
+        if path in seen:
+            raise AtlaWireError("Duplicate pull request diff path.")
+        seen.add(path)
+        targets.append(_pull_request_diff_request(url, context, path, None))
+    results: list[dict[str, object]] = []
+    with bearer_session(token) as session:
+        for target, params in targets:
+            value = get_json_object(session, target, params=params)
+            _validate_diff(value, subject="pull request")
+            results.append(value)
+    return results
 
 
 def get_pull_request_diff_with_fallback(
@@ -3770,6 +3905,39 @@ def _dashboard_repo(value: object) -> str:
     ):
         raise AtlaWireError(invalid)
     return f"{key}/{slug}"
+
+
+def _active_reviewers(value: dict[str, object]) -> list[str]:
+    """Collect known reviewer names whose ``user.active`` is not literally false.
+
+    A missing or null ``active`` says nothing, so that person counts as active;
+    only an explicit ``false`` excludes a name. Names are deduplicated and
+    sorted for a stable report.
+    """
+    invalid = "Invalid reviewers in a Bitbucket pull request."
+    names: set[str] = set()
+    reviewers = value.get("reviewers")
+    if reviewers is None:
+        return []
+    if not isinstance(reviewers, list):
+        raise AtlaWireError(invalid)
+    for person in reviewers:
+        if not isinstance(person, dict):
+            raise AtlaWireError(invalid)
+        user = person.get("user")
+        if user is None:
+            continue
+        if not isinstance(user, dict):
+            raise AtlaWireError(invalid)
+        active = user.get("active")
+        if active is not None and not isinstance(active, bool):
+            raise AtlaWireError(invalid)
+        name = user.get("name")
+        if name is not None and not isinstance(name, str):
+            raise AtlaWireError(invalid)
+        if active is not False and name:
+            names.add(_require_encodable(name, "reviewer name"))
+    return sorted(names)
 
 
 def _inactive_reviewers(value: dict[str, object]) -> list[str]:

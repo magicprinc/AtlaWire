@@ -7,7 +7,7 @@ from atlawire import repo_grep
 
 def _scan(monkeypatch, names, matches, limit):
     monkeypatch.setattr(
-        repo_grep, "get_repository_file", lambda *args, **kwargs: "a\nb\n"
+        repo_grep, "_read_repository_file_in_session", lambda *args, **kwargs: "a\nb\n"
     )
 
     def fake_match(text, pattern, *, ignore_case, limit, timeout_s, line_count=None):

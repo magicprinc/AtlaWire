@@ -13,6 +13,7 @@ from atlawire.http import (
     get_json_object,
     normalize_base_url,
 )
+from atlawire.issue_markdown import render_issue_markdown
 
 _ISSUE_KEY = r"[A-Z][A-Z0-9_]*-[0-9]+"
 _SEARCH_FIELDS = "summary,status,priority,issuetype,assignee,updated"
@@ -239,6 +240,44 @@ def get_issue(
     ):
         raise AtlaWireError("Expected a Jira issue with a key and fields.")
     return issue
+
+
+def issue_url(base_url: str, key_or_url: str) -> str:
+    """Return the browser URL of one Jira issue without making a request.
+
+    ``base_url`` is normalized with the shared rules, so a deployment context
+    path such as ``/jira`` is preserved. ``key_or_url`` accepts a bare key or a
+    browse/API URL; only its key is used, and the destination always comes from
+    the supplied base URL, never from the argument.
+    """
+    key = _issue_key(key_or_url)
+    base = normalize_base_url(base_url, allow_http_loopback=False)
+    return f"{base}/browse/{key}"
+
+
+def get_issue_markdown(
+    base_url: str,
+    key_or_url: str,
+    *,
+    token: str,
+    use_wiki: bool = False,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Fetch one issue and render it as Markdown in a single call.
+
+    Reads the issue through [get_issue][atlawire.jira.get_issue] with rendered
+    fields and renders it with
+    [render_issue_markdown][atlawire.issue_markdown.render_issue_markdown].
+    ``use_wiki=True`` renders the raw wiki markup instead. No second request is
+    made and nothing is fetched.
+    """
+    issue = get_issue(
+        base_url,
+        key_or_url,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    return render_issue_markdown(issue, use_wiki=use_wiki)
 
 
 def get_issue_worklogs(

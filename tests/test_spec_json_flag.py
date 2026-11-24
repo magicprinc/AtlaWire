@@ -7,7 +7,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from click.testing import CliRunner
 
-from atlawire.catalog import build_command_catalog
 from atlawire.cli import _JSON_FLAG_EXCEPTIONS, cli
 
 TOKEN = "synthetic-json-flag-token"
@@ -23,7 +22,9 @@ def test_every_visible_command_takes_json_except_the_documented_exception():
     for name, body in _catalog().items():
         if body.get("hidden") is True:
             continue
-        opts = {opt for param in body.get("params", []) for opt in param.get("opts", [])}
+        opts = {
+            opt for param in body.get("params", []) for opt in param.get("opts", [])
+        }
         if "--json" not in opts and name not in _JSON_FLAG_EXCEPTIONS:
             missing.append(name)
 
@@ -145,13 +146,13 @@ def test_json_is_a_no_op_on_an_already_json_command():
 def test_json_selects_json_where_tsv_is_the_default(server):
     httpd, base = server
     httpd.content_type = "application/json"
-    httpd.body = json.dumps(
-        {"values": [{"key": "A"}], "isLastPage": True}
-    ).encode()
+    httpd.body = json.dumps({"values": [{"key": "A"}], "isLastPage": True}).encode()
 
     with_flag = _invoke(base, ["projects", "--json"])
     without = _invoke(base, ["projects"])
 
-    assert with_flag.exit_code == without.exit_code == 0, with_flag.stderr + without.stderr
+    assert with_flag.exit_code == without.exit_code == 0, (
+        with_flag.stderr + without.stderr
+    )
     assert json.loads(with_flag.stdout)[0]["key"] == "A"
     assert without.stdout.startswith("# ") and "key\tname" in without.stdout

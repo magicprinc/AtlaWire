@@ -28,7 +28,9 @@ def test_a_plain_link_keeps_its_destination_as_inert_text():
 
 def test_a_link_whose_label_is_the_url_is_not_duplicated():
     markdown = render_issue_markdown(
-        _issue('<p><a href="https://example.invalid/a">https://example.invalid/a</a></p>')
+        _issue(
+            '<p><a href="https://example.invalid/a">https://example.invalid/a</a></p>'
+        )
     )
 
     assert markdown.count("https://example.invalid/a") == 1
@@ -58,7 +60,9 @@ def test_a_confluence_link_keeps_its_destination():
     page = {
         "id": "1",
         "title": "T",
-        "body": {"storage": {"value": '<p><a href="https://example.invalid/x">label</a></p>'}},
+        "body": {
+            "storage": {"value": '<p><a href="https://example.invalid/x">label</a></p>'}
+        },
     }
 
     markdown = render_page_markdown(page)
@@ -83,8 +87,6 @@ def test_collapse_blank_lines_preserves_fenced_content():
 
 
 def test_issue_markdown_has_no_long_blank_runs():
-    markdown = render_issue_markdown(
-        _issue("<p>one</p>" * 1 + "<p>two</p>")
-    )
+    markdown = render_issue_markdown(_issue("<p>one</p>" * 1 + "<p>two</p>"))
 
     assert "\n\n\n" not in markdown

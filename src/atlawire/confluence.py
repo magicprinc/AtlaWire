@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 import requests
 
+from atlawire.confluence_markdown import render_page_markdown
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
@@ -357,6 +358,80 @@ def _validated_page(
     if not isinstance(storage, dict) or not isinstance(storage.get("value"), str):
         raise AtlaWireError(_INVALID_PAGE)
     return page
+
+
+def get_page_storage(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return one page's raw storage-format XHTML in a single call.
+
+    Reads the page through [get_page][atlawire.confluence.get_page] and returns
+    the validated ``body.storage.value`` unchanged, so the original markup is
+    available without a second request or a CLI flag.
+    """
+    page = get_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    body = page.get("body")
+    storage = body.get("storage") if isinstance(body, dict) else None
+    value = storage.get("value") if isinstance(storage, dict) else None
+    if not isinstance(value, str):
+        raise AtlaWireError("Expected a Confluence page storage body.")
+    return value
+
+
+def get_page_title(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return one page's title in a single call.
+
+    Reads the page through [get_page][atlawire.confluence.get_page]; the title
+    is already validated as text there.
+    """
+    page = get_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    title = page.get("title")
+    if not isinstance(title, str):
+        raise AtlaWireError("Expected a Confluence page title.")
+    return title
+
+
+def get_page_markdown(
+    base_url: str,
+    page_id_or_url: str | int,
+    *,
+    token: str,
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return one page rendered as Markdown in a single call.
+
+    Reads the page through [get_page][atlawire.confluence.get_page] and renders
+    the already-validated storage body with
+    [render_page_markdown][atlawire.confluence_markdown.render_page_markdown].
+    No second request is made and nothing is fetched.
+    """
+    page = get_page(
+        base_url,
+        page_id_or_url,
+        token=token,
+        allow_http_loopback=allow_http_loopback,
+    )
+    return render_page_markdown(page)
 
 
 def get_page_history(
