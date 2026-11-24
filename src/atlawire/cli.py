@@ -205,6 +205,7 @@ from atlawire.repo_grep import (
     grep_repository,
 )
 from atlawire.repo_scan import scan_repository_extensions_report
+from atlawire.repo_search import Engine, Fetch, search_repositories
 from atlawire.sdk import SdkRequestError, get_json, request_json
 
 _TSV_CONTROLS = re.compile(
@@ -1583,6 +1584,114 @@ def grep_repo_command(
             ignore_case=not case_sensitive,
             limit=limit,
             timeout_s=timeout,
+            regex_timeout_s=regex_timeout,
+            max_pages=max_pages,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(json.dumps(result))
+
+
+@cli.command("repo-search")
+@click.argument("query")
+@click.option("--project", default=None, help="Bitbucket project key to scope.")
+@click.option(
+    "--repo-glob", default=None, help="Case-sensitive PROJECT/slug glob filter."
+)
+@click.option("--path-glob", default=None, help="Case-sensitive file path glob filter.")
+@click.option(
+    "--engine",
+    type=click.Choice(["auto", "index", "bytes"]),
+    default="auto",
+    show_default=True,
+    help="index: fast plugin search; bytes: deep regex; auto: pick by query.",
+)
+@click.option(
+    "--fetch",
+    "fetch_mode",
+    type=click.Choice(["files", "archive"]),
+    default="files",
+    show_default=True,
+    help="bytes engine only: per-file reads or one zip per repository.",
+)
+@click.option("--limit", type=click.IntRange(1, 1000), default=200, show_default=True)
+@click.option("--max-repos", type=click.IntRange(1, 100), default=25, show_default=True)
+@click.option(
+    "--max-files", type=click.IntRange(1, 100000), default=5000, show_default=True
+)
+@click.option(
+    "--max-bytes",
+    type=click.IntRange(1, 1024 * 1024 * 1024),
+    default=256 * 1024 * 1024,
+    show_default=True,
+)
+@click.option("--workers", type=click.IntRange(1, 8), default=1, show_default=True)
+@click.option("--timeout", "timeout_s", type=float, default=120.0, show_default=True)
+@click.option("--regex-timeout", "regex_timeout", type=float, default=5.0)
+@click.option(
+    "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
+)
+@click.option(
+    "--case-sensitive", is_flag=True, help="Match the regex case-sensitively."
+)
+@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def repo_search_command(
+    query: str,
+    project: str | None,
+    repo_glob: str | None,
+    path_glob: str | None,
+    engine: str,
+    fetch_mode: str,
+    limit: int,
+    max_repos: int,
+    max_files: int,
+    max_bytes: int,
+    workers: int,
+    timeout_s: float,
+    regex_timeout: float,
+    max_pages: int,
+    case_sensitive: bool,
+    base_url: str | None,
+    token_from_env: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Search many Bitbucket repositories in one read-only call as JSON.
+
+    ``--engine index`` is one fast plugin search (exact terms, default branch).
+    ``--engine bytes`` reads each default branch of the bounded repository set
+    and evaluates a Python regex; ``--fetch archive`` replaces per-file reads
+    with one zip per repository. ``--engine auto`` uses index only when the
+    query has no regex metacharacters and no glob filter is given.
+
+    ``--max-repos``, ``--max-files``, ``--max-bytes`` and ``--timeout`` bound
+    the work. A capped result carries ``status``/``truncated``/``complete``; a
+    listing, read, archive or regex failure aborts with no stdout.
+    """
+    base_url, token = _product_base_url_and_token(
+        "bitbucket", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        result = search_repositories(
+            base_url,
+            query,
+            token=token,
+            project=project,
+            repo_glob=repo_glob,
+            path_glob=path_glob,
+            engine=cast(Engine, engine),
+            fetch=cast(Fetch, fetch_mode),
+            limit=limit,
+            max_repos=max_repos,
+            max_files=max_files,
+            max_bytes=max_bytes,
+            workers=workers,
+            ignore_case=not case_sensitive,
+            timeout_s=timeout_s,
             regex_timeout_s=regex_timeout,
             max_pages=max_pages,
             allow_http_loopback=allow_http_loopback,
@@ -5599,7 +5708,7 @@ def page_version(
     "--json",
     "as_json",
     is_flag=True,
-    help="Print {\"url\": ...} instead of the bare URL.",
+    help='Print {"url": ...} instead of the bare URL.',
 )
 @click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")

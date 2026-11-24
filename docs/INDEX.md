@@ -38,7 +38,7 @@ C:/Python315/python.exe -P -B -m atlawire --help
 
 ## Из чего состоит CLI
 
-88 видимых команд (проверено `atlawire --catalog`). Команды плоские — `atlawire issue`,
+89 видимых команд (проверено `atlawire --catalog`). Команды плоские — `atlawire issue`,
 `atlawire pr`, `atlawire page`, без группировки по продуктам. Группы по смыслу:
 
 | Группа | Команды | Что дают |
@@ -63,7 +63,7 @@ C:/Python315/python.exe -P -B -m atlawire --help
 
 | что | команда | что вернёт |
 |---|---|---|
-| все команды и их параметры | `atlawire --catalog` | один JSON: 88 команд, типы/дефолты/envvars и 3 канонические операции |
+| все команды и их параметры | `atlawire --catalog` | один JSON: 89 команд, типы/дефолты/envvars и 3 канонические операции |
 | все зарегистрированные операции | `atlawire operations` | JSON-массив 202 записей (192 из `manifest.json` + 51 встроенная, после дедупликации по маршруту) |
 | одна операция | `atlawire --describe <id>` | описание, `command` и готовый `example.argv` |
 | выполнить операцию | `atlawire read <id> --params '{"k":"v"}'` | JSON-конверт `{"ok": true, "product": ..., "data": ...}` |

@@ -14,7 +14,7 @@ not replace opening the underlying issue, page, or file as evidence.
 
 ## Status and verified scope
 
-- 88 visible read-only commands (`atlawire --catalog`) and 202 registered read
+- 89 visible read-only commands (`atlawire --catalog`) and 202 registered read
   operations (`atlawire operations`) are advertised. Only `jira.project.get`,
   `confluence.space.get` and `bitbucket.repository.get` are in the canonical
   `--catalog` operations list; the rest are reachable through `read <id>` and the

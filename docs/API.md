@@ -718,9 +718,20 @@ JQL-поиск для коротких строк фиксирует
   `complete=False`, `repositories_scanned`, `repositories_total`, `reason`.
 * `repo_grep.grep_repository(base_url, repo, pattern=None, *, token, at=None, glob=None,
   path=None, ignore_case=True, limit=200, timeout_s=120.0, regex_timeout_s=5.0, max_pages=100,
-  allow_http_loopback=False) -> GrepResult` (`repo_grep.py:186`) — regex или листинг путей
+  allow_http_loopback=False) -> GrepResult` (`repo_grep.py:149`) — regex или листинг путей
   одного закреплённого коммита; `GrepResult` содержит `hits`, `truncated`, `complete`,
   `status` (`complete`/`truncated`/`timeout`), `message`.
+* `repo_search.search_repositories(base_url, query, *, token, project=None, repo_glob=None,
+  path_glob=None, engine="auto", fetch="files", limit=200, max_repos=25, max_files=5000,
+  max_bytes=268435456, workers=1, ignore_case=True, timeout_s=120.0, regex_timeout_s=5.0,
+  max_pages=100, allow_http_loopback=False) -> RepoSearchResult` (`repo_search.py:130`) —
+  поиск по многим репозиториям: `engine="index"` — один вызов плагина, `engine="bytes"` —
+  regex по default-веткам (до `max_repos` репозиториев), `engine="auto"` выбирает index для
+  литерала без regex-метасимволов и без glob-фильтров; `fetch="archive"` — один zip на
+  репозиторий с отказом от небезопасных имён и лимитами. Результат:
+  `{rows, engine, fetch, status, truncated, complete, files_scanned, files_eligible,
+  repositories_scanned, repositories_total, budget, limitations}`; строки —
+  `{repo, path, line, text, text_truncated}`.
 * `identity.whoami(*, confluence, jira, bitbucket, allow_http_loopback=False) ->
   dict[str, IdentityCheck]` (`identity.py:93`) — по записи на продукт; Confluence требует
   известную личность, Bitbucket подтверждает только authenticated dashboard.
