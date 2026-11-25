@@ -82,7 +82,8 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _DIFF_CONTEXT_MAX = 100
 _DIFF_REVIEW_HEADER = (
     "# Bitbucket {subject} diff review "
-    "(context={context}; whitespace=ignore-all; not a patch)"
+    "(context={context}; whitespace={whitespace}; "
+    "server-declared truncation: none; not a patch)"
 )
 _DIFF_SUBJECT_PULL_REQUEST = "PR"
 _DIFF_SUBJECT_COMMIT = "commit"
@@ -212,9 +213,16 @@ class Commit(TypedDict):
     точностью до минуты (``YYYY-MM-DD HH:MM``), ``timestamp`` — исходный
     ``authorTimestamp`` в миллисекундах epoch без округления; отсутствующее
     поле даёт ``None`` в обоих.
+
+    ``id`` — полный идентификатор коммита из документированной схемы
+    ``/commits``; ``short_id`` — присланный сервером ``displayId`` для показа
+    человеку, без обрезки строки на стороне вызывающего. Поле ``hash`` не
+    используется: одно значение под двумя именами заставляет угадывать, какое
+    читать.
     """
 
-    hash: str
+    id: str
+    short_id: str | None
     date: str | None
     timestamp: int | None
     author: str | None
@@ -1235,6 +1243,40 @@ def get_pull_request_diff_with_fallback(
     )
 
 
+def get_pull_request_diffs_text(
+    base_url: str,
+    repo: str,
+    pr_id: str | int,
+    *,
+    token: str,
+    paths: Sequence[str],
+    context: int = 3,
+    whitespace: str = "ignore-all",
+    allow_http_loopback: bool = False,
+) -> str:
+    """Return one review view over several per-file pull request diffs.
+
+    This is the batch text form of
+    [get_pull_request_diffs][atlawire.bitbucket.get_pull_request_diffs]: one
+    ``/diff/{path}`` request per entry, rendered under a single header in input
+    order, so a caller pays one call instead of one call per file. Duplicates,
+    an empty sequence, non-string entries and more than 100 paths are rejected
+    before any request; a later failure raises without returning partial text.
+    ``whitespace`` and ``context`` are the same validated values as the single
+    file readers.
+    """
+    _diff_context(context)
+    _, url, _ = _pull_request_target(
+        base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
+    )
+    values = _pull_request_diff_paths(url, context, paths, token, whitespace=whitespace)
+    text = _render_pull_request_diffs_text(
+        values, context=context, whitespace=whitespace
+    )
+    reject_credential_echo(text, tokens=(token,))
+    return text
+
+
 def get_pull_request_diff_text(
     base_url: str,
     repo: str,
@@ -1274,7 +1316,7 @@ def get_pull_request_diff_text(
         whitespace=whitespace,
         allow_http_loopback=allow_http_loopback,
     )
-    text = _render_pull_request_diff_text(value, context=context)
+    text = _render_pull_request_diff_text(value, context=context, whitespace=whitespace)
     reject_credential_echo(text, tokens=(token,))
     return text
 
@@ -1953,7 +1995,12 @@ def get_commit_diff_text(
         allow_http_loopback=allow_http_loopback,
     )
     values = [value] if isinstance(value, dict) else value
-    text = _render_diff_text(values, context=context, subject=_DIFF_SUBJECT_COMMIT)
+    text = _render_diff_text(
+        values,
+        context=context,
+        subject=_DIFF_SUBJECT_COMMIT,
+        whitespace=whitespace,
+    )
     reject_credential_echo(text, tokens=(token,))
     return text
 
@@ -3319,7 +3366,11 @@ def _commit_changes_page(page: dict[str, object]) -> dict[str, object]:
 
 
 def _render_diff_text(
-    values: Sequence[dict[str, object]], *, context: int, subject: str
+    values: Sequence[dict[str, object]],
+    *,
+    context: int,
+    subject: str,
+    whitespace: str = "ignore-all",
 ) -> str:
     """Build the full review view without I/O or partial output.
 
@@ -3329,7 +3380,10 @@ def _render_diff_text(
     Each response without file diffs gets an explicit marker rather than a claim
     that nothing changed.
     """
-    lines = [_DIFF_REVIEW_HEADER.format(subject=subject, context=context), ""]
+    header = _DIFF_REVIEW_HEADER.format(
+        subject=subject, context=context, whitespace=whitespace
+    )
+    lines = [header, ""]
     for value in values:
         diffs = value.get("diffs")
         if not isinstance(diffs, list):
@@ -3342,10 +3396,27 @@ def _render_diff_text(
     return "\n".join(lines) + "\n"
 
 
-def _render_pull_request_diff_text(value: dict[str, object], *, context: int) -> str:
+def _render_pull_request_diff_text(
+    value: dict[str, object], *, context: int, whitespace: str = "ignore-all"
+) -> str:
     """Render one pull request diff review under the PR label."""
     return _render_diff_text(
-        [value], context=context, subject=_DIFF_SUBJECT_PULL_REQUEST
+        [value],
+        context=context,
+        subject=_DIFF_SUBJECT_PULL_REQUEST,
+        whitespace=whitespace,
+    )
+
+
+def _render_pull_request_diffs_text(
+    values: Sequence[dict[str, object]], *, context: int, whitespace: str
+) -> str:
+    """Render an ordered batch of per-file pull request diffs under one header."""
+    return _render_diff_text(
+        list(values),
+        context=context,
+        subject=_DIFF_SUBJECT_PULL_REQUEST,
+        whitespace=whitespace,
     )
 
 
@@ -4120,8 +4191,12 @@ def _commit(value: object) -> Commit:
     moment = _utc_timestamp(
         timestamp, error="Invalid author timestamp in a Bitbucket commit."
     )
+    short = value.get("displayId")
+    if short is not None and (not isinstance(short, str) or not short):
+        raise AtlaWireError("Invalid fields in a Bitbucket commit.")
     return Commit(
-        hash=_require_encodable(identifier, "commit hash"),
+        id=_require_encodable(identifier, "commit id"),
+        short_id=_optional_encodable(short, "commit short id"),
         date=_commit_date(moment),
         timestamp=timestamp,
         author=_optional_encodable(author, "commit author"),

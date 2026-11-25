@@ -65,6 +65,13 @@ class AtlaWireError(Exception):
       failure could not be classified without guessing.
     * ``http_status`` -- the real status of an arrived response; never inferred.
     * ``method`` / ``path`` -- the failed request when known.
+    * ``detail`` -- the documented reason a rejected request gave, for example
+      ``limit: "abc" is not a valid value for "limit"``. It is filled only from
+      the documented error fields of a client-error response (see
+      [error_detail][atlawire.http]), is bounded and escaped, and never contains
+      the credential. It is deliberately **not** part of ``str(error)``: the
+      message stays generic so logging and tracebacks cannot publish response
+      content, and a caller that wants the reason reads ``error.detail``.
 
     Every attribute defaults to ``None`` so a plain ``AtlaWireError(message)``
     stays a normal exception and existing raise sites keep working unchanged.
@@ -76,6 +83,7 @@ class AtlaWireError(Exception):
     http_status: int | None
     method: str | None
     path: str | None
+    detail: str | None
 
     def __init__(
         self,
@@ -87,6 +95,7 @@ class AtlaWireError(Exception):
         http_status: int | None = None,
         method: str | None = None,
         path: str | None = None,
+        detail: str | None = None,
     ) -> None:
         super().__init__(message)
         self.product = product
@@ -95,6 +104,7 @@ class AtlaWireError(Exception):
         self.http_status = http_status
         self.method = method
         self.path = path
+        self.detail = detail
 
 
 class _PolicySession(requests.Session):
@@ -261,8 +271,122 @@ def _finite_float(value: str) -> float:
     return number
 
 
+# A rejected request usually carries the reason in documented Atlassian fields.
+# Only 400 is listed: it is the status the three products actually returned for a
+# malformed query, JQL or limit on the live read-only run. Other 4xx statuses are
+# left generic until one is observed, so the message never guesses why.
+_ERROR_DETAIL_STATUSES = frozenset({400})
+_ERROR_BODY_LIMIT = 8 * 1024
+_ERROR_TEXT_LIMIT = 400
+_ERROR_UNSAFE = re.compile(
+    "[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ud800-\udfff]"
+)
+
+
+def _error_messages(document: Mapping[str, object]) -> list[str]:
+    """Collect the documented error strings from one Atlassian error document.
+
+    The three products publish different shapes for the same idea, so all three
+    are read instead of guessing by product:
+
+    * Jira: ``{"errorMessages": ["..."], "errors": {"field": "..."}}``.
+    * Bitbucket: ``{"errors": [{"context": "field", "message": "..."}]}``.
+    * Confluence: a top-level ``message`` and ``reason``.
+
+    Anything else contributes nothing; the raw body is never used as a message.
+    """
+    messages: list[str] = []
+    listed = document.get("errorMessages")
+    if isinstance(listed, list):
+        messages.extend(item for item in listed if isinstance(item, str))
+    errors = document.get("errors")
+    if isinstance(errors, dict):
+        messages.extend(
+            f"{name}: {message}"
+            for name, message in errors.items()
+            if isinstance(name, str) and isinstance(message, str)
+        )
+    elif isinstance(errors, list):
+        for entry in errors:
+            if not isinstance(entry, dict):
+                continue
+            message = entry.get("message")
+            if not isinstance(message, str):
+                continue
+            context = entry.get("context")
+            if isinstance(context, str) and context:
+                messages.append(f"{context}: {message}")
+            else:
+                messages.append(message)
+    for name in ("message", "reason"):
+        value = document.get(name)
+        if isinstance(value, str):
+            messages.append(value)
+    # A server may repeat the same sentence in several fields; one copy is
+    # enough, and the documented order is preserved.
+    return list(dict.fromkeys(messages))
+
+
+def error_detail(raw: bytes | str, *, tokens: Iterable[str] = ()) -> str:
+    """Return the documented reason from one error body, or ``""``.
+
+    Shared by the streaming transport and the adapter layer so a caller sees the
+    same sentence whichever entry point failed. Only the documented error fields
+    are read (see [_error_messages][atlawire.http]); the raw body is never echoed,
+    because it can carry unrelated data. The result is bounded, control and bidi
+    characters are escaped, and a sentence that discloses one of the supplied
+    credentials is dropped whole rather than partially shown.
+    """
+    if isinstance(raw, bytes):
+        if len(raw) > _ERROR_BODY_LIMIT:
+            raw = raw[:_ERROR_BODY_LIMIT]
+        try:
+            text = raw.decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001 - a diagnostic must never raise
+            return ""
+    else:
+        text = raw[:_ERROR_BODY_LIMIT]
+    try:
+        document = json.loads(text)
+    except ValueError, RecursionError:
+        return ""
+    if not isinstance(document, dict):
+        return ""
+    detail = _ERROR_UNSAFE.sub(" ", " ".join(_error_messages(document)))
+    detail = " ".join(detail.split())
+    if not detail:
+        return ""
+    needles: list[str] = []
+    for token in tokens:
+        if isinstance(token, str) and token:
+            needles.extend(_echo_needles(token))
+    if any(needle in detail for needle in needles):
+        return ""
+    return detail[:_ERROR_TEXT_LIMIT]
+
+
+def _server_detail(response: requests.Response, session: object) -> str:
+    """Read one bounded error body and return its redacted reason, or ``""``."""
+    if getattr(response, "status_code", None) not in _ERROR_DETAIL_STATUSES:
+        return ""
+    try:
+        raw = b""
+        for chunk in response.iter_content(1024):
+            raw += chunk
+            if len(raw) >= _ERROR_BODY_LIMIT:
+                break
+    except Exception:  # noqa: BLE001 - a diagnostic must never mask the error
+        return ""
+    token = _bearer_token(session)
+    return error_detail(raw, tokens=(token,) if token is not None else ())
+
+
 def _check_status(
-    status: int, *, method: str | None = None, product: str | None = None
+    status: int,
+    *,
+    method: str | None = None,
+    product: str | None = None,
+    detail: str = "",
 ) -> None:
     """Apply the shared read-only status policy without echoing the request.
 
@@ -308,6 +432,7 @@ def _check_status(
             http_status=status,
             method=method,
             product=product,
+            detail=detail or None,
         )
 
 
@@ -502,6 +627,7 @@ def _get_json(
                 response.status_code,
                 method="GET",
                 product=_session_product(session),
+                detail=_server_detail(response, session),
             )
             if allow_no_content and response.status_code == 204:
                 return _NO_CONTENT
@@ -587,6 +713,7 @@ def post_json_object(
                 response.status_code,
                 method="POST",
                 product=_session_product(session),
+                detail=_server_detail(response, session),
             )
             data = _read_limited(
                 response, limit=_JSON_LIMIT, message=_JSON_LIMIT_MESSAGE
@@ -680,6 +807,7 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
                 response.status_code,
                 method="GET",
                 product=_session_product(session),
+                detail=_server_detail(response, session),
             )
             _check_text_type(response.headers.get("Content-Type"))
             payload = read_encoded_limited(

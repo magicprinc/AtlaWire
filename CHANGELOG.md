@@ -10,6 +10,57 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.2] - 2026-11-25
+
+### Added
+
+- `get_pull_request_diffs_text`: a batch form of the PR diff review view. One
+  call, one header, every requested file in argument order, one session. The
+  library also keeps `get_pull_request_diffs` for the ordered JSON batch.
+- `atlawire pr <repo> <id> diff a.py b.py` now reads several files in one call:
+  two or more PATH values print an ordered JSON array with `--json`, or one
+  review view. No PATH and exactly one PATH keep the previous one-object shape,
+  because the single-file form is the only one that accepts `--source-path` for
+  a renamed file.
+
+### Changed
+
+- **Rejected requests now carry the server's documented reason** in a new
+  `AtlaWireError.detail` attribute, for example `limit: "abc" is not a valid
+  value for "limit"; the value should be numeric`. `str(error)` stays generic
+  (`HTTP 400: request failed.`) so log records and tracebacks still never publish
+  response content; the CLI prints `detail` on a second line, where it is
+  useful. All three documented shapes are parsed: Jira `errorMessages` and
+  `errors` object, Bitbucket `errors` array with `context`, and Confluence
+  top-level `message`/`reason`. Only those fields are read, never the raw body;
+  the text is bounded to 400 characters, control and bidi characters are
+  escaped, repeated sentences are reported once, and a sentence that would
+  disclose the bearer token is dropped whole. The typed transport and the
+  adapter layer (`api-get`, `api-request`) share one parser, so `detail` matches
+  whichever entry point failed. `detail` is filled only for HTTP 400, the status
+  the products actually returned for a malformed request in the live run.
+- **Breaking:** `Commit` and `PrReviewCommit` rows expose `id` (the full commit
+  identifier from the documented schema) and optionally `short_id` (the server's
+  `displayId`) instead of the invented `hash`. The `commits` and `pr commits`
+  TSV views print `id` first. The library keeps vendor names for `displayName`
+  because that field is the author's label; the short commit form is named
+  `short_id` because it is a git concept, and `id` + `short_id` is the pair git
+  libraries use.
+
+### Fixed
+
+- The diff review header claimed `whitespace=ignore-all` even when the caller
+  passed `ignore-none`; it now states the mode actually used, plus the
+  truncation fact (`declared-truncation=none`). A declared truncation still
+  raises `DeclaredTruncationError`, which is why the view is complete by
+  contract; an undeclared server cap remains undetectable and is documented.
+
+### Documentation
+
+- `AGENT-SKILL.md` documents the batch diff, the Confluence page comment and
+  history commands, the new error messages, and why repository `grep` is linear
+  in repository size while index search is not.
+
 ## [0.9.1] - 2026-11-25
 
 ### Added

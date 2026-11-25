@@ -223,15 +223,13 @@ def test_list_commits_metadata_reports_incomplete_limited_listing(server):
     assert len(result["commits"]) == 3
     assert result["limit"] == 3
     assert result["complete"] is False
-    assert [row["hash"] for row in result["commits"]] == [
-        f"{i:040x}" for i in (0, 1, 3)
-    ]
+    assert [row["id"] for row in result["commits"]] == [f"{i:040x}" for i in (0, 1, 3)]
     # Текущая форма вызова остаётся прежней: список коммитов без метаданных.
     httpd.routes[ROOT + "/commits"] = commits_route([(0, (0, 1), 3), (3, (3, 4), 0)])
     rows = bitbucket.list_commits(
         base, "PROJ/repo", token=TOKEN, limit=3, allow_http_loopback=True
     )
-    assert [row["hash"] for row in rows] == [f"{i:040x}" for i in (0, 1, 3)]
+    assert [row["id"] for row in rows] == [f"{i:040x}" for i in (0, 1, 3)]
     assert_no_leak(httpd)
 
 
@@ -244,7 +242,7 @@ def test_list_commits_metadata_walks_server_cursor_to_the_end(server):
     result = bitbucket.list_commits_with_metadata(
         base, "PROJ/repo", token=TOKEN, limit=10, allow_http_loopback=True
     )
-    assert [row["hash"] for row in result["commits"]] == [
+    assert [row["id"] for row in result["commits"]] == [
         f"{i:040x}" for i in (0, 1, 3, 4)
     ]
     assert result["complete"] is True

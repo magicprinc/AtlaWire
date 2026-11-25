@@ -177,14 +177,15 @@ def main(argv: list[str]) -> int:
         rows = bitbucket.list_commits(bb[0], repo_key, token=bb[1], limit=5)
         assert rows, "no commit listed"
         first = rows[0]
-        detail = bitbucket.get_commit(bb[0], repo_key, first["hash"], token=bb[1])
-        assert detail["id"] == first["hash"], "commit hash mismatch"
+        detail = bitbucket.get_commit(bb[0], repo_key, first["id"], token=bb[1])
+        assert detail["id"] == first["id"], "commit id mismatch"
+        assert first.get("short_id"), "commit row carries no short id"
         return f"{len(rows)} commit(s)"
 
     def bb_changes() -> str | None:
         commits = bitbucket.list_commits(bb[0], repo_key, token=bb[1], limit=1)
         rows = bitbucket.list_commit_changes(
-            bb[0], repo_key, commits[0]["hash"], token=bb[1]
+            bb[0], repo_key, commits[0]["id"], token=bb[1]
         )
         return f"{len(rows)} change(s)"
 

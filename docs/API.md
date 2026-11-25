@@ -160,6 +160,12 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   детектируется.
 
 **`get_pull_request_diffs(base_url, repo, pr_id, *, token, paths, context=3, whitespace="ignore-all", allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1072`
+- REST: один `GET .../pull-requests/{id}/diff/{path}` на каждый файл, один session на батч.
+- → список в порядке запроса; дубликаты, пустой список, не-строки и >100 путей —
+  ошибка до запроса, поздний сбой не отдаёт частичный список.
+
+**`get_pull_request_diffs_text(...) -> str`** — та же выборка, но один общий заголовок и все
+файлы в порядке `paths`: «один вызов» для CLI `pr <repo> <id> diff p1 p2`.
 - REST: один `GET .../pull-requests/{id}/diff/{path}` на каждый файл, один session на батч;
   `whitespace` действует на все запросы батча.
 - → список в порядке запроса. Дубликаты, пустой список, не-строки и >100 путей —
@@ -193,7 +199,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 
 **`list_pull_request_commits(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1316`
 - REST: `GET .../pull-requests/{id}/commits`; query `start=0`, `limit=100`.
-- → `Commit` (`hash`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
+- → `Commit` (`id` — полный идентификатор коммита, `short_id` — присланный сервером `displayId`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
   `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
   пустой строкой), `displayName` — `author.displayName` (на 5.10 всегда `None`: сервер
   документирует для автора только `name` и `emailAddress`), `message`).
@@ -248,7 +254,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - REST: `GET .../commits`; query `until` (из `at`), `path` (если непустой), `start`, `limit`;
   `author` фильтруется на стороне клиента по точному git-имени (серверный фильтр 5.10 не
   документирован), поэтому читаются страницы до `limit` совпадений.
-- → `Commit` (`hash`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
+- → `Commit` (`id` — полный идентификатор коммита, `short_id` — присланный сервером `displayId`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
   `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
   пустой строкой), `displayName` — `author.displayName` (на 5.10 всегда `None`: сервер
   документирует для автора только `name` и `emailAddress`), `message` — сырое сообщение).
@@ -642,6 +648,32 @@ JQL-поиск для коротких строк фиксирует
 **`get_issue_link(base_url, link_id, *, token, allow_http_loopback=False) -> IssueLinkRow`** — `jira.py:2133`
 - REST: `GET /rest/api/2/issueLink/{linkId}`.
 - → `IssueLinkRow` (`id`, `type`, `inwardIssue`, `outwardIssue` — ключи задач, не объекты).
+
+## Ошибки HTTP
+
+`AtlaWireError.message` для отклонённого запроса содержит причину, которую прислал сервер,
+если она описывает входные данные вызывающего. Разбираются только документированные поля:
+
+| Продукт | Схема ответа | Что берётся |
+|---|---|---|
+| Jira | `{"errorMessages": ["..."], "errors": {"поле": "..."}}` | оба поля |
+| Bitbucket | `{"errors": [{"context": "поле", "message": "..."}]}` | `message`, с префиксом `context` |
+| Confluence | `{"message": "...", "reason": "..."}` | оба поля |
+
+Пример: `HTTP 400: limit: "abc" is not a valid value for "limit"; the value should be numeric`.
+
+Причина не входит в `str(error)`: сообщение остаётся общим (`HTTP 400: request failed.`),
+чтобы логи и трейсбеки не публиковали содержимое ответа, а причина лежит в `error.detail`.
+CLI печатает её второй строкой, потому что терминал — то место, где она нужна.
+
+Ограничения и защита: `detail` заполняется только для `400` — именно этот статус три продукта
+реально вернули на кривые query/JQL/limit в живом read-only прогоне; остальные 4xx остаются
+общими, пока не наблюдены, чтобы сообщение не догадывалось о причине. Текст ≤ 400 символов,
+управляющие и bidi-символы экранируются, повторы схлопываются, читаются только
+документированные поля, а фраза, раскрывающая bearer-токен, отбрасывается целиком.
+Типизированный транспорт и слой адаптера (`api-get`/`api-request`) используют один разбор,
+поэтому `detail` совпадает независимо от точки входа. У слоя адаптера исходное тело также
+доступно программно в `SdkRequestError.body`.
 
 ## Диспетчер операций (`src/atlawire/operations.py`)
 

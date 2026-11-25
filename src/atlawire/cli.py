@@ -37,6 +37,8 @@ from atlawire.bitbucket import (
     get_pull_request_diff,
     get_pull_request_diff_text,
     get_pull_request_diff_with_fallback,
+    get_pull_request_diffs,
+    get_pull_request_diffs_text,
     get_pull_request_file,
     get_pull_request_merge_status,
     get_related_repositories,
@@ -227,7 +229,7 @@ _COMMENT_COLUMNS = "id\tauthor\tpath\tline\ttext"
 _PULL_REQUEST_COLUMNS = "id\ttitle\tstate\tauthor\tfrom\tto\tupdated"
 _MY_PULL_REQUEST_COLUMNS = "repo\tid\ttitle\tstate\tauthor\treviewers_inactive\tcreated"
 _BRANCH_COLUMNS = "name\tcommit\tdefault"
-_COMMIT_COLUMNS = "hash\tdate\tauthor\tmessage"
+_COMMIT_COLUMNS = "id\tdate\tauthor\tmessage"
 _BLAME_COLUMNS = "line\tauthor\tdate\tcommit"
 _COMMIT_MESSAGE_MAX = 160
 _SEARCH_SNIPPET_MAX = 110
@@ -235,6 +237,20 @@ _SEARCH_UNSAFE = re.compile(
     r"[\\\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069"
     r"\ud800-\udfff]"
 )
+
+
+def _click_error(exc: AtlaWireError) -> click.ClickException:
+    """Wrap one library failure for Click, adding the server reason when known.
+
+    ``str(exc)`` stays generic so log records and tracebacks cannot publish
+    response content; a terminal is a different surface, where the documented
+    reason is the whole point of an error. The second line is therefore printed
+    only here, and only when the library recorded one.
+    """
+    message = str(exc)
+    if exc.detail:
+        message = f"{message}\n{exc.detail}"
+    return click.ClickException(message)
 
 
 def _error_envelope(
@@ -509,7 +525,7 @@ def _product_base_url_and_token(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     return saved.base_url, saved.token
 
 
@@ -647,7 +663,7 @@ def repos(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -693,7 +709,7 @@ def projects(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -750,7 +766,7 @@ def find_repos_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -812,7 +828,7 @@ def find_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -1402,7 +1418,7 @@ def whoami_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
     if any(check.get("ok") is not True for check in result.values()):
         context.exit(1)
@@ -1480,7 +1496,7 @@ def search_command(
             rendered = _render_search_results(rows, every_page=every_page)
         reject_credential_echo(rendered, tokens=(token,))
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(rendered)
         return
@@ -1599,7 +1615,7 @@ def grep_repo_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -1707,7 +1723,7 @@ def repo_search_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -1753,7 +1769,7 @@ def branches(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_branches(rows, as_json=as_json)
 
 
@@ -1790,7 +1806,7 @@ def branch_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(row))
 
 
@@ -1843,7 +1859,7 @@ def commits(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_commits(rows, as_json=as_json)
 
 
@@ -1882,7 +1898,7 @@ def commit_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -1928,7 +1944,7 @@ def commit_changes_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_changed_files(rows, as_json=as_json)
 
 
@@ -1985,7 +2001,7 @@ def commit_diff_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
 
 
 @cli.command("file")
@@ -2033,7 +2049,7 @@ def file_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         payload = text.encode("utf-8")
         receipt = {
@@ -2145,7 +2161,7 @@ def attachment_get_command(
             receipt = _write_bytes(destination, payload)
             document = json.dumps(receipt)
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(document)
 
 
@@ -2191,7 +2207,7 @@ def files_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_repository_files(paths, as_json=as_json)
 
 
@@ -2240,7 +2256,7 @@ def ls_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_directory_entries(rows, as_json=as_json)
 
 
@@ -2279,7 +2295,7 @@ def blame_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_blame(rows, as_json=as_json)
 
 
@@ -2391,7 +2407,7 @@ def _print_commits(rows: list[Commit], *, as_json: bool) -> None:
     for row in rows:
         # Legacy text view: collapse whitespace, then cut, then escape.
         message = " ".join(row["message"].split())[:_COMMIT_MESSAGE_MAX]
-        values = (row["hash"], row["date"], row["author"], message)
+        values = (row["id"], row["date"], row["author"], message)
         click.echo("\t".join(map(_tsv_cell, values)))
 
 
@@ -2436,11 +2452,51 @@ def _run_pr_diff_action(
     token: str,
     as_json: bool,
     context: int,
-    path: str | None,
+    paths: tuple[str, ...],
     source_path: str | None,
     whitespace: str,
     allow_http_loopback: bool,
 ) -> None:
+    """Print the whole diff, one file's diff, or an ordered batch.
+
+    The shape mirrors the two library readers: no PATH or exactly one PATH uses
+    the single-file reader and returns one server object (that form alone
+    accepts ``--source-path``, which a renamed file needs), while two or more
+    PATH values return a list in argument order.
+    """
+    if len(paths) > 1:
+        if source_path is not None:
+            raise click.UsageError(
+                '"--source-path" is only supported with a single PATH.'
+            )
+        if as_json:
+            batch = get_pull_request_diffs(
+                base_url,
+                repo,
+                pr_id,
+                token=token,
+                paths=paths,
+                context=context,
+                whitespace=whitespace,
+                allow_http_loopback=allow_http_loopback,
+            )
+            click.echo(json.dumps(batch))
+            return
+        click.echo(
+            get_pull_request_diffs_text(
+                base_url,
+                repo,
+                pr_id,
+                token=token,
+                paths=paths,
+                context=context,
+                whitespace=whitespace,
+                allow_http_loopback=allow_http_loopback,
+            ),
+            nl=False,
+        )
+        return
+    path = paths[0] if paths else None
     read = get_pull_request_diff if as_json else get_pull_request_diff_text
     result = read(
         base_url,
@@ -2546,7 +2602,7 @@ def _run_pr_action(
     page_limit: int,
     row_limit: int | None,
     context: int,
-    path: str | None,
+    paths: tuple[str, ...],
     source_path: str | None,
     whitespace: str,
     allow_http_loopback: bool,
@@ -2577,7 +2633,7 @@ def _run_pr_action(
             token=token,
             as_json=as_json,
             context=context,
-            path=path,
+            paths=paths,
             source_path=source_path,
             whitespace=whitespace,
             allow_http_loopback=allow_http_loopback,
@@ -2598,7 +2654,7 @@ def _run_pr_action(
 
 def _pr_arguments(
     action: str | None,
-    path: str | None,
+    paths: tuple[str, ...],
     side: str | None,
     source_path: str | None,
     *,
@@ -2613,12 +2669,14 @@ def _pr_arguments(
             'The optional third argument must be "show", "files", "comments", '
             '"commits", "diff", or "file".'
         )
-    if selected not in {"file", "diff"} and path is not None:
+    if selected not in {"file", "diff"} and paths:
         raise click.UsageError('PATH is only supported with "file" or "diff".')
+    if selected != "diff" and len(paths) > 1:
+        raise click.UsageError('Several PATH values are only supported with "diff".')
     if selected != "file" and side is not None:
         raise click.UsageError('"--side" is only supported with "file".')
-    if selected == "file" and path is None:
-        raise click.UsageError('The "file" action requires PATH.')
+    if selected == "file" and len(paths) != 1:
+        raise click.UsageError('The "file" action requires exactly one PATH.')
     if selected == "file" and as_json:
         raise click.UsageError('"--json" is not supported with "file".')
     if max_pages is not None and selected not in {"comments", "commits"}:
@@ -2629,8 +2687,8 @@ def _pr_arguments(
         raise click.UsageError('"--context" is only supported with "diff".')
     if source_path is not None and selected != "diff":
         raise click.UsageError('"--source-path" is only supported with "diff".')
-    if source_path is not None and path is None:
-        raise click.UsageError('"--source-path" requires PATH.')
+    if source_path is not None and len(paths) != 1:
+        raise click.UsageError('"--source-path" requires exactly one PATH.')
     return selected, "new" if side is None else side
 
 
@@ -2660,7 +2718,7 @@ def _run_pr_file_action(
 @click.argument("repo")
 @click.argument("pr_id")
 @click.argument("action", required=False)
-@click.argument("path", required=False)
+@click.argument("path", nargs=-1)
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
 @click.option(
@@ -2711,7 +2769,7 @@ def pr(
     repo: str,
     pr_id: str,
     action: str | None,
-    path: str | None,
+    path: tuple[str, ...],
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
@@ -2728,12 +2786,15 @@ def pr(
     The optional third argument is "show" (default raw JSON), "files",
     "comments", "commits", "diff", or "file". "--max-pages" and "--limit" apply
     to "comments" and "commits"; "--context" and "--whitespace" apply only to
-    "diff"; PATH selects one diff file with "diff" and is required with "file";
-    "--source-path" applies only to a "diff" with PATH.
+    "diff". With "diff", no PATH shows the whole pull request diff as one
+    object, exactly one PATH shows that file's object (the only form that takes
+    "--source-path"), and two or more PATH values are read in one call and
+    printed as an ordered list. "file" requires exactly one PATH.
     """
+    paths = tuple(path)
     selected, selected_side = _pr_arguments(
         action,
-        path,
+        paths,
         side,
         source_path,
         as_json=as_json,
@@ -2744,11 +2805,11 @@ def pr(
         "bitbucket", base_url, token_from_env, allow_http_loopback
     )
     try:
-        if selected == "file" and path is not None:
+        if selected == "file" and len(paths) == 1:
             _run_pr_file_action(
                 repo,
                 pr_id,
-                path,
+                paths[0],
                 base_url=base_url,
                 token=token,
                 side=selected_side,
@@ -2765,13 +2826,13 @@ def pr(
             page_limit=100 if max_pages is None else max_pages,
             row_limit=limit,
             context=3 if context is None else context,
-            path=path,
+            paths=paths,
             source_path=source_path,
             whitespace=("ignore-all" if whitespace is None else whitespace),
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
 
 
 @cli.command("pr-merge-status")
@@ -2806,7 +2867,7 @@ def pr_merge_status(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -2862,7 +2923,7 @@ def pr_diff_complete_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -2936,7 +2997,7 @@ def pr_review_command(
         else:
             repo, requested_id = repo_or_url, pr_id
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if jira_base_url is not None and not jira_token_from_env:
         raise click.UsageError("--jira-base-url requires --jira-token-from-env.")
     bitbucket_url, bitbucket_token = _product_base_url_and_token(
@@ -2979,7 +3040,7 @@ def pr_review_command(
         tokens = tuple(value for value in (bitbucket_token, jira_token) if value)
         reject_credential_echo(output, tokens=tokens)
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if markdown:
         click.echo(output, nl=False)
         return
@@ -3059,7 +3120,7 @@ def tags_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -3095,7 +3156,7 @@ def tag_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -3144,7 +3205,7 @@ def last_modified_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -3223,7 +3284,7 @@ def scan_extension_command(
             project=project,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if report["complete"]:
         click.echo(json.dumps(report["rows"]))
         return
@@ -3318,7 +3379,7 @@ def prs(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_pull_requests(rows, as_json=as_json)
 
 
@@ -3387,7 +3448,7 @@ def my_prs(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     _print_my_pull_requests(rows, as_json=as_json)
 
 
@@ -3451,7 +3512,7 @@ def project(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3491,7 +3552,7 @@ def repository(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3534,7 +3595,7 @@ def default_branch(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3577,7 +3638,7 @@ def repo_changes(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3620,7 +3681,7 @@ def commit_comments(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3666,7 +3727,7 @@ def commit_comment(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3706,7 +3767,7 @@ def repo_participants(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3746,7 +3807,7 @@ def repo_forks(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3786,7 +3847,7 @@ def related_repos(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -3882,7 +3943,7 @@ def issue(
         if rendered is not None:
             reject_credential_echo(rendered, tokens=(token,))
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if rendered is not None:
         click.echo(rendered, nl=False)
         return
@@ -3946,7 +4007,7 @@ def issue_comments(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json or thread["truncated"]:
         click.echo(json.dumps(thread))
     else:
@@ -3988,7 +4049,7 @@ def issue_remote_links(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -4021,7 +4082,7 @@ def issue_worklogs(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -4055,7 +4116,7 @@ def issue_changelog(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -4100,7 +4161,7 @@ def issue_votes(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4145,7 +4206,7 @@ def issue_watchers(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4191,7 +4252,7 @@ def issue_subtasks(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4240,7 +4301,7 @@ def issue_comment(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4289,7 +4350,7 @@ def issue_worklog(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4334,7 +4395,7 @@ def issue_properties(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4383,7 +4444,7 @@ def issue_property(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4428,7 +4489,7 @@ def issue_link(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -4500,7 +4561,7 @@ def jql(
                 allow_http_loopback=allow_http_loopback,
             )
         except AtlaWireError as exc:
-            raise click.ClickException(str(exc)) from None
+            raise _click_error(exc) from None
         click.echo(json.dumps(envelope))
         return
     try:
@@ -4512,7 +4573,7 @@ def jql(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -4568,7 +4629,7 @@ def mine(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -4609,7 +4670,7 @@ def statuses(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(names))
         return
@@ -4646,7 +4707,7 @@ def transitions(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -4684,7 +4745,7 @@ def jira_edit_meta(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -4721,7 +4782,7 @@ def jira_create_meta(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -4760,7 +4821,7 @@ def jira_transition_fields(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -4784,7 +4845,7 @@ def jira_me(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(user))
 
 
@@ -4808,7 +4869,7 @@ def jira_priorities(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -4832,7 +4893,7 @@ def jira_resolutions(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -4856,7 +4917,7 @@ def jira_issue_types(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -4880,7 +4941,7 @@ def jira_status_categories(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -4908,7 +4969,7 @@ def jira_projects(
             base_url, token=token, allow_http_loopback=allow_http_loopback
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -4962,7 +5023,7 @@ def jira_users(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -5053,7 +5114,7 @@ def jira_author_comments(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(rows))
 
 
@@ -5123,7 +5184,7 @@ def cql(
                 params={"cql": query, "expand": expand, "start": 0, "limit": limit},
             )
         except AtlaWireError as exc:
-            raise click.ClickException(str(exc)) from None
+            raise _click_error(exc) from None
         click.echo(json.dumps(document))
         return
     try:
@@ -5135,7 +5196,7 @@ def cql(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if result["truncated"]:
         click.echo(json.dumps(result))
         if not as_json:
@@ -5193,7 +5254,7 @@ def spaces(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if as_json:
         click.echo(json.dumps(rows))
         return
@@ -5244,7 +5305,7 @@ def space(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -5289,7 +5350,7 @@ def space_content(
                 allow_http_loopback=allow_http_loopback,
             )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(document))
 
 
@@ -5341,7 +5402,7 @@ def children(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if result["truncated"]:
         click.echo(json.dumps(result))
         if not as_json:
@@ -5431,7 +5492,7 @@ def page(
                 params={"expand": expand},
             )
         except AtlaWireError as exc:
-            raise click.ClickException(str(exc)) from None
+            raise _click_error(exc) from None
         click.echo(json.dumps(document))
         return
     storage_text: str | None = None
@@ -5448,7 +5509,7 @@ def page(
         if rendered is not None:
             reject_credential_echo(rendered, tokens=(token,))
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     if storage_text is not None:
         _write_storage_text(storage_text)
         return
@@ -5530,7 +5591,7 @@ def convert_body_command(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -5581,7 +5642,7 @@ def page_attachments(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -5642,7 +5703,7 @@ def page_comments(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -5693,7 +5754,7 @@ def page_labels(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -5726,7 +5787,7 @@ def page_history(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -5763,7 +5824,7 @@ def page_version(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps(result))
 
 
@@ -5806,7 +5867,7 @@ def page_url(
         )
         reject_credential_echo(url, tokens=(token,))
     except AtlaWireError as exc:
-        raise click.ClickException(str(exc)) from None
+        raise _click_error(exc) from None
     click.echo(json.dumps({"url": url}) if as_json else url)
 
 

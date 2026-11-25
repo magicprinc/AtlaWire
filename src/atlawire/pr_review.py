@@ -215,7 +215,8 @@ _HEURISTIC_NOTE = (
 class PrReviewCommit(TypedDict):
     """One projected pull request commit."""
 
-    hash: str
+    id: str
+    short_id: str | None
     date: str | None
     author: str | None
     message: str
@@ -941,12 +942,15 @@ def _bounded(value: str, limit: int) -> tuple[str, bool]:
 def _commit_row(value: object) -> PrReviewCommit:
     if not isinstance(value, dict):
         raise AtlaWireError("Expected a pull request commit row.")
-    identifier = value.get("hash")
+    identifier = value.get("id")
+    short = value.get("short_id")
     message = value.get("message")
     date = value.get("date")
     author = value.get("author")
     if not isinstance(identifier, str) or not identifier:
-        raise AtlaWireError("Invalid hash in a pull request commit row.")
+        raise AtlaWireError("Invalid commit id in a pull request commit row.")
+    if short is not None and not isinstance(short, str):
+        raise AtlaWireError("Invalid commit short id in a pull request commit row.")
     if not isinstance(message, str):
         raise AtlaWireError("Invalid message in a pull request commit row.")
     if date is not None and not isinstance(date, str):
@@ -955,7 +959,8 @@ def _commit_row(value: object) -> PrReviewCommit:
         raise AtlaWireError("Invalid author in a pull request commit row.")
     bounded, truncated = _bounded(message, COMMIT_MESSAGE_LIMIT)
     return PrReviewCommit(
-        hash=identifier,
+        id=identifier,
+        short_id=short,
         date=date,
         author=author,
         message=bounded,
@@ -2412,7 +2417,7 @@ def render_markdown(packet: PrReviewPacket) -> str:
     for commit in packet["commits"]:
         truncated = " _(message truncated)_" if commit["message_truncated"] else ""
         lines.append(
-            f"- {_code(commit['hash'][:10])} "
+            f"- {_code(commit['short_id'] or commit['id'][:10])} "
             f"{inline(commit['date'] or '')} "
             f"{inline(commit['author'] or '')} — "
             f"{inline(commit['message'])}{truncated}"

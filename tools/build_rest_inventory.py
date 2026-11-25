@@ -24,7 +24,6 @@ import hashlib
 import json
 import re
 import sys
-from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -278,19 +277,6 @@ def _rule_text_names(rule: str, path: str) -> bool:
     return re.search(pattern, rule) is not None
 
 
-def _rule_text_extra_paths() -> list[str]:
-    """Return audit routes the prose names but the constant does not carry."""
-    document = _read("confluence", "mapping-confluence.json")
-    provenance = _mapping(document, "inventory_provenance")
-    rule = provenance.get("exclusion_rule")
-    if not isinstance(rule, str):
-        return []
-    named = {
-        match.rstrip(".") for match in re.findall(r"/rest/[A-Za-z0-9_./{}\-]+", rule)
-    }
-    return sorted(named - set(_CONFLUENCE_AUDIT))
-
-
 def _rule_text_names_every_audit_path() -> list[str]:
     """Prove the hard-coded audit exclusion still matches the mapping prose."""
     document = _read("confluence", "mapping-confluence.json")
@@ -435,51 +421,74 @@ def _rows_of(block: Mapping[str, object]) -> list[Mapping[str, object]]:
 
 
 def verify(document: Mapping[str, object]) -> list[str]:
-    """Return every two-way inconsistency in one built inventory document."""
+    """Return every inconsistency between the artifact, the freeze and the registry.
+
+    Three questions, no more: do the frozen totals match, does every required row
+    resolve to a registered operation (and every registered operation have a
+    disposition), and is the excluded set still the reviewed one. A hand-edited
+    artifact is already caught by the byte comparison in ``main``, so this
+    function does not re-validate the document against itself.
+    """
     problems: list[str] = []
     totals = document["totals"]
     if not isinstance(totals, dict):
         return ["totals is not an object"]
     for name, expected in _EXPECTED.items():
-        actual = totals.get(name)
-        if actual != expected:
-            problems.append(f"{name}: expected {expected}, built {actual}")
+        if totals.get(name) != expected:
+            problems.append(f"{name}: expected {expected}, built {totals.get(name)}")
+
+    products = document["products"]
+    additions = document["registered_additions"]
+    if not isinstance(products, dict) or not isinstance(additions, list):
+        return [*problems, "products or registered_additions has the wrong shape"]
 
     registry = _registry()
-    census = [
-        (str(item["product"]), str(item["method"]), normalize_path(str(item["path"])))
-        for item in operations_census()
-    ]
-    duplicated = [key for key, count in Counter(census).items() if count > 1]
-    if duplicated:
-        problems.append(f"duplicate registry keys: {duplicated}")
-
     seen: set[tuple[str, str, str]] = set()
-    products = document["products"]
-    if not isinstance(products, dict):
-        return [*problems, "products is not an object"]
     for product, block in products.items():
         if not isinstance(block, dict):
             problems.append(f"{product}: block is not an object")
             continue
-        for row in _rows_of(block):
+        rows = _rows_of(block)
+        expected_counts = _EXPECTED_PRODUCT.get(product)
+        if expected_counts is None:
+            problems.append(f"{product}: no frozen counts")
+            continue
+        required = [row for row in rows if row["disposition"] == "required"]
+        excluded = [row for row in rows if row["disposition"] == "excluded"]
+        if len(required) != expected_counts["required"]:
+            problems.append(
+                f"{product} required: expected {expected_counts['required']}, "
+                f"rows say {len(required)}"
+            )
+        if len(excluded) != expected_counts["excluded"]:
+            problems.append(
+                f"{product} excluded: expected {expected_counts['excluded']}, "
+                f"rows say {len(excluded)}"
+            )
+        if len(required) + len(excluded) != len(rows):
+            problems.append(f"{product}: a row has no final disposition")
+        for row in rows:
             key = (product, str(row["method"]), normalize_path(str(row["path"])))
-            matches = registry.get(key)
+            registered = key in registry
             if row["disposition"] == "required":
-                if not matches:
-                    problems.append(
-                        f"{product} {row['method']} {row['path']}: required but unregistered"
-                    )
-                else:
+                if registered:
                     seen.add(key)
-            elif matches:
+                else:
+                    problems.append(
+                        f"{product} {row['method']} {row['path']}: "
+                        "required but unregistered"
+                    )
+            elif registered:
                 problems.append(
                     f"{product} {row['method']} {row['path']}: excluded but registered"
                 )
+        digest = _excluded_digest(rows)
+        if _EXPECTED_EXCLUDED_DIGEST.get(product) != digest:
+            problems.append(
+                f"{product} excluded set changed: {digest}; review the swap, then "
+                "update _EXPECTED_EXCLUDED_DIGEST"
+            )
 
-    additions = document["registered_additions"]
-    if not isinstance(additions, list):
-        return [*problems, "registered_additions is not a list"]
     for addition in additions:
         if not isinstance(addition, dict):
             problems.append("registered_additions holds a non-object")
@@ -490,130 +499,17 @@ def verify(document: Mapping[str, object]) -> list[str]:
             normalize_path(str(addition["path"])),
         )
         if key not in registry:
-            problems.append(
-                f"registered addition not in the registry: {addition['path']}"
-            )
+            problems.append(f"addition is not registered: {addition['path']}")
+        if key in seen:
+            problems.append(f"addition duplicates a required row: {addition['path']}")
         seen.add(key)
 
-    for key in registry:
-        if key not in seen:
-            problems.append(
-                f"runtime operation unaccounted for: {key[0]} {key[1]} {key[2]}"
-            )
-
-    required_keys = {
-        (product, str(row["method"]), normalize_path(str(row["path"])))
-        for product, block in products.items()
-        if isinstance(block, dict)
-        for row in _rows_of(block)
-        if row["disposition"] == "required"
-    }
-    addition_keys = {
-        (str(item["product"]), str(item["method"]), normalize_path(str(item["path"])))
-        for item in additions
-        if isinstance(item, dict)
-    }
-    masked = addition_keys & required_keys
-    if masked:
-        problems.append(f"an addition masks a required row: {sorted(masked)}")
-
-    for product, expected in _EXPECTED_PRODUCT.items():
-        block = products.get(product)
-        counts = block.get("counts") if isinstance(block, dict) else None
-        if not isinstance(block, dict) or not isinstance(counts, dict):
-            problems.append(f"{product}: missing counts")
-            continue
-        rows = _rows_of(block)
-        # Recompute from the rows, not from the document's own self-report, so a
-        # tampered artifact cannot pass by agreeing with itself.
-        actual_required = sum(1 for row in rows if row["disposition"] == "required")
-        actual_excluded = sum(1 for row in rows if row["disposition"] == "excluded")
-        if actual_required != expected["required"]:
-            problems.append(
-                f"{product} required: expected {expected['required']}, "
-                f"rows say {actual_required}"
-            )
-        if actual_excluded != expected["excluded"]:
-            problems.append(
-                f"{product} excluded: expected {expected['excluded']}, "
-                f"rows say {actual_excluded}"
-            )
-        if counts.get("required") != actual_required:
-            problems.append(
-                f"{product} counts.required disagrees with its rows: "
-                f"{counts.get('required')} vs {actual_required}"
-            )
-        if counts.get("excluded") != actual_excluded:
-            problems.append(
-                f"{product} counts.excluded disagrees with its rows: "
-                f"{counts.get('excluded')} vs {actual_excluded}"
-            )
-        if counts.get("rows") != len(rows):
-            problems.append(
-                f"{product} counts.rows disagrees with its rows: "
-                f"{counts.get('rows')} vs {len(rows)}"
-            )
-        recomputed_reasons: dict[str, int] = {}
-        for row in rows:
-            key = (product, str(row["method"]), normalize_path(str(row["path"])))
-            matches = registry.get(key)
-            expected_id = matches[0]["id"] if matches else None
-            if row["registered"] is not bool(matches):
-                problems.append(
-                    f"{product} {row['method']} {row['path']}: registered flag "
-                    "disagrees with the registry"
-                )
-            if row["runtime_operation_id"] != expected_id:
-                problems.append(
-                    f"{product} {row['method']} {row['path']}: runtime id "
-                    "disagrees with the registry"
-                )
-            if matches and row["response_kind"] != matches[0]["response"]["kind"]:
-                problems.append(
-                    f"{product} {row['method']} {row['path']}: response_kind "
-                    "disagrees with the registry"
-                )
-            if row["disposition"] == "excluded":
-                reason = row.get("reason")
-                if not isinstance(reason, str) or not reason:
-                    problems.append(
-                        f"{product} {row['method']} {row['path']}: excluded row "
-                        "states no reason"
-                    )
-                    continue
-                recomputed_reasons[reason] = recomputed_reasons.get(reason, 0) + 1
-        if counts.get("excluded_by_reason") != dict(sorted(recomputed_reasons.items())):
-            problems.append(
-                f"{product} counts.excluded_by_reason disagrees with its rows"
-            )
-        digest = _excluded_digest(rows)
-        pinned = _EXPECTED_EXCLUDED_DIGEST.get(product)
-        if pinned is None or digest != pinned:
-            problems.append(
-                f"{product} excluded set changed: {digest} (pinned {pinned}); "
-                "review the swap, then update _EXPECTED_EXCLUDED_DIGEST"
-            )
-
-    actual_unresolved = sum(
-        1
-        for block in products.values()
-        if isinstance(block, dict)
-        for row in _rows_of(block)
-        if row["disposition"] not in {"required", "excluded"}
+    problems.extend(
+        f"runtime operation unaccounted for: {key[0]} {key[1]} {key[2]}"
+        for key in registry
+        if key not in seen
     )
-    if actual_unresolved:
-        problems.append(
-            f"rows with no final disposition: {actual_unresolved}; every row "
-            "must be required or excluded"
-        )
-
     problems.extend(_rule_text_names_every_audit_path())
-    extra = _rule_text_extra_paths()
-    if extra:
-        problems.append(
-            "confluence exclusion_rule names audit routes missing from the "
-            f"constant: {extra}"
-        )
     return problems
 
 

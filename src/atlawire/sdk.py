@@ -33,6 +33,7 @@ from atlawire.http import (
     _TRANSPORT_MESSAGE,
     AtlaWireError,
     _NoRedirectSession,
+    error_detail,
     normalize_base_url,
     read_encoded_limited,
     reject_credential_echo,
@@ -152,6 +153,7 @@ class SdkRequestError(AtlaWireError):
         body_truncated: bool = False,
         product: str | None = None,
         method: str | None = None,
+        detail: str | None = None,
     ) -> None:
         category = _error_category(status, classification)
         super().__init__(
@@ -165,6 +167,7 @@ class SdkRequestError(AtlaWireError):
             ),
             method=method,
             path=path,
+            detail=detail,
         )
         self.status = status
         self.code = code
@@ -1078,6 +1081,27 @@ def _retry_after(response: requests.Response) -> float | None:
     return max(0.0, (parsed - datetime.now(UTC)).total_seconds())
 
 
+def _request_token(response: requests.Response) -> tuple[str, ...]:
+    """Return the bearer credential this response's request carried, if any.
+
+    The message is hardened against echoing the credential, and this layer has no
+    session object, so the value is read back from the prepared request instead
+    of being threaded through every call site.
+    """
+    request = getattr(response, "request", None)
+    headers = getattr(request, "headers", None)
+    if not isinstance(headers, Mapping):
+        return ()
+    value = headers.get("Authorization")
+    if not isinstance(value, str):
+        return ()
+    scheme, separator, token = value.partition(" ")
+    if not separator or scheme.lower() != "bearer":
+        return ()
+    stripped = token.strip()
+    return (stripped,) if stripped else ()
+
+
 def _error(
     response: requests.Response,
     *,
@@ -1091,12 +1115,20 @@ def _error(
     body, truncated = _read_excerpt(response)
     if not truncated and body is not None and body.endswith("\n"):
         body = body.rstrip("\n")
+    reason: str | None = None
+    if message == f"HTTP {response.status_code}: request failed." and body is not None:
+        # The typed transport records the documented reason for a rejected
+        # request; this layer must not be less useful than the one above it.
+        # `error_detail` is the shared, redacted parser, so no body text that is
+        # not a documented error field survives, and the message stays generic.
+        reason = error_detail(body, tokens=_request_token(response)) or None
     return SdkRequestError(
         status=response.status_code,
         code=code,
         classification=classification,
         message=message,
         body=body,
+        detail=reason,
         content_type=response.headers.get("Content-Type"),
         path=path,
         body_truncated=truncated,

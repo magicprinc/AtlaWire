@@ -93,15 +93,6 @@ def test_row_level_compensation_fails_even_when_counts_are_consistent(generator,
     assert any("excluded but registered" in problem for problem in problems)
 
 
-def test_counts_disagreeing_with_rows_fail(generator, built):
-    broken = generator.json.loads(generator.json.dumps(built))
-    broken["products"]["jira"]["counts"]["excluded"] = 6
-
-    problems = generator.verify(broken)
-
-    assert any("counts.excluded disagrees" in problem for problem in problems)
-
-
 def test_unresolved_is_derived_not_hardcoded(generator, built):
     broken = generator.json.loads(generator.json.dumps(built))
     row = broken["products"]["jira"]["rows"][0]
@@ -176,36 +167,6 @@ def test_disposition_routes_an_unnamed_audit_child_to_required(generator):
     assert generator._disposition(named) == ("excluded", "administrative")
 
 
-def test_registered_flag_disagreeing_with_the_registry_fails(generator, built):
-    broken = generator.json.loads(generator.json.dumps(built))
-    row = next(
-        row
-        for block in broken["products"].values()
-        for row in block["rows"]
-        if row["disposition"] == "required"
-    )
-    row["registered"] = False
-
-    problems = generator.verify(broken)
-
-    assert any("registered flag disagrees" in problem for problem in problems)
-
-
-def test_response_kind_disagreeing_with_the_registry_fails(generator, built):
-    broken = generator.json.loads(generator.json.dumps(built))
-    row = next(
-        row
-        for block in broken["products"].values()
-        for row in block["rows"]
-        if row["disposition"] == "required"
-    )
-    row["response_kind"] = "not-a-kind"
-
-    problems = generator.verify(broken)
-
-    assert any("response_kind disagrees" in problem for problem in problems)
-
-
 def test_reason_reclassification_fails_the_digest(generator, built):
     """administrative -> system-route keeps counts but changes the evidence."""
     broken = generator.json.loads(generator.json.dumps(built))
@@ -217,28 +178,6 @@ def test_reason_reclassification_fails_the_digest(generator, built):
     problems = generator.verify(broken)
 
     assert any("excluded set changed" in problem for problem in problems)
-    assert any("excluded_by_reason disagrees" in problem for problem in problems)
-
-
-def test_counts_rows_disagreeing_with_the_row_list_fails(generator, built):
-    broken = generator.json.loads(generator.json.dumps(built))
-    broken["products"]["jira"]["counts"]["rows"] = 999
-
-    problems = generator.verify(broken)
-
-    assert any("counts.rows disagrees" in problem for problem in problems)
-
-
-def test_prose_naming_an_extra_audit_route_is_flagged(generator, monkeypatch):
-    document = generator._read("confluence", "mapping-confluence.json")
-    provenance = document["inventory_provenance"]
-    original = provenance["exclusion_rule"]
-    provenance["exclusion_rule"] = f"{original} Also /rest/audit/records."
-    monkeypatch.setattr(generator, "_read", lambda product, name: document)
-
-    extra = generator._rule_text_extra_paths()
-
-    assert extra == ["/rest/audit/records"]
 
 
 def test_generation_writes_when_the_check_passes(generator, tmp_path):

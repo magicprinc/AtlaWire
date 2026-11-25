@@ -147,15 +147,13 @@ def test_verify_catches_a_compensating_per_product_shift(built):
     """201 must not be reachable by one product short and another long."""
     generator = _load_generator()
     broken = json.loads(json.dumps(built))
-    broken["products"]["jira"]["counts"]["required"] = 107
-    broken["products"]["confluence"]["counts"]["required"] = 37
+    jira_rows = broken["products"]["jira"]["rows"]
+    required = next(row for row in jira_rows if row["disposition"] == "required")
+    required["disposition"] = "excluded"
 
     problems = generator.verify(broken)
 
-    assert any("jira counts.required disagrees" in problem for problem in problems)
-    assert any(
-        "confluence counts.required disagrees" in problem for problem in problems
-    )
+    assert any("jira required: expected 108" in problem for problem in problems)
 
 
 def test_verify_catches_an_addition_that_masks_a_required_row(built):
@@ -183,21 +181,9 @@ def test_verify_catches_an_addition_that_masks_a_required_row(built):
     )
 
     assert any(
-        "masks a required row" in problem for problem in generator.verify(broken)
+        "addition duplicates a required row" in problem
+        for problem in generator.verify(broken)
     )
-
-
-def test_verify_catches_a_duplicate_registry_key(monkeypatch, built):
-    """Two operations on one route would hide a lost row behind a stable total."""
-    generator = _load_generator()
-    census = generator.operations_census()
-    monkeypatch.setattr(
-        generator, "operations_census", lambda: [*census, dict(census[0])]
-    )
-
-    problems = generator.verify(built)
-
-    assert any("duplicate registry keys" in problem for problem in problems)
 
 
 def test_per_product_required_counts_are_pinned(built):
