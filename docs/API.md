@@ -653,7 +653,14 @@ JQL-поиск для коротких строк фиксирует
 - REST: нет (офлайн, токен не читается).
 - → отсортированный по id список описаний: `id`, `product`, `method`, `path`, `description`,
   `documented_version`, `response` (`kind`, `required`, `items_required`,
-  `optional_object_arrays`, `null_on_204`), `arguments`, `query_rules`, `body`, `query`.
+  `optional_object_arrays`, `null_on_204`), `arguments`, `query_rules`, `body`, `query`,
+  `query_documented`.
+- `query_documented: bool | None` — `true`, если объявлено хотя бы одно query-поле;
+  `null`, если query-поверхность маршрута ещё не сверена с версионированной документацией
+  (`null` не значит «параметров нет»); `false` зарезервирован для сверенного «параметров
+  нет» и пока не выставлен ни у одной операции. При `true`/`null` команда `read`
+  отвергает любые query-значения, поэтому отдельный документированный параметр передаётся
+  через `api-get`, а не через `read`.
 - Ошибки/лимиты: нечитаемый manifest просто не добавляет записей (базовые остаются).
 
 **`describe_operation(operation_id: object) -> dict[str, object]`** — `operations.py:1798`

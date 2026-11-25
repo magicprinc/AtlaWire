@@ -1,0 +1,2423 @@
+{
+  "schema": "atlawire-rest-inventory/v1",
+  "note": "Frozen release denominator. `required` rows must have a runtime operation; every runtime operation must be required or listed in `registered_additions`. Regenerate with tools/build_rest_inventory.py.",
+  "totals": {
+    "documented_rows": 252,
+    "rows_with_disposition": 248,
+    "required": 201,
+    "excluded": 51,
+    "unresolved": 0,
+    "runtime_operations": 202
+  },
+  "products": {
+    "jira": {
+      "documented_version": "Jira Server 8.22.0 REST API 2",
+      "mapping_source": ".development/jira/mapping-jira.json",
+      "rows": [
+        {
+          "method": "GET",
+          "path": "/rest/api/2/attachment/meta",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.attachment.meta",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/attachment/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.attachment.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/attachment/{id}/expand/human",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.attachment.id.expand.human",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/attachment/{id}/expand/raw",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.attachment.expand.raw",
+          "response_kind": "binary"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/avatar/{type}/system",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.avatar.system",
+          "response_kind": "binary"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/comment/{commentId}/properties",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.comment.commentid.properties",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/comment/{commentId}/properties/{propertyKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.comment.commentid.properties.propertykey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/component/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.component.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/component/{id}/relatedIssueCounts",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.component.id.relatedissuecounts",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/configuration",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.configuration",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/customFieldOption/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.customfieldoption.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/customFields",
+          "disposition": "excluded",
+          "mapping_status": "authorization-uncertain",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "authorization-uncertain",
+          "reason_text": "Only HTTP 200 is documented; authorization is unstated."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/dashboard",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.dashboard.list",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.dashboard.dashboardid.items.itemid.properties",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties/{propertyKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.dashboard.dashboardid.items.itemid.properties.propertykey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/dashboard/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.dashboard.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/field",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.field.list",
+          "response_kind": "array"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/filter/defaultShareScope",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.filter.defaultsharescope",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/filter/favourite",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.filter.favourites",
+          "response_kind": "array"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/filter/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.filter.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/filter/{id}/columns",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.filter.id.columns",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/filter/{id}/permission",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.filter.id.permission",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/filter/{id}/permission/{permissionId}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.filter.id.permission.permissionid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/groups/picker",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.groups.picker",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/groupuserpicker",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.groupuserpicker",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/createmeta",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.createmeta",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.createmeta.projectidorkey.issuetypes",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.createmeta.projectidorkey.issuetypes.issuetypeid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/picker",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.picker",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/comment",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.comment",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/comment/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.comment.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/editmeta",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.editmeta",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/properties",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.properties",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/properties/{propertyKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.properties.propertykey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.remotelink",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink/{linkId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.remotelink.linkid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/subtask",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.subtask",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/subtask/move",
+          "disposition": "excluded",
+          "mapping_status": "uncertain",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "documented-inconsistently",
+          "reason_text": "Documented as a GET but changes state; the same path is a POST."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/transitions",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.transitions",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/votes",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.votes",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/watchers",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.watchers",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/worklog",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.issueidorkey.worklog",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issue/{issueIdOrKey}/worklog/{id}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issue.worklog.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issueLink/{linkId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issue-link.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issueLinkType",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issuelinktype",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issueLinkType/{issueLinkTypeId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issuelinktype.issuelinktypeid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issuetype",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.issuetype",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issuetype/{id}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issuetype.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issuetype/{id}/alternatives",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issuetype.id.alternatives",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issuetype/{issueTypeId}/properties",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issuetype.issuetypeid.properties",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/issuetype/{issueTypeId}/properties/{propertyKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.issuetype.issuetypeid.properties.propertykey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/jql/autocompletedata",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.jql.autocomplete",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/jql/autocompletedata/suggestions",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.jql.autocompletedata.suggestions",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/mypermissions",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.mypermissions.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/mypreferences",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.mypreferences",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/myself",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.myself",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/password/policy",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.password.policy",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/priority",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.priority",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/priority/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.priority.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/type",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.type",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/type/{projectTypeKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.project.type.projecttypekey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/type/{projectTypeKey}/accessible",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.project.type.projecttypekey.accessible",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/avatars",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.project.projectidorkey.avatars",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/components",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.components",
+          "response_kind": "array"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/properties",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.project.projectidorkey.properties",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/properties/{propertyKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.project.projectidorkey.properties.propertykey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/role",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.roles",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/role/{id}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "jira.project.projectidorkey.role.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/statuses",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.statuses",
+          "response_kind": "array"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/version",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.projectidorkey.version",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectIdOrKey}/versions",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.versions",
+          "response_kind": "array"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/project/{projectKeyOrId}/securitylevel",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.project.projectkeyorid.securitylevel",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/projectCategory",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.projectcategory",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/projectCategory/{id}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.projectcategory.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/projects/picker",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.projects.picker",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/projectvalidate/key",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.projectvalidate.key",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/resolution",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.resolution",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/resolution/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.resolution.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/search",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.search",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/securitylevel/{id}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.securitylevel.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/serverInfo",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.serverinfo",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/status",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.status",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/status/{idOrName}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "jira.status.idorname",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/statuscategory",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.statuscategory",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/statuscategory/{idOrKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.statuscategory.idorkey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/terminology/entries",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.terminology.entries",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/terminology/entries/{originalName}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.terminology.entries.originalname",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/universal_avatar/type/{type}/owner/{owningObjectId}",
+          "disposition": "excluded",
+          "mapping_status": "authorization-uncertain",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "authorization-uncertain",
+          "reason_text": "Only HTTP 200 is documented; authorization is unstated."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.user.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/a11y/personal-settings",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.user.a11y.personal-settings",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/assignable/multiProjectSearch",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.user.assignable.multiprojectsearch",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/assignable/search",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.user.assignable-search",
+          "response_kind": "array"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/avatars",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.user.avatars",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/columns",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.user.columns",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/picker",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.user.picker",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/properties",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "jira.user.properties",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/properties/{propertyKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.user.properties.propertykey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/search",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.user.search",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/user/viewissue/search",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.user.viewissue.search",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/version/remotelink",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.version.remotelink",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/version/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.version.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/version/{id}/relatedIssueCounts",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.version.id.relatedissuecounts",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/version/{id}/unresolvedIssueCount",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.version.id.unresolvedissuecount",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/version/{versionId}/remotelink",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.version.versionid.remotelink",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/version/{versionId}/remotelink/{globalId}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.version.versionid.remotelink.globalid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/worklog/deleted",
+          "disposition": "excluded",
+          "mapping_status": "authorization-uncertain",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "authorization-uncertain",
+          "reason_text": "Only HTTP 200 is documented; authorization is unstated."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/2/worklog/updated",
+          "disposition": "excluded",
+          "mapping_status": "authorization-uncertain",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "authorization-uncertain",
+          "reason_text": "Only HTTP 200 is documented; authorization is unstated."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/auth/1/session",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.rest.auth.1.session",
+          "response_kind": "json"
+        },
+        {
+          "method": "POST",
+          "path": "/rest/api/2/search",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "jira.search.post",
+          "response_kind": "object"
+        },
+        {
+          "method": "POST",
+          "path": "/rest/api/2/worklog/list",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "jira.worklog.list",
+          "response_kind": "array"
+        }
+      ],
+      "counts": {
+        "rows": 113,
+        "required": 108,
+        "excluded": 5,
+        "excluded_by_reason": {
+          "authorization-uncertain": 4,
+          "documented-inconsistently": 1
+        }
+      },
+      "excluded_by_rule": []
+    },
+    "confluence": {
+      "documented_version": "Confluence Server 6.6.0 REST API",
+      "mapping_source": ".development/confluence/mapping-confluence.json",
+      "rows": [
+        {
+          "method": "GET",
+          "path": "/rest/api/content",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.by-title",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/search",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.search",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/child",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.children",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/child/attachment",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.attachments",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/child/comment",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.child.comment",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/child/{type}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.child.type",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/descendant",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.descendant",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/descendant/{type}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.descendant.type",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/history",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.history",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/history/{version}/macro/hash/{hash}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.history.version.macro.hash.hash",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/history/{version}/macro/id/{macroId}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.history.version.macro.id.macroid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/label",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.label",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/property",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.properties",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/property/{key}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.property.key",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/restriction/byOperation",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.restriction.byoperation",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/content/{id}/restriction/byOperation/{operationKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.id.restriction.byoperation.operationkey",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/group",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.group",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/group/{groupName}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "confluence.group.groupname",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/group/{groupName}/member",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.group.groupname.member",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/longtask",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.longtask",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/longtask/{id}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.longtask.id",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/search",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.search",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/space",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.space",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/space/{spaceKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.space.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/space/{spaceKey}/content",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "confluence.space.content",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/space/{spaceKey}/content/{type}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "confluence.space.spacekey.content.type",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/space/{spaceKey}/property",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.space.spacekey.property",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/space/{spaceKey}/property/{key}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.space.spacekey.property.key",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/user",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.user.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/user/anonymous",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.user.anonymous",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/user/current",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "confluence.user.current",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/user/memberof",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.user.memberof",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/user/watch/content/{contentId}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.user.watch.content.contentid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/user/watch/space/{spaceKey}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "confluence.user.watch.space.spacekey",
+          "response_kind": "json"
+        },
+        {
+          "method": "POST",
+          "path": "/rest/api/contentbody/convert/{to}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "confluence.content.convert",
+          "response_kind": "object"
+        }
+      ],
+      "counts": {
+        "rows": 36,
+        "required": 36,
+        "excluded": 0,
+        "excluded_by_reason": {}
+      },
+      "excluded_by_rule": [
+        {
+          "method": "GET",
+          "path": "/rest/audit",
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route.",
+          "note": "Named in the mapping's exclusion_rule; never a row."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/audit/export",
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route.",
+          "note": "Named in the mapping's exclusion_rule; never a row."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/audit/retention",
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route.",
+          "note": "Named in the mapping's exclusion_rule; never a row."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/audit/since",
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route.",
+          "note": "Named in the mapping's exclusion_rule; never a row."
+        }
+      ]
+    },
+    "bitbucket": {
+      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
+      "mapping_source": ".development/bitbucket/mapping-bitbucket.json",
+      "rows": [
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/cluster",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/groups",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/groups/more-members",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/groups/more-non-members",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/license",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/mail-server",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/mail-server/sender-address",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/permissions/groups",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/permissions/groups/none",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/permissions/users",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/permissions/users/none",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/pull-requests/{scmId}",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/users",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/users/more-members",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/admin/users/more-non-members",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/application-properties",
+          "disposition": "excluded",
+          "mapping_status": "gap",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "system-route",
+          "reason_text": "No SDK builder and the runtime path validator refuses the segment."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/dashboard/pull-request-suggestions",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.dashboard.pull-request-suggestions",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/dashboard/pull-requests",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.dashboard.pull-requests",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/groups",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/hooks/{hookKey}/avatar",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.hooks.avatar",
+          "response_kind": "binary"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/inbox/pull-requests",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.inbox.pull-requests",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/inbox/pull-requests/count",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.inbox.pull-requests.count",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/logs/logger/{loggerName}",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/logs/rootLogger",
+          "disposition": "excluded",
+          "mapping_status": "instance-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/profile/recent/repos",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.profile.recent-repositories",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.project.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/avatar.png",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.project.avatar",
+          "response_kind": "binary"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/permissions/groups",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/permissions/groups/none",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/permissions/users",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/permissions/users/none",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/permissions/{permission}/all",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/archive",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.archive",
+          "response_kind": "binary"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.branches",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches/default",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.default-branch",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/browse",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.browse",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/browse/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.browse.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/changes",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.changes",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.commits",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/changes",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.changes",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.commit-comments",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments/{commentId}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.comments.commentid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/diff",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/diff/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/changes",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.compare-changes",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/commits",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.compare-commits",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/diff{path:.*}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.compare.diff-path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.diff",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.diff.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/files",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.files",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/files/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.files.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/forks",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.forks",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/last-modified",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/last-modified/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/participants",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.participants",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/groups",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/groups/none",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/users",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/users/none",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/activities",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.pull-request-activity",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/changes",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.changes",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/comments",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/comments/{commentId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments.commentid",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/commits",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.commits",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/diff",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/diff/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/merge",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.merge",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/participants",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.participants",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/tasks",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/tasks/count",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks.count",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.raw",
+          "response_kind": "binary"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.raw.path",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/related",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repository.related",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks",
+          "disposition": "excluded",
+          "mapping_status": "covered",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}",
+          "disposition": "excluded",
+          "mapping_status": "covered",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}/settings",
+          "disposition": "excluded",
+          "mapping_status": "gap",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/pull-requests",
+          "disposition": "excluded",
+          "mapping_status": "covered",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/tags",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.tags",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/tags/{name:.*}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.tags.name",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/latest",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/statistics",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/statistics/summary",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks",
+          "disposition": "excluded",
+          "mapping_status": "covered",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}",
+          "disposition": "excluded",
+          "mapping_status": "covered",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}/settings",
+          "disposition": "excluded",
+          "mapping_status": "gap",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/projects/{projectKey}/settings/pull-requests/{scmId}",
+          "disposition": "excluded",
+          "mapping_status": "gap",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/repos",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.repos",
+          "response_kind": "json"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/tasks/{taskId}",
+          "disposition": "required",
+          "mapping_status": "covered",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.task.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/users",
+          "disposition": "required",
+          "mapping_status": "partial",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.users.list",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/users/{userSlug}",
+          "disposition": "required",
+          "mapping_status": "gap",
+          "registered": true,
+          "runtime_operation_id": "bitbucket.user.get",
+          "response_kind": "object"
+        },
+        {
+          "method": "GET",
+          "path": "/rest/api/1.0/users/{userSlug}/settings",
+          "disposition": "excluded",
+          "mapping_status": "project-admin",
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "administrative",
+          "reason_text": "Administrative, project-admin or system route."
+        }
+      ],
+      "counts": {
+        "rows": 99,
+        "required": 57,
+        "excluded": 42,
+        "excluded_by_reason": {
+          "administrative": 41,
+          "system-route": 1
+        }
+      },
+      "excluded_by_rule": []
+    }
+  },
+  "registered_additions": [
+    {
+      "runtime_operation_id": "jira.attachment.content",
+      "product": "jira",
+      "method": "GET",
+      "path": "/rest/api/2/attachment/{id}/content",
+      "reason": "Binary attachment reader registered in the runtime registry; the versioned mapping documents the expand/raw variant instead."
+    }
+  ]
+}

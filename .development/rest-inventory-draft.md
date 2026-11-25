@@ -1,5 +1,10 @@
 # Draft release REST inventory (derived)
 
+> **Superseded 2026-11-25.** The frozen denominator now lives in
+> `.development/rest-inventory.json`, produced and checked by
+> `tools/build_rest_inventory.py`. This file is kept as the analysis record that
+> led to it; the numbers below count rows differently and must not be quoted.
+
 Draft for owner review. This is **not** a frozen denominator and not a claim of
 behavioral evidence: `src/atlawire/manifest.json` is a projection of
 `src/atlawire/operations.py`, and both were derived from the same versioned mapping
@@ -162,3 +167,25 @@ Each `rows[]` entry: `product`, `method`, `reference_version`, `path_normalized`
 `row_group` is `denominator` or `excluded_list`. `mapped_operation_id` is null when no
 exact route+method exists in `manifest.json`; that is a mapping statement, not a claim
 that the route is absent from the runtime registry (see `runtime_operation_id`).
+
+## 4. Decision D4: the nine unresolved rows
+
+Resolved 2026-11-25 by the delivery decision recorded in the release plan: the
+denominator is what the runtime registry can actually serve, and a documented
+row that the runtime path validator refuses is excluded with a stated reason
+rather than advertised.
+
+| Row group | Count | Disposition | Reason |
+| --- | ---: | --- | --- |
+| Bitbucket `/projects/{key}/settings/hooks…` and `…/repos/{slug}/settings/…` | 4 | excluded | `settings` segments are PROJECT_ADMIN-only in 5.10 |
+| Bitbucket `…/settings/pull-requests`, `…/settings/pull-requests/{scmId}` and their repo-level forms | 4 | excluded | same rule; the mapping records no permission evidence |
+| Jira `GET /rest/api/2/issue/{id}/subtask/move` | 1 | excluded | documented as a GET but state-changing; the same path is a POST |
+| Bitbucket `GET /rest/api/1.0/application-properties` | 1 | excluded | no SDK builder and the runtime path validator refuses the segment |
+
+Result: **201 required**, **51 excluded** (41 administrative or unrelated to a
+reader, 4 authorization-uncertain, 1 documented inconsistently, 1 system route,
+4 Confluence audit GETs excluded by the mapping's own rule), **0 unresolved**.
+
+The frozen artifact also records one runtime operation with no documented row,
+`jira.attachment.content`, as a named addition with its reason, so the two-way
+check stays exact instead of silently widening the required set.

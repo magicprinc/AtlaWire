@@ -1698,7 +1698,14 @@ def list_operations() -> list[dict[str, object]]:
     The result is a fresh, JSON-serializable list sorted by stable operation ID.
     Each entry exposes the product, fixed GET path, one-line description,
     documented version, expected JSON shape, accepted path arguments, and
-    declared typed query fields.
+    declared typed query fields. ``query_documented`` is ``True`` when at least
+    one query field is declared and ``None`` when none is: ``None`` means the
+    route's query surface has not been reconciled with the versioned reference
+    yet, so it is neither a promise that parameters exist nor proof that the
+    route takes none. A ``False`` would mean verified as parameter-free, and no
+    operation carries that verdict yet. Either way ``read`` rejects every query
+    value for such an operation, so an ad-hoc documented parameter has to go
+    through ``api-get``.
     """
     return [_describe(_OPERATIONS[key]) for key in sorted(_OPERATIONS)]
 
@@ -1763,6 +1770,7 @@ def _describe(operation: _Operation) -> dict[str, object]:
             }
             for field in operation.query
         ],
+        "query_documented": True if operation.query else None,
     }
 
 

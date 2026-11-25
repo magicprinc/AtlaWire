@@ -244,7 +244,9 @@ def main(argv: list[str] | None = None) -> int:
         args.output.write_text(rendered, encoding="utf-8")
 
     operations = document["operations"]
-    assert isinstance(operations, list)
+    if not isinstance(operations, list):
+        print("manifest operations are not a list")
+        return 1
     print(f"operations: {len(operations)}")
     print(f"deferred: {len(deferred)}")
     for item in deferred:
