@@ -13,6 +13,20 @@ subsequent agent-facing batch (the latter spans commits `2960a43..a4efee1`).
 
 ### Added
 
+- `whitespace` on every diff reader (`get_pull_request_diff`,
+  `get_pull_request_diffs`, `get_pull_request_diff_text`, `get_commit_diff`,
+  `get_commit_diff_text`) and `--whitespace` on `pr ... diff` and
+  `commit-diff`. BBK exposed this parameter; AtlaWire now supports the same
+  `ignore-all` / `ignore-trailing` / `ignore-none` values and rejects others
+  before any request. All three were confirmed accepted by the live server.
+- `atlawire.markdown` as a public module (`compact`, `compact_json`,
+  `confluence_to_md`, `html_to_md`, `wiki_to_md`, `jira_issue_to_md`,
+  `render_diff`, `page_to_md`) and the review helpers `file_links`,
+  `java_members`, `red_flags`, `changed_symbols`, plus the one-call
+  `pr_review.review(...)`.
+- `checks/live_consumer_matrix.py`: a live read-only consumer matrix that
+  discovers anchors, verifies 54 capabilities semantically, and reports
+  PASS/FAIL without printing payloads or identifiers.
 - `atlawire repo-search` and `repo_search.search_repositories`: cross-repository
   search with an `index` engine (one plugin call), a `bytes` engine (regex over
   default branches), and `fetch="archive"` (one zip per repository, with

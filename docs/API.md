@@ -148,17 +148,20 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   `truncated=true` или строк не меньше заявленного `limit` — ошибка (выдача может быть
   урезана).
 
-**`get_pull_request_diff(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1017`
+**`get_pull_request_diff(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, whitespace="ignore-all", allow_http_loopback=False) -> dict[str, object]`** — `bitbucket.py:1017`
 - REST: `GET .../pull-requests/{id}/diff` (весь PR) или `.../diff/{path}`; query
-  `contextLines`, `whitespace=ignore-all`, `withComments=false`; `srcPath` — только вместе
-  с `path`.
+  `contextLines`, `whitespace`, `withComments=false`; `srcPath` — только вместе
+  с `path`. `whitespace` — `ignore-all` (по умолчанию), `ignore-trailing` или
+  `ignore-none` (сохраняет whitespace-only изменения); значение проверяется до запроса,
+  все три подтверждены живым read-only прогоном.
 - → сырой diff-объект.
 - Ошибки/лимиты: `context` 0..100; `source_path` без `path`; объявленный `truncated` —
   `DeclaredTruncationError` (подкласс `AtlaWireError`); незаявленный серверный cap не
   детектируется.
 
-**`get_pull_request_diffs(base_url, repo, pr_id, *, token, paths, context=3, allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1072`
-- REST: один `GET .../pull-requests/{id}/diff/{path}` на каждый файл, один session на батч.
+**`get_pull_request_diffs(base_url, repo, pr_id, *, token, paths, context=3, whitespace="ignore-all", allow_http_loopback=False) -> list[dict[str, object]]`** — `bitbucket.py:1072`
+- REST: один `GET .../pull-requests/{id}/diff/{path}` на каждый файл, один session на батч;
+  `whitespace` действует на все запросы батча.
 - → список в порядке запроса. Дубликаты, пустой список, не-строки и >100 путей —
   ошибка до запроса; поздний сбой не отдаёт частичный список.
 
@@ -176,7 +179,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
   усечения, дубли путей, нет `srcPath` у MOVE/COPY/RENAME, агрегат > 32 MiB — ошибка;
   снимок между запросами не гарантируется.
 
-**`get_pull_request_diff_text(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, allow_http_loopback=False) -> str`** — `bitbucket.py:1232`
+**`get_pull_request_diff_text(base_url, repo, pr_id, *, token, context=3, path=None, source_path=None, whitespace="ignore-all", allow_http_loopback=False) -> str`** — `bitbucket.py:1232`
 - REST: тот же один запрос diff.
 - → читаемый unified-diff-подобный текст (не применяемый патч; без index/binary/rename
   маркеров), управляющие символы и bidi экранируются.
@@ -269,9 +272,9 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - Ошибки/лимиты: `sha`; `truncated=true`; `max_pages`; серверный незаявленный cap не
   детектируется.
 
-**`get_commit_diff(base_url, repo, sha, *, token, paths=None, context=3, allow_http_loopback=False) -> dict[str, object] | list[dict[str, object]]`** — `bitbucket.py:1872`
+**`get_commit_diff(base_url, repo, sha, *, token, paths=None, context=3, whitespace="ignore-all", allow_http_loopback=False) -> dict[str, object] | list[dict[str, object]]`** — `bitbucket.py:1872`
 - REST: `GET .../commits/{sha}/diff` или по одному `.../diff/{path}` на каждый путь; query
-  `contextLines`, `whitespace=ignore-all`, `withComments=false`.
+  `contextLines`, `whitespace`, `withComments=false`.
 - → сырой diff-объект; при `paths` — список объектов в порядке путей.
 - Ошибки/лимиты: `context` 0..100; не более 100 путей; небезопасный путь; объявленная
   обрезка — `DeclaredTruncationError`.

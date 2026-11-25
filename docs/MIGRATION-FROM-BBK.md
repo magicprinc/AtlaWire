@@ -77,7 +77,7 @@ equivalent.
 | `bitbucket.file_at` | `bitbucket.get_repository_file` | default branch when `at` is omitted |
 | `bitbucket.pr` | `bitbucket.get_pull_request` | |
 | `bitbucket.pr_files` | `bitbucket.list_pull_request_files` | |
-| `bitbucket.pr_diff` | `bitbucket.get_pull_request_diff` / `get_pull_request_diffs` | one path per call, or `paths=[...]` for a batch |
+| `bitbucket.pr_diff` | `bitbucket.get_pull_request_diff` / `get_pull_request_diffs` | one path per call, or `paths=[...]` for a batch; `whitespace` keeps the same three values and is validated |
 | `bitbucket.pr_file` | `bitbucket.get_pull_request_file` | |
 | `bitbucket.pr_comments` | `bitbucket.list_pull_request_comments` | |
 | `bitbucket.pr_commits` | `bitbucket.list_pull_request_commits` | |
@@ -147,8 +147,12 @@ equivalent.
   `identity.whoami` (explicit pairs), `repo_search.search_repositories` (cross-repository).
 - **Gaps closed after this run:** `pr_compact`, `jira.url`, one-call
   `page_storage`/`title`, and `pr_diff(paths=[...])` now have equivalents; see §3.
-- **Remaining gaps:** public `review` heuristics (private helpers), and BBK's
-  `compact`/`compact_json` formatters.
+- **Previously remaining gaps, now public:** the Markdown formatters
+  (`atlawire.markdown.compact`, `compact_json`) and the review heuristics
+  (`pr_review.file_links`, `java_members`, `red_flags`, `changed_symbols`) are
+  exported; `pr_review.review(...)` is the one-call review.
+- **Still different by design:** `find_author_comments` is always strict and
+  takes `grep=` instead of BBK's `text=`; `titles` has no cache and no `refresh`.
 - **Not a product bug:** my first `search_code(repo=...)` call used a slug
   keyword; the correct scope is `repo="KEY/slug"` or `project="KEY"`.
 - **Markdown differs in size** for Jira and Confluence. Both are inert and
