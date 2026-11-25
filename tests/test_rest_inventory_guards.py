@@ -78,8 +78,11 @@ def test_row_level_compensation_fails_even_when_counts_are_consistent(generator,
     block = broken["products"]["jira"]
     required = [row for row in block["rows"] if row["disposition"] == "required"]
     excluded = [row for row in block["rows"] if row["disposition"] == "excluded"]
+    # An excluded row that is unregistered: an admin-registered one is a valid
+    # disposition, so promoting it would not be a contradiction.
+    unregistered = next(row for row in excluded if not row["registered"])
     required[0]["disposition"] = "excluded"
-    excluded[0]["disposition"] = "required"
+    unregistered["disposition"] = "required"
     block["counts"]["required"] = sum(
         1 for row in block["rows"] if row["disposition"] == "required"
     )

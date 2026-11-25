@@ -22,7 +22,7 @@ from atlawire.pr_review import (
 )
 from atlawire.sdk import SdkRequestError, client_for, get_json, request_json
 
-__version__ = "0.9.5"
+__version__ = "0.9.6"
 
 __all__ = [
     "AtlaWireError",

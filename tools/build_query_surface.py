@@ -41,11 +41,18 @@ def _routes(product: str) -> dict[tuple[str, str], list[wadl.Param]]:
 
 
 def _declared_operations() -> dict[str, tuple[str, str, str, set[str]]]:
-    """Return id -> (product, method, route, already-declared query names)."""
+    """Return id -> (product, method, route, already-declared query names).
+
+    Administrative operations are skipped: their parameters are carried by
+    ``admin_operations.json``, which is generated from the same WADL, so listing
+    them here as well would declare the same parameter twice.
+    """
     from atlawire import operations
 
     declared: dict[str, tuple[str, str, str, set[str]]] = {}
     for described in operations.list_operations():
+        if described.get("scope") == "admin":
+            continue
         product = str(described["product"])
         route = str(described["path"]).removeprefix(PREFIX[product])
         names = {

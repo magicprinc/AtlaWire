@@ -68,5 +68,8 @@ def test_cli_operations_matches_the_packaged_manifest():
         (entry["product"], entry["method"], entry["path"]) for entry in operations
     }
 
-    assert len(operations) == 202
+    # 202 non-administrative reads plus 117 administrative reads, each declared
+    # in its own artifact and gated behind --allow-admin.
+    assert len(operations) == 319
+    assert sum(1 for entry in operations if entry["scope"] == "admin") == 117
     assert manifest_routes - registry_routes == set()

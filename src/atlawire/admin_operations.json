@@ -1,0 +1,2382 @@
+{
+  "deferred": [
+    {
+      "method": "GET",
+      "path": "/audit/export",
+      "product": "confluence",
+      "reason": "binary archive body (application/zip, text/csv)"
+    },
+    {
+      "method": "GET",
+      "path": "/email-templates",
+      "product": "jira",
+      "reason": "binary archive body (application/zip)"
+    },
+    {
+      "method": "GET",
+      "path": "/issue/{issueIdOrKey}/subtask/move",
+      "product": "jira",
+      "reason": "documented as a GET but changes state; the same path is a POST"
+    }
+  ],
+  "note": "Administrative and system reads the deployments expose. Declared with scope=admin: `read` requires --allow-admin, so nothing administrative is implicit. Generated from each server's own WADL by tools/build_admin_surface.py.",
+  "operations": [
+    {
+      "arguments": [],
+      "description": "Gets information about the nodes that currently make up the stash cluster. The authenticated user must have the SYS_ADMIN permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.cluster",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/cluster",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of groups. The authenticated user must have LICENSED_USER permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.groups",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/groups",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves a list of users that are members of a specified group. The authenticated user must have the LICENSED_USER permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.groups.more-members",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/groups/more-members",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "context",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves a list of users that are not members of a specified group. The authenticated user must have the LICENSED_USER permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.groups.more-non-members",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/groups/more-non-members",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "context",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves details about the current license, as well as the current status of the system with regards to the installed license. The status includes the current number of users applied toward the licen",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.license",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/license",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves the current mail configuration. The authenticated user must have the SYS_ADMIN permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.mail-server",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/mail-server",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves the server email address",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.mail-server.sender-address",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/mail-server/sender-address",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of groups that have been granted at least one global permission. The authenticated user must have ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.permissions.groups",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/permissions/groups",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of groups that have no granted global permissions. The authenticated user must have ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.permissions.groups.none",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/permissions/groups/none",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of users that have been granted at least one global permission. The authenticated user must have ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.permissions.users",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/permissions/users",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of users that have no granted global permissions. The authenticated user must have ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.permissions.users.none",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/permissions/users/none",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for scmId.",
+          "name": "scmId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve the merge strategies available for this instance. The user must be authenticated to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.pull-requests.scmid",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/pull-requests/{scmId}",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of users. The authenticated user must have the LICENSED_USER permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.users",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/users",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves a list of groups the specified user is a member of. The authenticated user must have the LICENSED_USER permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.users.more-members",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/users/more-members",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "context",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves a list of groups the specified user is not a member of. The authenticated user must have the LICENSED_USER permission to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.admin.users.more-non-members",
+      "method": "GET",
+      "path": "/rest/api/1.0/admin/users/more-non-members",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "context",
+          "type": "string"
+        },
+        {
+          "default": "",
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve version information and other application properties. No authentication is required to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.application-properties",
+      "method": "GET",
+      "path": "/rest/api/1.0/application-properties",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve a page of group names. The authenticated user must have PROJECT_ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.groups",
+      "method": "GET",
+      "path": "/rest/api/1.0/groups",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for loggerName.",
+          "name": "loggerName",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve the current log level for a given logger. The authenticated user must have ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.logs.logger.loggername",
+      "method": "GET",
+      "path": "/rest/api/1.0/logs/logger/{loggerName}",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Retrieve the current log level for the root logger. The authenticated user must have ADMIN permission or higher to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.logs.rootlogger",
+      "method": "GET",
+      "path": "/rest/api/1.0/logs/rootLogger",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of groups that have been granted at least one permission for the specified project. The authenticated user must have PROJECT_ADMIN permission for the specified project or a higher glob",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.permissions.groups",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/groups",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of groups that have no granted permissions for the specified project. The authenticated user must have PROJECT_ADMIN permission for the specified project or a higher global permission ",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.permissions.groups.none",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/groups/none",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for permission.",
+          "name": "permission",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Check whether the specified permission is the default permission (granted to all users) for a project. The authenticated user must have PROJECT_ADMIN permission for the specified project or a higher g",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.permissions.permission.all",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/{permission}/all",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of users that have been granted at least one permission for the specified project. The authenticated user must have PROJECT_ADMIN permission for the specified project or a higher globa",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.permissions.users",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/users",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of licensed users that have no granted permissions for the specified project. The authenticated user must have PROJECT_ADMIN permission for the specified project or a higher global per",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.permissions.users.none",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/users/none",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of groups that have been granted at least one permission for the specified repository. The authenticated user must have REPO_ADMIN permission for the specified repository or a higher p",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.groups",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/groups",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of groups that have no granted permissions for the specified repository. The authenticated user must have REPO_ADMIN permission for the specified repository or a higher project or glob",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.groups.none",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/groups/none",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of users that have been granted at least one permission for the specified repository. The authenticated user must have REPO_ADMIN permission for the specified repository or a higher pr",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.users",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/users",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of licensed users that have no granted permissions for the specified repository. The authenticated user must have REPO_ADMIN permission for the specified repository or a higher project",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.users.none",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/users/none",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "filter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of repository hooks for this repository. The authenticated user must have REPO_READ permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "",
+          "name": "type",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for hookKey.",
+          "name": "hookKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a repository hook for this repository. The authenticated user must have REPO_READ permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks.hookkey",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for hookKey.",
+          "name": "hookKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve the settings for a repository hook for this repository. The authenticated user must have REPO_READ permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks.hookkey.settings",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}/settings",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve the pull request settings for the context repository. The authenticated user must have REPO_READ permission for the context repository to call this resource. This resource will call all RestF",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.pull-requests",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/pull-requests",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Find webhooks in this repository. The authenticated user must have REPO_ADMIN permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "event",
+          "type": "string"
+        },
+        {
+          "default": "false",
+          "name": "statistics",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Get a webhook by id. The authenticated user must have REPO_ADMIN permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "false",
+          "name": "statistics",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Get the latest invocations for a specific webhook. The authenticated user must have REPO_ADMIN permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.latest",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/latest",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "event",
+          "type": "string"
+        },
+        {
+          "name": "outcome",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Get the statistics for a specific webhook. The authenticated user must have REPO_ADMIN permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.statistics",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/statistics",
+      "product": "bitbucket",
+      "query": [
+        {
+          "name": "event",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for repositorySlug.",
+          "name": "repositorySlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Get the statistics summary for a specific webhook. The authenticated user must have REPO_ADMIN permission for the specified repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.statistics.summary",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/statistics/summary",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a page of repository hooks for this project. The authenticated user must have PROJECT_READ permission for the specified project to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.settings.hooks",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks",
+      "product": "bitbucket",
+      "query": [
+        {
+          "default": "",
+          "name": "type",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for hookKey.",
+          "name": "hookKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a repository hook for this project. The authenticated user must have PROJECT_READ permission for the specified project to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.settings.hooks.hookkey",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for hookKey.",
+          "name": "hookKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve the settings for a repository hook for this project. The authenticated user must have PROJECT_READ permission for the specified project to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.settings.hooks.hookkey.settings",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}/settings",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKey.",
+          "name": "projectKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for scmId.",
+          "name": "scmId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve the merge strategy configuration for this project and SCM. The authenticated user must have PROJECT_READ permission for the context repository to call this resource.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.projects.projectkey.settings.pull-requests.scmid",
+      "method": "GET",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/pull-requests/{scmId}",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for userSlug.",
+          "name": "userSlug",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieve a map of user setting key values for a specific user identified by the user slug.",
+      "documented_version": "Bitbucket Server 5.10 REST API 1.0",
+      "id": "bitbucket.users.userslug.settings",
+      "method": "GET",
+      "path": "/rest/api/1.0/users/{userSlug}/settings",
+      "product": "bitbucket",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /accessmode.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.accessmode",
+      "method": "GET",
+      "path": "/rest/api/accessmode",
+      "product": "confluence",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /audit.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.audit",
+      "method": "GET",
+      "path": "/rest/api/audit",
+      "product": "confluence",
+      "query": [
+        {
+          "name": "startDate",
+          "type": "string"
+        },
+        {
+          "name": "endDate",
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "type": "integer"
+        },
+        {
+          "default": "1000",
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "searchString",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /audit/retention.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.audit.retention",
+      "method": "GET",
+      "path": "/rest/api/audit/retention",
+      "product": "confluence",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /audit/since.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.audit.since",
+      "method": "GET",
+      "path": "/rest/api/audit/since",
+      "product": "confluence",
+      "query": [
+        {
+          "default": "3",
+          "name": "number",
+          "type": "integer"
+        },
+        {
+          "name": "units",
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "type": "integer"
+        },
+        {
+          "default": "1000",
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "searchString",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /webhooks.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.webhooks",
+      "method": "GET",
+      "path": "/rest/api/webhooks",
+      "product": "confluence",
+      "query": [
+        {
+          "name": "event",
+          "type": "string"
+        },
+        {
+          "default": "false",
+          "name": "statistics",
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "type": "integer"
+        },
+        {
+          "default": "100",
+          "name": "limit",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Administrative read: /webhooks/{webhookId}.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.webhooks.webhookid",
+      "method": "GET",
+      "path": "/rest/api/webhooks/{webhookId}",
+      "product": "confluence",
+      "query": [
+        {
+          "default": "false",
+          "name": "statistics",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Administrative read: /webhooks/{webhookId}/latest.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.webhooks.webhookid.latest",
+      "method": "GET",
+      "path": "/rest/api/webhooks/{webhookId}/latest",
+      "product": "confluence",
+      "query": [
+        {
+          "name": "event",
+          "type": "string"
+        },
+        {
+          "name": "outcome",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Administrative read: /webhooks/{webhookId}/statistics.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.webhooks.webhookid.statistics",
+      "method": "GET",
+      "path": "/rest/api/webhooks/{webhookId}/statistics",
+      "product": "confluence",
+      "query": [
+        {
+          "name": "event",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for webhookId.",
+          "name": "webhookId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Administrative read: /webhooks/{webhookId}/statistics/summary.",
+      "documented_version": "Confluence Server 6.6 REST API",
+      "id": "confluence.webhooks.webhookid.statistics.summary",
+      "method": "GET",
+      "path": "/rest/api/webhooks/{webhookId}/statistics/summary",
+      "product": "confluence",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns an application property.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.application-properties",
+      "method": "GET",
+      "path": "/rest/api/2/application-properties",
+      "product": "jira",
+      "query": [
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "permissionLevel",
+          "type": "string"
+        },
+        {
+          "name": "keyFilter",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns the properties that are displayed on the \"General Configuration > Advanced Settings\" page.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.application-properties.advanced-settings",
+      "method": "GET",
+      "path": "/rest/api/2/application-properties/advanced-settings",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns all ApplicationRoles in the system. Will also return an ETag header containing a version hash of the collection of ApplicationRoles.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.applicationrole",
+      "method": "GET",
+      "path": "/rest/api/2/applicationrole",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for key.",
+          "name": "key",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the ApplicationRole with passed key if it exists.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.applicationrole.key",
+      "method": "GET",
+      "path": "/rest/api/2/applicationrole/{key}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns auditing records filtered using provided parameters",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.auditing.record",
+      "method": "GET",
+      "path": "/rest/api/2/auditing/record",
+      "product": "jira",
+      "query": [
+        {
+          "name": "offset",
+          "type": "integer"
+        },
+        {
+          "name": "limit",
+          "type": "integer"
+        },
+        {
+          "name": "filter",
+          "type": "string"
+        },
+        {
+          "name": "from",
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "type": "string"
+        },
+        {
+          "name": "projectIds",
+          "type": "string"
+        },
+        {
+          "name": "userIds",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /cluster/nodes.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.cluster.nodes",
+      "method": "GET",
+      "path": "/rest/api/2/cluster/nodes",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /cluster/zdu/state.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.cluster.zdu.state",
+      "method": "GET",
+      "path": "/rest/api/2/cluster/zdu/state",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /customFields.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.customfields",
+      "method": "GET",
+      "path": "/rest/api/2/customFields",
+      "product": "jira",
+      "query": [
+        {
+          "default": "1",
+          "name": "startAt",
+          "type": "integer"
+        },
+        {
+          "default": "50",
+          "name": "maxResults",
+          "type": "integer"
+        },
+        {
+          "name": "search",
+          "type": "string"
+        },
+        {
+          "name": "projectIds",
+          "type": "string"
+        },
+        {
+          "name": "screenIds",
+          "type": "string"
+        },
+        {
+          "name": "types",
+          "type": "string"
+        },
+        {
+          "name": "sortOrder",
+          "type": "string"
+        },
+        {
+          "name": "sortColumn",
+          "type": "string"
+        },
+        {
+          "name": "lastValueUpdate",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns a list of root templates mapped with Event Types. The list can be used to decide which test emails to send.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.email-templates.types",
+      "method": "GET",
+      "path": "/rest/api/2/email-templates/types",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns REST representation for the requested group. Allows to get list of active users belonging to the specified group and its subgroups if \"users\" expand option is provided. You can page through us",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.group",
+      "method": "GET",
+      "path": "/rest/api/2/group",
+      "product": "jira",
+      "query": [
+        {
+          "name": "groupname",
+          "type": "string"
+        },
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "This resource returns a paginated list of users who are members of the specified group and its subgroups. Users in the page are ordered by user names. User of this resource is required to have sysadmi",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.group.member",
+      "method": "GET",
+      "path": "/rest/api/2/group/member",
+      "product": "jira",
+      "query": [
+        {
+          "name": "groupname",
+          "type": "string"
+        },
+        {
+          "default": "false",
+          "name": "includeInactiveUsers",
+          "type": "string"
+        },
+        {
+          "default": "0",
+          "name": "startAt",
+          "type": "integer"
+        },
+        {
+          "default": "50",
+          "name": "maxResults",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Summarizes index condition of current node. Returned data consists of: nodeId - Node identifier. reportTime - Time of this report creation. issueIndex - Summary of issue index status. replicationQueue",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.index.summary",
+      "method": "GET",
+      "path": "/rest/api/2/index/summary",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns all issue security schemes that are defined.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.issuesecurityschemes",
+      "method": "GET",
+      "path": "/rest/api/2/issuesecurityschemes",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the issue security scheme along with that are defined.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.issuesecurityschemes.id",
+      "method": "GET",
+      "path": "/rest/api/2/issuesecurityschemes/{id}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns a list of all issue type schemes visible to the user (must be admin). All issue types associated with the scheme will only be returned if an additional query parameter is provided: expand=sche",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.issuetypescheme",
+      "method": "GET",
+      "path": "/rest/api/2/issuetypescheme",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for schemeId.",
+          "name": "schemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns a full representation of the issue type scheme that has the given id (must be admin).",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.issuetypescheme.schemeid",
+      "method": "GET",
+      "path": "/rest/api/2/issuetypescheme/{schemeId}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for schemeId.",
+          "name": "schemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "For the specified issue type scheme, returns all of the associated projects. (Admin required)",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.issuetypescheme.schemeid.associations",
+      "method": "GET",
+      "path": "/rest/api/2/issuetypescheme/{schemeId}/associations",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /monitoring/jmx/areMetricsExposed.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.monitoring.jmx.aremetricsexposed",
+      "method": "GET",
+      "path": "/rest/api/2/monitoring/jmx/areMetricsExposed",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Administrative read: /monitoring/jmx/getAvailableMetrics.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.monitoring.jmx.getavailablemetrics",
+      "method": "GET",
+      "path": "/rest/api/2/monitoring/jmx/getAvailableMetrics",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns a paginated list of notification schemes. In order to access notification scheme, the calling user is required to have permissions to administer at least one project associated with the reques",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.notificationscheme",
+      "method": "GET",
+      "path": "/rest/api/2/notificationscheme",
+      "product": "jira",
+      "query": [
+        {
+          "name": "startAt",
+          "type": "integer"
+        },
+        {
+          "name": "maxResults",
+          "type": "integer"
+        },
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns a full representation of the notification scheme for the given id. This resource will return a notification scheme containing a list of events and recipient configured to receive notifications",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.notificationscheme.id",
+      "method": "GET",
+      "path": "/rest/api/2/notificationscheme/{id}",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns all permissions that are present in the Jira instance - Global, Project and the global ones added by plugins",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.permissions",
+      "method": "GET",
+      "path": "/rest/api/2/permissions",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns a list of all permission schemes. By default only shortened beans are returned. If you want to include permissions of all the schemes, then specify the permissions expand parameter. Permission",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.permissionscheme",
+      "method": "GET",
+      "path": "/rest/api/2/permissionscheme",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for permissionSchemeId.",
+          "name": "permissionSchemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for attributeKey.",
+          "name": "attributeKey",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Administrative read: /permissionscheme/{permissionSchemeId}/attribute/{attributeKey}.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.permissionscheme.permissionschemeid.attribute.attributekey",
+      "method": "GET",
+      "path": "/rest/api/2/permissionscheme/{permissionSchemeId}/attribute/{attributeKey}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for schemeId.",
+          "name": "schemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns a permission scheme identified by the given id.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.permissionscheme.schemeid",
+      "method": "GET",
+      "path": "/rest/api/2/permissionscheme/{schemeId}",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for schemeId.",
+          "name": "schemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns all permission grants of the given permission scheme.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.permissionscheme.schemeid.permission",
+      "method": "GET",
+      "path": "/rest/api/2/permissionscheme/{schemeId}/permission",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for schemeId.",
+          "name": "schemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for permissionId.",
+          "name": "permissionId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns a permission grant identified by the given id.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.permissionscheme.schemeid.permission.permissionid",
+      "method": "GET",
+      "path": "/rest/api/2/permissionscheme/{schemeId}/permission/{permissionId}",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns all priority schemes. All project keys associated with the priority scheme will only be returned if additional query parameter is provided expand=schemes.projectKeys .",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.priorityschemes",
+      "method": "GET",
+      "path": "/rest/api/2/priorityschemes",
+      "product": "jira",
+      "query": [
+        {
+          "name": "startAt",
+          "type": "integer"
+        },
+        {
+          "name": "maxResults",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for schemeId.",
+          "name": "schemeId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets a full representation of a priority scheme in JSON format. All project keys associated with the priority scheme will only be returned if additional query parameter is provided expand=projectKeys ",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.priorityschemes.schemeid",
+      "method": "GET",
+      "path": "/rest/api/2/priorityschemes/{schemeId}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKeyOrId.",
+          "name": "projectKeyOrId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the issue security scheme for project.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.project.projectkeyorid.issuesecuritylevelscheme",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/issuesecuritylevelscheme",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKeyOrId.",
+          "name": "projectKeyOrId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets a notification scheme associated with the project. Follow the documentation of /notificationscheme/{id} resource for all details about returned value.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.project.projectkeyorid.notificationscheme",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/notificationscheme",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKeyOrId.",
+          "name": "projectKeyOrId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets a permission scheme assigned with a project.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.project.projectkeyorid.permissionscheme",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/permissionscheme",
+      "product": "jira",
+      "query": [
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKeyOrId.",
+          "name": "projectKeyOrId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets a full representation of a priority scheme in JSON format used by specified project. User must be global administrator or project administrator. All project keys associated with the priority sche",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.project.projectkeyorid.priorityscheme",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/priorityscheme",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for projectKeyOrId.",
+          "name": "projectKeyOrId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the workflow scheme that is associated with requested project.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.project.projectkeyorid.workflowscheme",
+      "method": "GET",
+      "path": "/rest/api/2/project/{projectKeyOrId}/workflowscheme",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns information on the system reindexes. If a reindex is currently taking place then information about this reindex is returned. If there is no active index task, then returns information about th",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.reindex",
+      "method": "GET",
+      "path": "/rest/api/2/reindex",
+      "product": "jira",
+      "query": [
+        {
+          "name": "taskId",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns information on the system reindexes. If a reindex is currently taking place then information about this reindex is returned. If there is no active index task, then returns information about th",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.reindex.progress",
+      "method": "GET",
+      "path": "/rest/api/2/reindex/progress",
+      "product": "jira",
+      "query": [
+        {
+          "name": "taskId",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Retrieves the progress of a multiple reindex requests. Only reindex requests that actually exist will be returned in the results.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.reindex.request.bulk",
+      "method": "GET",
+      "path": "/rest/api/2/reindex/request/bulk",
+      "product": "jira",
+      "query": [
+        {
+          "name": "requestId",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for requestId.",
+          "name": "requestId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Retrieves the progress of a single reindex request.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.reindex.request.requestid",
+      "method": "GET",
+      "path": "/rest/api/2/reindex/request/{requestId}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Get all the ProjectRoles available in Jira. Currently this list is global.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.role",
+      "method": "GET",
+      "path": "/rest/api/2/role",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Get a specific ProjectRole available in Jira.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.role.id",
+      "method": "GET",
+      "path": "/rest/api/2/role/{id}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets default actors for the given role.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.role.id.actors",
+      "method": "GET",
+      "path": "/rest/api/2/role/{id}/actors",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Gets available field screens",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.screens",
+      "method": "GET",
+      "path": "/rest/api/2/screens",
+      "product": "jira",
+      "query": [
+        {
+          "name": "startAt",
+          "type": "string"
+        },
+        {
+          "name": "maxResults",
+          "type": "string"
+        },
+        {
+          "name": "expand",
+          "type": "string"
+        },
+        {
+          "name": "search",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for screenId.",
+          "name": "screenId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets available fields for screen. i.e ones that haven't already been added.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.screens.screenid.availablefields",
+      "method": "GET",
+      "path": "/rest/api/2/screens/{screenId}/availableFields",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for screenId.",
+          "name": "screenId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns a list of all tabs for the given screen",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.screens.screenid.tabs",
+      "method": "GET",
+      "path": "/rest/api/2/screens/{screenId}/tabs",
+      "product": "jira",
+      "query": [
+        {
+          "name": "projectKey",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for screenId.",
+          "name": "screenId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for tabId.",
+          "name": "tabId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Gets all fields for a given tab",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.screens.screenid.tabs.tabid.fields",
+      "method": "GET",
+      "path": "/rest/api/2/screens/{screenId}/tabs/{tabId}/fields",
+      "product": "jira",
+      "query": [
+        {
+          "name": "projectKey",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns the default system columns for issue navigator. Admin permission will be required.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.settings.columns",
+      "method": "GET",
+      "path": "/rest/api/2/settings/columns",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for type.",
+          "name": "type",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for owningObjectId.",
+          "name": "owningObjectId",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Administrative read: /universal_avatar/type/{type}/owner/{owningObjectId}.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.universal-avatar.type.type.owner.owningobjectid",
+      "method": "GET",
+      "path": "/rest/api/2/universal_avatar/type/{type}/owner/{owningObjectId}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Returns the result of the last upgrade task. Returns {@link javax.ws.rs.core.Response#seeOther(java.net.URI)} if still running.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.upgrade",
+      "method": "GET",
+      "path": "/rest/api/2/upgrade",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [],
+      "description": "Validates user anonymization process.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.user.anonymization",
+      "method": "GET",
+      "path": "/rest/api/2/user/anonymization",
+      "product": "jira",
+      "query": [
+        {
+          "name": "userKey",
+          "type": "string"
+        },
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns information about a user anonymization operation progress.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.user.anonymization.progress",
+      "method": "GET",
+      "path": "/rest/api/2/user/anonymization/progress",
+      "product": "jira",
+      "query": [
+        {
+          "name": "taskId",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Validates user anonymization re-run process.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.user.anonymization.rerun",
+      "method": "GET",
+      "path": "/rest/api/2/user/anonymization/rerun",
+      "product": "jira",
+      "query": [
+        {
+          "name": "userKey",
+          "type": "string"
+        },
+        {
+          "name": "oldUserKey",
+          "type": "string"
+        },
+        {
+          "name": "oldUserName",
+          "type": "string"
+        },
+        {
+          "name": "expand",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns the number of users whose accounts are duplicated. Duplicated means that the user has an account in more than one directory and either more than one account is active or the only active accoun",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.user.duplicated.count",
+      "method": "GET",
+      "path": "/rest/api/2/user/duplicated/count",
+      "product": "jira",
+      "query": [
+        {
+          "name": "flush",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns duplicated users mapped to their directories with an indication if their accounts are active or not. Duplicated means that the user has an account in more than one directory and either more th",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.user.duplicated.list",
+      "method": "GET",
+      "path": "/rest/api/2/user/duplicated/list",
+      "product": "jira",
+      "query": [
+        {
+          "name": "flush",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns a list of active users that match the search string and have all specified permissions for the project or issue. This resource can be accessed by users with ADMINISTER_PROJECT permission for t",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.user.permission.search",
+      "method": "GET",
+      "path": "/rest/api/2/user/permission/search",
+      "product": "jira",
+      "query": [
+        {
+          "name": "username",
+          "type": "string"
+        },
+        {
+          "name": "permissions",
+          "type": "string"
+        },
+        {
+          "name": "issueKey",
+          "type": "string"
+        },
+        {
+          "name": "projectKey",
+          "type": "string"
+        },
+        {
+          "name": "startAt",
+          "type": "integer"
+        },
+        {
+          "name": "maxResults",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns all workflows.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflow",
+      "method": "GET",
+      "path": "/rest/api/2/workflow",
+      "product": "jira",
+      "query": [
+        {
+          "name": "workflowName",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Return the property or properties associated with a transition.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflow.transitions.id.properties",
+      "method": "GET",
+      "path": "/rest/api/2/workflow/transitions/{id}/properties",
+      "product": "jira",
+      "query": [
+        {
+          "name": "includeReservedKeys",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "workflowName",
+          "type": "string"
+        },
+        {
+          "name": "workflowMode",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the requested workflow scheme to the caller.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}",
+      "product": "jira",
+      "query": [
+        {
+          "default": "false",
+          "name": "returnDraftIfExists",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Return the default workflow from the passed workflow scheme.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.default",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/default",
+      "product": "jira",
+      "query": [
+        {
+          "default": "false",
+          "name": "returnDraftIfExists",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the requested draft workflow scheme to the caller.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.draft",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/draft",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Return the default workflow from the passed draft workflow scheme to the caller.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.draft.default",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/draft/default",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for issueType.",
+          "name": "issueType",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the issue type mapping for the passed draft workflow scheme.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.draft.issuetype.issuetype",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/draft/issuetype/{issueType}",
+      "product": "jira",
+      "query": []
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the draft workflow mappings or requested mapping to the caller.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.draft.workflow",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/draft/workflow",
+      "product": "jira",
+      "query": [
+        {
+          "name": "workflowName",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        },
+        {
+          "allow_slash": false,
+          "description": "Path value for issueType.",
+          "name": "issueType",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the issue type mapping for the passed workflow scheme.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.issuetype.issuetype",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/issuetype/{issueType}",
+      "product": "jira",
+      "query": [
+        {
+          "default": "false",
+          "name": "returnDraftIfExists",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "allow_slash": false,
+          "description": "Path value for id.",
+          "name": "id",
+          "pattern": "[A-Za-z0-9_.~\\-]+"
+        }
+      ],
+      "description": "Returns the workflow mappings or requested mapping to the caller for the passed scheme.",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.workflowscheme.id.workflow",
+      "method": "GET",
+      "path": "/rest/api/2/workflowscheme/{id}/workflow",
+      "product": "jira",
+      "query": [
+        {
+          "name": "workflowName",
+          "type": "string"
+        },
+        {
+          "default": "false",
+          "name": "returnDraftIfExists",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns worklogs id and delete time of worklogs that was deleted since given time. The returns set of worklogs is limited to 1000 elements. This API will not return worklogs deleted during last minute",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.worklog.deleted",
+      "method": "GET",
+      "path": "/rest/api/2/worklog/deleted",
+      "product": "jira",
+      "query": [
+        {
+          "default": "0",
+          "name": "since",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "description": "Returns worklogs id and update time of worklogs that was updated since given time. The returns set of worklogs is limited to 1000 elements. This API will not return worklogs updated during last minute",
+      "documented_version": "Jira Server 8.22 REST API 2",
+      "id": "jira.worklog.updated",
+      "method": "GET",
+      "path": "/rest/api/2/worklog/updated",
+      "product": "jira",
+      "query": [
+        {
+          "default": "0",
+          "name": "since",
+          "type": "integer"
+        }
+      ]
+    }
+  ],
+  "schema": "atlawire-admin-surface/v1"
+}

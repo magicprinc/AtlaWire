@@ -10,6 +10,29 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.6] - 2026-11-25
+
+### Added
+
+- **117 administrative and system reads are declared**, so a consumer no longer
+  has to reach for `api-get` and lose validation, paging and the operation id.
+  Each carries `scope="admin"` and `read` refuses it unless `--allow-admin` is
+  passed; the refusal happens before any request. Both layers enforce it
+  independently: the registry's scope gate and the transport's path validator, so
+  a mistake in one is caught by the other. Live on this deployment, 11 of them
+  answer 200 for the configured token and 39 answer 401/403 - the server decides,
+  and we no longer hide that.
+- `tools/check_read_only.py` proves the whole registry is read-only, by method and
+  by the documented purpose of each route. It runs as a CI gate.
+
+### Fixed
+
+- Three routes that could change state are never declared: Jira
+  `GET /issue/{key}/subtask/move` (a GET that moves a subtask), and two binary
+  bodies (Jira `/email-templates`, Confluence `/audit/export`). They are listed in
+  `admin_operations.json` under `deferred` with the reason, so the exclusion is
+  auditable rather than remembered.
+
 ## [0.9.5] - 2026-11-25
 
 ### Added

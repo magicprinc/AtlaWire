@@ -38,30 +38,31 @@ route_variants = wadl.route_variants
 
 BASELINE = {
     # Counts, plus the identity of both difference lists and the WADL they were
-    # read from. Counts alone stay green through a rename on either side.
+    # read from. Only the deliberately deferred routes remain: a binary body and
+    # one state-changing GET.
     "bitbucket": {
-        "matched": 58,
+        "matched": 100,
         "undeclared_param_routes": 0,
-        "server_only": 42,
-        "server_only_sha": "d347abf9d8bc1b48",
+        "server_only": 0,
+        "server_only_sha": "e3b0c44298fc1c14",
         "registry_only": 0,
         "registry_only_sha": "e3b0c44298fc1c14",
         "wadl_sha256": "9942abd00c3aedaf",
     },
     "confluence": {
-        "matched": 35,
+        "matched": 44,
         "undeclared_param_routes": 0,
-        "server_only": 10,
-        "server_only_sha": "26ce100d3a9c143a",
+        "server_only": 1,
+        "server_only_sha": "43e09becea01acfe",
         "registry_only": 0,
         "registry_only_sha": "e3b0c44298fc1c14",
         "wadl_sha256": "f5c08e2b952650f1",
     },
     "jira": {
-        "matched": 105,
+        "matched": 171,
         "undeclared_param_routes": 0,
-        "server_only": 68,
-        "server_only_sha": "c3b41638baf41b02",
+        "server_only": 2,
+        "server_only_sha": "39b600fed2ab32fe",
         "registry_only": 2,
         "registry_only_sha": "67ede67ab0463047",
         "wadl_sha256": "1106c2469ec3dca8",

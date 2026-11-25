@@ -441,8 +441,12 @@ def request_json_with_status(
     params: Mapping[str, object] | None = None,
     body: Mapping[str, object] | None = None,
     allow_http_loopback: bool = False,
+    allow_admin: bool = False,
 ) -> tuple[int, object]:
-    """Read one standard non-admin JSON endpoint with its HTTP status.
+    """Read one standard JSON endpoint with its HTTP status.
+
+    ``allow_admin`` opens the administrative path guard for a call whose
+    registered scope is admin; the registry refuses such an operation first.
 
     Exactly one route is requested per attempt. Redirects are refused rather
     than followed, the body is read in bounded chunks, and retries are owned
@@ -460,7 +464,7 @@ def request_json_with_status(
             category="validation",
             product=_supported_product(product),
         )
-    _validate_path(path, product=product)
+    _validate_path(path, product=product, allow_admin=allow_admin)
     if normalized == "POST":
         _check_semantic_post(product, path)
     if normalized == "GET" and body is not None:
@@ -508,6 +512,7 @@ def download_to_file(
     params: Mapping[str, object] | None = None,
     max_bytes: int = _BINARY_LIMIT,
     allow_http_loopback: bool = False,
+    allow_admin: bool = False,
 ) -> tuple[str | None, int, str]:
     """Read one bounded read-only response into a file and return its receipt.
 
@@ -531,7 +536,7 @@ def download_to_file(
             category="validation",
             product=_supported_product(product),
         )
-    _validate_path(path, product=product)
+    _validate_path(path, product=product, allow_admin=allow_admin)
     if max_bytes < 1:
         raise AtlaWireError(
             "The byte limit must be a positive integer.",
@@ -1155,7 +1160,9 @@ def _fully_unquoted(path: str) -> str:
         decoded = next_value
 
 
-def _validate_path(path: str, *, product: str | None = None) -> None:
+def _validate_path(
+    path: str, *, product: str | None = None, allow_admin: bool = False
+) -> None:
     if (
         not isinstance(path, str)
         or not path.startswith("/rest/")
@@ -1175,7 +1182,12 @@ def _validate_path(path: str, *, product: str | None = None) -> None:
             category="validation",
             product=_supported_product(product),
         )
-    if any(segment in _ADMIN_SEGMENTS for segment in decoded_segments):
+    if not allow_admin and any(
+        segment in _ADMIN_SEGMENTS for segment in decoded_segments
+    ):
+        # The message stays stable and flag-free: `api-get` has no --allow-admin,
+        # so suggesting it there would be wrong. The registry refuses an admin
+        # operation first and names the flag in its own message.
         raise AtlaWireError(
             "Administrative REST paths are not supported.",
             category="validation",

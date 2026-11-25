@@ -52,7 +52,7 @@ def test_frozen_totals_are_exact(built):
         "required": 201,
         "excluded": 51,
         "unresolved": 0,
-        "runtime_operations": 202,
+        "runtime_operations": 319,
     }
 
 
@@ -68,16 +68,24 @@ def test_every_required_row_is_a_registered_operation(built):
     assert missing == []
 
 
-def test_every_excluded_row_is_absent_from_the_registry(built):
-    """An excluded route that is registered contradicts its own reason."""
-    registered = [
+def test_every_excluded_row_is_absent_or_registered_as_admin(built):
+    """An excluded route may be served only as an opt-in admin read."""
+    from atlawire import operations
+
+    scope = {
+        (item["product"], item["method"], item["path"]): item["scope"]
+        for item in operations.list_operations()
+    }
+    leaked = [
         (product, row["method"], row["path"])
         for product, block in built["products"].items()
         for row in block["rows"]
-        if row["disposition"] == "excluded" and row["registered"]
+        if row["disposition"] == "excluded"
+        and row["registered"]
+        and scope.get((product, row["method"], row["path"])) != "admin"
     ]
 
-    assert registered == []
+    assert leaked == []
 
 
 def test_every_excluded_row_states_a_known_reason(built):

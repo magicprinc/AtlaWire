@@ -866,6 +866,11 @@ def operations_command() -> None:
     help="Read the selected product's URL/token pair from the environment.",
 )
 @click.option(
+    "--allow-admin",
+    is_flag=True,
+    help="Permit an operation whose scope is admin.",
+)
+@click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def read_operation_command(
@@ -875,6 +880,7 @@ def read_operation_command(
     base_url: str | None,
     token_from_env: bool,
     allow_http_loopback: bool,
+    allow_admin: bool,
 ) -> None:
     """Run one allowlisted fixed GET and print its raw JSON result.
 
@@ -922,6 +928,7 @@ def read_operation_command(
             arguments=arguments,
             query=query,
             allow_http_loopback=allow_http_loopback,
+            allow_admin=allow_admin,
         )
     except AtlaWireError as exc:
         validation = exc.category in {"validation", "unknown_operation", "credentials"}
@@ -1021,6 +1028,11 @@ class _CanonicalReadCommand(click.Command):
 @click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
+@click.option(
+    "--allow-admin",
+    is_flag=True,
+    help="Permit an operation whose scope is admin.",
+)
 def read_command(
     operation_id: str,
     raw_params: str,
@@ -1031,6 +1043,7 @@ def read_command(
     base_url: str | None,
     token_from_env: bool,
     allow_http_loopback: bool,
+    allow_admin: bool,
 ) -> None:
     """Run one described read-only operation and print a JSON envelope.
 
@@ -1204,6 +1217,7 @@ def read_command(
             body=body,
             allow_http_loopback=allow_http_loopback,
             use_library=True,
+            allow_admin=allow_admin,
         )
     except SdkRequestError as exc:
         click.echo(json.dumps(exc.to_dict(product=product, token=token)))

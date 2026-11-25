@@ -53,6 +53,14 @@ jobs:
       - name: Documented query parameters
         run: python -B tools/build_query_surface.py --check
 
+      - name: Administrative read surface
+        run: python -B tools/build_admin_surface.py --check
+
+      - name: Read-only guarantee
+        run: python -B tools/check_read_only.py
+        env:
+          PYTHONPATH: src
+
       - name: Registry against the servers' own API surface
         run: python -B tools/check_api_surface.py --check
         env:

@@ -122,6 +122,7 @@ _MAX_QUERY_INTEGER = 2**31 - 1
 # controls, and allowed to contain the spaces that search terms need.
 _MAX_QUERY_TEXT = 2048
 _SAFE_QUERY_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
+_ADMIN_REFUSED = "This operation is administrative; pass --allow-admin to read it."
 _GENERATED_QUERY_NOTE = "Documented by the deployment's own API description (WADL)."
 
 _JIRA_PROJECT_ID_OR_KEY = re.compile(r"(?:[A-Z][A-Z0-9_]*|[1-9][0-9]*)")
@@ -159,6 +160,9 @@ _MANIFEST_PATH = Path(__file__).with_name("manifest.json")
 # Query parameters each deployment documents for a registered route, generated
 # from its own WADL by tools/build_query_surface.py.
 _QUERY_SURFACE_PATH = _MANIFEST_PATH.with_name("query_params.json")
+# Administrative and system reads each deployment exposes, generated from its own
+# WADL by tools/build_admin_surface.py.
+_ADMIN_SURFACE_PATH = _MANIFEST_PATH.with_name("admin_operations.json")
 
 # Safe example values for the canonical read examples. A missing entry means
 # the description returns no example rather than inventing an identifier.
@@ -247,6 +251,10 @@ class _Operation:
     query_exactly_one: tuple[str, ...] = ()
     null_on_204: bool = False
     method: str = "GET"
+    # "read" for the non-administrative surface, "admin" for a route that needs
+    # elevated permission or exposes system data. `read` refuses an admin route
+    # unless the caller opts in, so nothing administrative is implicit.
+    scope: str = "read"
     body: tuple[_BodyField, ...] = ()
 
 
@@ -1787,8 +1795,113 @@ def _install_documented_query() -> int:
     return added
 
 
+def _admin_surface() -> dict[str, object]:
+    """Load the packaged admin surface; a broken package is a fatal error."""
+    try:
+        document = json.loads(_ADMIN_SURFACE_PATH.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        raise AtlaWireError(
+            "The packaged admin surface is missing or invalid.",
+            category="validation",
+        ) from None
+    if not isinstance(document, dict) or not isinstance(
+        document.get("operations"), list
+    ):
+        raise AtlaWireError(
+            "The packaged admin surface is missing or invalid.",
+            category="validation",
+        )
+    return document
+
+
+def _admin_operation(row: Mapping[str, object]) -> _Operation | None:
+    """Build one admin operation, or ``None`` when the row is malformed."""
+    operation_id = row.get("id")
+    product = row.get("product")
+    path = row.get("path")
+    method = row.get("method")
+    if (
+        not isinstance(operation_id, str)
+        or product not in wadl_products()
+        or method != "GET"
+        or not isinstance(path, str)
+        or not path.startswith("/rest/")
+    ):
+        return None
+    arguments: list[_Argument] = []
+    raw_arguments = row.get("arguments")
+    if raw_arguments is not None and not isinstance(raw_arguments, list):
+        return None
+    for raw in raw_arguments or []:
+        if not isinstance(raw, dict):
+            return None
+        name = raw.get("name")
+        pattern = raw.get("pattern")
+        if not isinstance(name, str) or not isinstance(pattern, str):
+            return None
+        try:
+            compiled = re.compile(pattern)
+        except re.error:
+            return None
+        arguments.append(
+            _Argument(
+                name,
+                compiled,
+                str(raw.get("description") or f"Path value for {name}."),
+                bool(raw.get("allow_slash")),
+            )
+        )
+    query: list[_QueryField] = []
+    raw_query = row.get("query")
+    if raw_query is not None and not isinstance(raw_query, list):
+        return None
+    for raw in raw_query or []:
+        if not isinstance(raw, dict):
+            continue
+        field = _documented_field(raw.get("name"), raw.get("type"))
+        if field is not None:
+            query.append(field)
+    return _Operation(
+        id=operation_id,
+        product=str(product),
+        path=path,
+        description=str(row.get("description") or "Administrative read."),
+        documented_version=str(row.get("documented_version") or ""),
+        kind="json",
+        required=(),
+        arguments=tuple(arguments),
+        query=tuple(query),
+        scope="admin",
+    )
+
+
+def wadl_products() -> frozenset[str]:
+    """Return the products this registry serves."""
+    return frozenset({"jira", "confluence", "bitbucket"})
+
+
+def _install_admin_operations() -> int:
+    """Merge the generated admin reads; a route we already serve is skipped."""
+    routes = {(op.product, op.method, op.path) for op in _OPERATIONS.values()}
+    added = 0
+    for row in _admin_surface()["operations"]:  # type: ignore[union-attr]
+        if not isinstance(row, dict):
+            continue
+        operation = _admin_operation(row)
+        if operation is None or operation.id in _OPERATIONS:
+            continue
+        key = (operation.product, operation.method, operation.path)
+        if key in routes:
+            continue
+        _OPERATIONS[operation.id] = operation
+        routes.add(key)
+        added += 1
+    return added
+
+
 _install_manifest_operations()
 _install_documented_query()
+_install_admin_operations()
 
 
 def list_operations() -> list[dict[str, object]]:
@@ -1817,6 +1930,7 @@ def _describe(operation: _Operation) -> dict[str, object]:
         "path": operation.path,
         "description": operation.description,
         "documented_version": operation.documented_version,
+        "scope": operation.scope,
         "response": {
             "kind": operation.kind,
             "required": [_field(field) for field in operation.required],
@@ -2046,6 +2160,7 @@ def read_operation(
     body: Mapping[str, object] | None = None,
     allow_http_loopback: bool = False,
     use_library: bool = False,
+    allow_admin: bool = False,
 ) -> dict[str, object] | list[object] | None:
     """Execute exactly one registered fixed GET and return its raw JSON.
 
@@ -2062,9 +2177,19 @@ def read_operation(
     [AtlaWireError][atlawire.http.AtlaWireError] instead of returning a partial
     or silently reduced document. Only the Bitbucket default-branch operation
     maps its documented 204 to ``None``; a 200 JSON ``null`` remains an error.
-    Unknown and administrative/mutating IDs are rejected before any request.
+    Unknown IDs are rejected before any request. An operation whose ``scope`` is
+    ``admin`` is refused unless ``allow_admin`` is true: the route is read-only,
+    but the deployment decides whether the caller may see it, and asking for it
+    must be deliberate.
     """
     operation = _operation(operation_id)
+    if operation.scope == "admin" and not allow_admin:
+        raise AtlaWireError(
+            _ADMIN_REFUSED,
+            product=operation.product,
+            operation=operation.id,
+            category="validation",
+        )
     path = _render_path(operation, arguments)
     params = _validated_query(operation, query)
     payload_body = _validated_body(operation, body)
@@ -2087,6 +2212,7 @@ def read_operation(
             params=params,
             body=payload_body,
             allow_http_loopback=allow_http_loopback,
+            allow_admin=operation.scope == "admin",
         )
         no_content = status == 204 and payload is None
     elif operation.method != "GET":

@@ -82,7 +82,7 @@ _EXPECTED = {
     "required": 201,
     "excluded": 51,
     "unresolved": 0,
-    "runtime_operations": 202,
+    "runtime_operations": 319,
 }
 # Per-product counts. Without them a global total could be satisfied by two
 # compensating mistakes, one product short and another long.
@@ -478,9 +478,18 @@ def verify(document: Mapping[str, object]) -> list[str]:
                         f"{product} {row['method']} {row['path']}: "
                         "required but unregistered"
                     )
+            elif registered and all(
+                match.get("scope") == "admin" for match in registry[key]
+            ):
+                # Registering an excluded row as an admin read is the point of
+                # the admin surface: the denominator stays the non-administrative
+                # one, and the operation is opt-in. It is still accounted for, so
+                # the two-way check below does not report it as orphaned.
+                seen.add(key)
             elif registered:
                 problems.append(
-                    f"{product} {row['method']} {row['path']}: excluded but registered"
+                    f"{product} {row['method']} {row['path']}: excluded but "
+                    "registered outside the admin scope"
                 )
         digest = _excluded_digest(rows)
         if _EXPECTED_EXCLUDED_DIGEST.get(product) != digest:
@@ -504,10 +513,15 @@ def verify(document: Mapping[str, object]) -> list[str]:
             problems.append(f"addition duplicates a required row: {addition['path']}")
         seen.add(key)
 
+    # The denominator is the non-administrative surface. An admin read is
+    # declared in admin_operations.json and gated behind an explicit opt-in, so it
+    # is outside this inventory by design; `build_admin_surface.py --check` owns
+    # that artifact. Every other unaccounted operation is still a contradiction.
     problems.extend(
         f"runtime operation unaccounted for: {key[0]} {key[1]} {key[2]}"
         for key in registry
         if key not in seen
+        and not all(match.get("scope") == "admin" for match in registry[key])
     )
     problems.extend(_rule_text_names_every_audit_path())
     return problems

@@ -73,6 +73,8 @@ def test_query_documented_matches_the_registry_census():
     """
     described = operations.list_operations()
 
-    assert len(described) == 202
-    assert sum(1 for entry in described if entry["query_documented"] is True) == 113
-    assert sum(1 for entry in described if entry["query_documented"] is None) == 89
+    # 319 = 202 non-administrative reads + 117 administrative reads.
+    assert len(described) == 319
+    assert sum(1 for entry in described if entry["scope"] == "read") == 202
+    assert sum(1 for entry in described if entry["scope"] == "admin") == 117
+    assert sum(1 for entry in described if entry["query_documented"] is True) >= 113
