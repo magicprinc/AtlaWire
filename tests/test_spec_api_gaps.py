@@ -288,7 +288,7 @@ def test_repository_scan_opens_one_session(server, monkeypatch):
     monkeypatch.setattr(repo_grep, "bearer_session", counting)
     monkeypatch.setattr(
         repo_grep,
-        "_read_repository_file_in_session",
+        "read_repository_file_in_session",
         lambda *args, **kwargs: "x\n",
     )
     monkeypatch.setattr(repo_grep, "_match_line_numbers", lambda *a, **k: [1])

@@ -1944,6 +1944,12 @@ def commit_changes_command(
     help="Diff context lines (0-100; default 3).",
 )
 @click.option(
+    "--whitespace",
+    type=click.Choice(["ignore-all", "ignore-trailing", "ignore-none"]),
+    default=None,
+    help="Diff whitespace mode (default ignore-all; ignore-none keeps them).",
+)
+@click.option(
     "--json", "as_json", is_flag=True, help="Print raw JSON instead of review text."
 )
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
@@ -1959,6 +1965,7 @@ def commit_diff_command(
     token_from_env: bool,
     as_json: bool,
     context: int,
+    whitespace: str | None,
     allow_http_loopback: bool,
 ) -> None:
     """Show a commit diff, whole or for explicit relative paths."""
@@ -1974,6 +1981,7 @@ def commit_diff_command(
             token=token,
             as_json=as_json,
             context=context,
+            whitespace=("ignore-all" if whitespace is None else whitespace),
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
@@ -2430,6 +2438,7 @@ def _run_pr_diff_action(
     context: int,
     path: str | None,
     source_path: str | None,
+    whitespace: str,
     allow_http_loopback: bool,
 ) -> None:
     read = get_pull_request_diff if as_json else get_pull_request_diff_text
@@ -2441,6 +2450,7 @@ def _run_pr_diff_action(
         context=context,
         path=path,
         source_path=source_path,
+        whitespace=whitespace,
         allow_http_loopback=allow_http_loopback,
     )
     if isinstance(result, str):
@@ -2458,6 +2468,7 @@ def _run_commit_diff_action(
     token: str,
     as_json: bool,
     context: int,
+    whitespace: str,
     allow_http_loopback: bool,
 ) -> None:
     """Fetch and print a whole or per-path commit diff after it fully succeeds."""
@@ -2470,6 +2481,7 @@ def _run_commit_diff_action(
             token=token,
             paths=selected_paths,
             context=context,
+            whitespace=whitespace,
             allow_http_loopback=allow_http_loopback,
         )
         click.echo(json.dumps(result))
@@ -2536,6 +2548,7 @@ def _run_pr_action(
     context: int,
     path: str | None,
     source_path: str | None,
+    whitespace: str,
     allow_http_loopback: bool,
 ) -> None:
     if selected == "show":
@@ -2566,6 +2579,7 @@ def _run_pr_action(
             context=context,
             path=path,
             source_path=source_path,
+            whitespace=whitespace,
             allow_http_loopback=allow_http_loopback,
         )
     else:
@@ -2680,6 +2694,12 @@ def _run_pr_file_action(
     help="Diff context lines (0-100; default 3).",
 )
 @click.option(
+    "--whitespace",
+    type=click.Choice(["ignore-all", "ignore-trailing", "ignore-none"]),
+    default=None,
+    help="Diff whitespace mode (default ignore-all; ignore-none keeps them).",
+)
+@click.option(
     "--source-path",
     default=None,
     help="Previous relative path for a renamed, copied, or moved diff file.",
@@ -2700,15 +2720,16 @@ def pr(
     limit: int | None,
     context: int | None,
     source_path: str | None,
+    whitespace: str | None,
     allow_http_loopback: bool,
 ) -> None:
     """Get one pull request, its changed files, comments, commits, diff, or one file.
 
     The optional third argument is "show" (default raw JSON), "files",
     "comments", "commits", "diff", or "file". "--max-pages" and "--limit" apply
-    to "comments" and "commits"; "--context" applies only to "diff"; PATH selects
-    one diff file with "diff" and is required with "file"; "--source-path"
-    applies only to a "diff" with PATH.
+    to "comments" and "commits"; "--context" and "--whitespace" apply only to
+    "diff"; PATH selects one diff file with "diff" and is required with "file";
+    "--source-path" applies only to a "diff" with PATH.
     """
     selected, selected_side = _pr_arguments(
         action,
@@ -2746,6 +2767,7 @@ def pr(
             context=3 if context is None else context,
             path=path,
             source_path=source_path,
+            whitespace=("ignore-all" if whitespace is None else whitespace),
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:

@@ -165,18 +165,14 @@ PullRequest = TypedDict(
 )
 
 
-MyPullRequest = TypedDict(
-    "MyPullRequest",
-    {
-        "repo": str,
-        "id": int,
-        "title": str,
-        "state": str,
-        "author": str | None,
-        "reviewers_inactive": list[str],
-        "created": int | None,
-    },
-)
+class MyPullRequest(TypedDict):
+    repo: str
+    id: int
+    title: str
+    state: str
+    author: str | None
+    reviewers_inactive: list[str]
+    created: int | None
 
 
 class PullRequestFallbackFile(TypedDict):
@@ -597,7 +593,7 @@ def get_repository_file(
         )
 
 
-def _read_repository_file_in_session(
+def read_repository_file_in_session(
     session: requests.Session,
     base_url: str,
     repo: str,
@@ -1023,6 +1019,7 @@ def get_pull_request_diff(
     context: int = 3,
     path: str | None = None,
     source_path: str | None = None,
+    whitespace: str = "ignore-all",
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
     """Return the server's decoded diff object for one pull request.
@@ -1030,8 +1027,10 @@ def get_pull_request_diff(
     ``repo`` is ``PROJECT/slug`` and ``pr_id`` follows the same canonical
     positive decimal rules as [get_pull_request][atlawire.bitbucket.get_pull_request].
     The whole-diff endpoint is requested once with ``contextLines=context``,
-    ``whitespace=ignore-all`` and ``withComments=false``; ``context`` must be an
-    ``int`` from 0 to 100 and is validated before any session is created.
+    ``withComments=false`` and ``whitespace``, which must be ``ignore-all``
+    (the default), ``ignore-trailing`` or ``ignore-none``. ``ignore-none``
+    keeps whitespace-only changes. Both arguments are validated before any
+    session is created; ``context`` must be an ``int`` from 0 to 100.
 
     An explicit relative ``path`` instead requests that one file's diff once,
     with each validated segment encoded exactly once. ``source_path`` is only
@@ -1062,7 +1061,9 @@ def get_pull_request_diff(
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    target, params = _pull_request_diff_request(url, context, path, source_path)
+    target, params = _pull_request_diff_request(
+        url, context, path, source_path, whitespace=whitespace
+    )
     with bearer_session(token, product="bitbucket") as session:
         value = get_json_object(session, target, params=params)
     _validate_diff(value, subject="pull request")
@@ -1077,6 +1078,7 @@ def get_pull_request_diffs(
     token: str,
     paths: Sequence[str],
     context: int = 3,
+    whitespace: str = "ignore-all",
     allow_http_loopback: bool = False,
 ) -> list[dict[str, object]]:
     """Read several per-file pull request diffs in one call.
@@ -1091,7 +1093,7 @@ def get_pull_request_diffs(
     _, url, _ = _pull_request_target(
         base_url, repo, pr_id, allow_http_loopback=allow_http_loopback
     )
-    return _pull_request_diff_paths(url, context, paths, token)
+    return _pull_request_diff_paths(url, context, paths, token, whitespace=whitespace)
 
 
 def _pull_request_diff_paths(
@@ -1099,6 +1101,8 @@ def _pull_request_diff_paths(
     context: int,
     paths: Sequence[str],
     token: str,
+    *,
+    whitespace: str = "ignore-all",
 ) -> list[dict[str, object]]:
     """Read one validated per-path diff per entry, in request order."""
     if not isinstance(paths, Sequence) or isinstance(paths, (str, bytes)):
@@ -1117,7 +1121,9 @@ def _pull_request_diff_paths(
         if path in seen:
             raise AtlaWireError("Duplicate pull request diff path.")
         seen.add(path)
-        targets.append(_pull_request_diff_request(url, context, path, None))
+        targets.append(
+            _pull_request_diff_request(url, context, path, None, whitespace=whitespace)
+        )
     results: list[dict[str, object]] = []
     with bearer_session(token, product="bitbucket") as session:
         for target, params in targets:
@@ -1238,6 +1244,7 @@ def get_pull_request_diff_text(
     context: int = 3,
     path: str | None = None,
     source_path: str | None = None,
+    whitespace: str = "ignore-all",
     allow_http_loopback: bool = False,
 ) -> str:
     """Return a terminal-safe review view of one pull request diff.
@@ -1264,6 +1271,7 @@ def get_pull_request_diff_text(
         context=context,
         path=path,
         source_path=source_path,
+        whitespace=whitespace,
         allow_http_loopback=allow_http_loopback,
     )
     text = _render_pull_request_diff_text(value, context=context)
@@ -1877,6 +1885,7 @@ def get_commit_diff(
     token: str,
     paths: Sequence[str] | None = None,
     context: int = 3,
+    whitespace: str = "ignore-all",
     allow_http_loopback: bool = False,
 ) -> dict[str, object] | list[dict[str, object]]:
     """Return the decoded diff for one commit or for explicit relative paths.
@@ -1890,7 +1899,7 @@ def get_commit_diff(
     most 100 paths are accepted, and there is no implicit fallback.
 
     Every request sends only ``contextLines`` (an exact integer from 0 to 100),
-    ``whitespace=ignore-all`` and ``withComments=false``; ``autoSrcPath``,
+    the validated ``whitespace`` mode and ``withComments=false``; ``autoSrcPath``,
     ``since`` and other filters are never sent. Declared truncation and
     malformed truncation-bearing collections fail the whole call, so no partial
     result is returned. Sources and links carried by a response are never
@@ -1901,7 +1910,7 @@ def get_commit_diff(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     commit = _commit_id(sha)
     url = f"{_repository_url(base, repo)}/commits/{commit}/diff"
-    params = _diff_params(context)
+    params = _diff_params(context, whitespace=whitespace)
     with bearer_session(token, product="bitbucket") as session:
         if targets is None:
             value = get_json_object(session, url, params=params)
@@ -1921,6 +1930,7 @@ def get_commit_diff_text(
     token: str,
     paths: Sequence[str] | None = None,
     context: int = 3,
+    whitespace: str = "ignore-all",
     allow_http_loopback: bool = False,
 ) -> str:
     """Return a terminal-safe review view of one commit diff.
@@ -1939,6 +1949,7 @@ def get_commit_diff_text(
         token=token,
         paths=paths,
         context=context,
+        whitespace=whitespace,
         allow_http_loopback=allow_http_loopback,
     )
     values = [value] if isinstance(value, dict) else value
@@ -2556,11 +2567,32 @@ def _commit_diff_targets(
     return tuple(_file_segments(path) for path in paths)
 
 
-def _diff_params(context: int) -> dict[str, str | int]:
-    """Build the fixed diff query shared by pull request and commit requests."""
+_DIFF_WHITESPACE = ("ignore-all", "ignore-trailing", "ignore-none")
+
+
+def _diff_whitespace(value: str) -> str:
+    """Accept one documented diff whitespace mode.
+
+    Bitbucket 5.10 documents ``ignore-all``; its deployment accepts
+    ``ignore-trailing`` and ``ignore-none`` as well, and the live read-only run
+    confirmed all three. The value is validated before any request so a typo
+    cannot silently change what a review diff contains.
+    """
+    if not isinstance(value, str) or value not in _DIFF_WHITESPACE:
+        raise AtlaWireError(
+            "The diff whitespace mode must be ignore-all, ignore-trailing, "
+            "or ignore-none."
+        )
+    return value
+
+
+def _diff_params(
+    context: int, *, whitespace: str = "ignore-all"
+) -> dict[str, str | int]:
+    """Build the diff query shared by pull request and commit requests."""
     return {
         "contextLines": context,
-        "whitespace": "ignore-all",
+        "whitespace": _diff_whitespace(whitespace),
         "withComments": "false",
     }
 
@@ -2570,6 +2602,8 @@ def _pull_request_diff_request(
     context: int,
     path: str | None,
     source_path: str | None,
+    *,
+    whitespace: str = "ignore-all",
 ) -> tuple[str, dict[str, str | int]]:
     """Build one PR diff route and query without issuing a request.
 
@@ -2578,7 +2612,7 @@ def _pull_request_diff_request(
     path is validated as relative text before being sent verbatim as
     ``srcPath``; Requests then encodes the query value once itself.
     """
-    params = _diff_params(context)
+    params = _diff_params(context, whitespace=whitespace)
     if path is None:
         if source_path is not None:
             raise AtlaWireError("Expected a diff path when a source path is given.")

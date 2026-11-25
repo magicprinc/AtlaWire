@@ -27,10 +27,10 @@ from time import monotonic as _monotonic
 from typing import Literal, NamedTuple, TypedDict
 
 from atlawire.bitbucket import (
-    _read_repository_file_in_session,
     get_default_branch,
     get_repository_archive,
     list_repository_files,
+    read_repository_file_in_session,
 )
 from atlawire.bitbucket_search import search_code
 from atlawire.http import AtlaWireError, bearer_session, normalize_base_url
@@ -570,7 +570,7 @@ def _scan_files(
         for name in selected:
             if _remaining(deadline) is None:
                 return _outcome(rows, scanned, eligible, bytes_used, True, file_capped)
-            raw = _read_repository_file_in_session(
+            raw = read_repository_file_in_session(
                 session,
                 base,
                 repo,

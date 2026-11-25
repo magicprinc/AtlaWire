@@ -58,11 +58,11 @@ from typing import Literal, TypedDict
 
 from atlawire import regex_helper
 from atlawire.bitbucket import (
-    _read_repository_file_in_session,
     get_branch,
     get_commit,
     get_tag,
     list_repository_files,
+    read_repository_file_in_session,
 )
 from atlawire.http import AtlaWireError, bearer_session, normalize_base_url
 from atlawire.operations import read_operation
@@ -393,7 +393,7 @@ def _scan(
             if _remaining_budget(deadline) is None:
                 return hits, scanned, "timeout"
             try:
-                text = _read_repository_file_in_session(
+                text = read_repository_file_in_session(
                     session,
                     base_url,
                     repo,
