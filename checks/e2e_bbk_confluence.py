@@ -26,8 +26,8 @@ Known AtlaWire coverage gaps are documented instead of asserted as passes:
 
 * BBK ``whoami`` reports the Bitbucket server version; AtlaWire reports only
   that the authenticated dashboard read succeeded (``authenticated: true``).
-* BBK ``selftest`` runs many probes (Bitbucket, Jira, Confluence, calendar,
-  Kafka, NATS, Maven, ...); AtlaWire's ``selftest`` command is an alias of
+* BBK ``selftest`` runs many probes across the three Atlassian products and
+  several unrelated integrations; AtlaWire's ``selftest`` command is an alias of
   ``whoami`` and this module covers only the Confluence/find parts through the
   library.
 * BBK ``page_md`` converts ``body.storage`` only; AtlaWire's

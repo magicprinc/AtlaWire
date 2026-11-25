@@ -2,8 +2,8 @@
 
 Scope: every public Atlassian and Markdown function BBK exposes (44 functions in
 `bbk.bitbucket`, `bbk.confluence`, `bbk.jira`, `bbk.md`). BBK's non-Atlassian
-integrations (Kafka, NATS, Grafana, Gmail, Calendar, chats, local indexes, Maven
-catalog, MSSQL) are out of scope by the owner's decision.
+integrations, local indexes and unrelated data stores are out of scope by the
+owner's decision.
 
 Verdicts:
 

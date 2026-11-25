@@ -173,8 +173,8 @@ Atlassian-часть публичного API (~45 экспортов):
 - review: `review`, `collect`, `render_markdown`, `Packet`, `parse_pr_link`,
   `file_links`, `java_members`, `red_flags`, `changed_symbols`;
 - `attachments.attachment_download`, `whoami`, `find`; есть и пишущий `write` (вне AtlaWire).
-- Не-Atlassian модули (agent_hub, calendar, gcal, gchat, gmail, kafka, maven, nats,
-  idx, local, envs, log) — вне области (по решению владельца уходят в devinoAI).
+- Не-Atlassian модули (координация агентов, календарь, чаты, почта, локальные
+  индексы, инфраструктурные интеграции) — вне области (уходят в devinoAI).
 - CLI bbk: 39 команд (argparse) — полная опись в
   `.development/review/2026-11-20_BBK_PARITY_BASELINE.md`.
 
@@ -185,7 +185,7 @@ Atlassian-часть публичного API (~45 экспортов):
   (копирует историю); создана новая сессия **`a63fedce-1037-4644-a93b-f38d86fa0184`**
   с брифом на Ponytail Audit; Ponytail Audit в этой сессии НЕ выполнялся
   (загружен только skill `ponytail-audit` + `evidence-contract.md`).
-- На машине не запускать GUI Everything (уже работает) — использовать `es.exe`.
+- На машине не запускать GUI индексатора файлов (уже работает) — использовать CLI.
 - Локальный профиль: установленный CPython 3.15 (`C:/Python315/python.exe`), без venv,
   без `uv run`/`uv sync`; `uv` — только `uv lock --check --offline`.
 - Полный офлайн-набор ~287 с; запускать на кандидатах, не после каждой правки.
@@ -672,8 +672,8 @@ one-line plan edits.
 - Мои длинные кириллические payload'ы периодически искажались при передаче
   (примеры: «防疫», «029», «усиле022ние»); после каждой записи проверять файл;
   упрямые строки чинить байтовыми python-правками по индексу строки.
-- GUI **Everything** запускался при использовании встроенных поисковых инструментов —
-  не запускать его, использовать CLI `es.exe`; поиск файлов — через `es`.
+- GUI индексатора файлов запускался при использовании встроенных поисковых
+  инструментов — не запускать его, использовать CLI.
 - GitHub About сейчас: «Complete API access to Atlassian Jira, Confluence & Bitbucket
   for AI agents. Supports self-hosted and legacy versions.» — требует замены (S8).
 - Файлы сессии: план — 438 строк; handoff — 586 строк + этот раздел; оба untracked;
