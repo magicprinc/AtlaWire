@@ -14,18 +14,18 @@ import json
 import re
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-from defusedxml import ElementTree  # type: ignore[import-untyped]
+# The tools run both as scripts and loaded by path from the test suite, so the
+# sibling module is resolved explicitly instead of relying on the caller's path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import wadl_surface as wadl
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / ".development"
-NS = "http://wadl.dev.java.net/2009/02"
-W = f"{{{NS}}}"
-PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
 UNSAFE = re.compile(r"[^a-z0-9]+")
-DOC_TAG = re.compile(r"<[^>]+>")
 
 GROUPS = {"jira", "confluence", "bitbucket"}
 # Above this many methods a group is split by its second route segment: a file
@@ -52,53 +52,9 @@ EXTRA_PATHS = {
 
 
 @dataclass
-class Param:
-    name: str
-    kind: str
-    default: str | None
-
-
-@dataclass
-class Method:
-    verb: str
-    route: str
-    doc: str = ""
-    query: list[Param] = field(default_factory=list)
-
-    @property
-    def key(self) -> str:
-        return f"{self.verb} {self.route}"
-
-
-@dataclass
 class Paths:
     group: str
-    methods: list[Method]
-
-
-def _text(element: ElementTree.Element | None) -> str:
-    """Return an element's prose with tags stripped and whitespace collapsed."""
-    if element is None:
-        return ""
-    raw = "".join(element.itertext())
-    return " ".join(DOC_TAG.sub(" ", raw).split())
-
-
-def _route(path: str) -> str:
-    """Turn a WADL path into `/a/{x}/b` with no repeated or trailing slashes."""
-    normalised = re.sub(r"/+", "/", path or "/").rstrip("/")
-    return (
-        PLACEHOLDER.sub(
-            lambda match: "{" + _param_name(match.group(1)) + "}", normalised
-        )
-        or "/"
-    )
-
-
-def _param_name(raw: str) -> str:
-    """Keep the documented placeholder name, without its regex suffix."""
-    name = raw.split(":", 1)[0].strip()
-    return name or "value"
+    methods: list[wadl.Method]
 
 
 def _slug(route: str) -> str:
@@ -132,58 +88,21 @@ def _group_of(route: str) -> str:
 
 
 def _groups(product: str) -> dict[str, Paths]:
-    """Split one WADL by its first route segment, which is the resource group."""
-    # Parsed with defusedxml: the WADL comes from the network, so entity
-    # expansion and external references must not be honoured.
-    root = ElementTree.parse(BASE / product / "source" / "application.wadl").getroot()
-    resources = root.find(f"{W}resources")
-    if resources is None:
-        raise SystemExit(f"{product}: WADL has no resources element")
-
+    """Group one product's methods, splitting a group that grew too large."""
+    _, methods = wadl.load(product)
     grouped: dict[str, Paths] = {}
+    for method in methods:
+        group = _group_of(method.route)
+        grouped.setdefault(group, Paths(group=group, methods=[])).methods.append(method)
 
-    def walk(node: ElementTree.Element, prefix: str) -> None:
-        for resource in node.findall(f"{W}resource"):
-            full = _route(f"{prefix}/{resource.get('path', '')}")
-            for method in resource.findall(f"{W}method"):
-                verb = method.get("name", "").upper()
-                params: list[Param] = []
-                request = method.find(f"{W}request")
-                if request is not None:
-                    for param in request.findall(f"{W}param"):
-                        if param.get("style") != "query":
-                            continue
-                        params.append(
-                            Param(
-                                name=param.get("name", ""),
-                                kind=(param.get("type") or "").removeprefix("xs:"),
-                                default=param.get("default"),
-                            )
-                        )
-                group = _group_of(full)
-                grouped.setdefault(
-                    group, Paths(group=group, methods=[])
-                ).methods.append(
-                    Method(
-                        verb=verb,
-                        route=full,
-                        doc=_text(method.find(f"{W}doc")),
-                        query=params,
-                    )
-                )
-            walk(resource, full)
-
-    walk(resources, "")
-
-    global _SPLIT_GROUPS
-    _SPLIT_GROUPS = {
-        name for name, paths in grouped.items() if len(paths.methods) > SPLIT_ABOVE
-    }
-    if not _SPLIT_GROUPS:
+    big = {name for name, paths in grouped.items() if len(paths.methods) > SPLIT_ABOVE}
+    if not big:
         return grouped
+    global _SPLIT_GROUPS
+    _SPLIT_GROUPS = big
     split: dict[str, Paths] = {}
     for name, paths in grouped.items():
-        if name not in _SPLIT_GROUPS:
+        if name not in big:
             split[name] = paths
             continue
         for method in paths.methods:
@@ -219,7 +138,8 @@ def _render_group(product: str, paths: Paths, version: str) -> str:
             lines.append("|---|---|---|")
             for param in method.query:
                 default = "" if param.default is None else f"`{param.default}`"
-                lines.append(f"| `{param.name}` | {param.kind or '-'} | {default} |")
+                shown = param.raw_type or param.kind or "-"
+                lines.append(f"| `{param.name}` | {shown} | {default} |")
             lines.append("")
         else:
             lines.append("No query parameters.")

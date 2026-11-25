@@ -15,32 +15,33 @@ fact about the product, not about a docs page. Three questions:
 import argparse
 import hashlib
 import json
-import re
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+
+# The tools run both as scripts and loaded by path from the test suite, so the
+# sibling module is resolved explicitly instead of relying on the caller's path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import wadl_surface as wadl
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / ".development"
 INDEX = BASE / "api-surface.json"
 
-PREFIX = {
-    "jira": "/rest/api/2",
-    "confluence": "/rest/api",
-    "bitbucket": "/rest/api/1.0",
-}
-PLACEHOLDER = re.compile(r"\{[^{}]*\}")
+PREFIX = wadl.REST_PREFIX
+normalize = wadl.normalize
+route_variants = wadl.route_variants
 
-# Baseline of known and accepted disagreements. A new entry means a real gap: one
-# more route the server serves that we cannot read, or a route we advertise that
-# the server does not serve. Regenerate the numbers with --write-baseline only
-# after reviewing what changed.
+# `route_variants` is re-exported for the tests, which pin the rule that a glued
+# optional suffix covers two routes while a trailing placeholder stays distinct.
+
 BASELINE = {
     # Counts, plus the identity of both difference lists and the WADL they were
     # read from. Counts alone stay green through a rename on either side.
     "bitbucket": {
         "matched": 58,
-        "undeclared_param_routes": 36,
+        "undeclared_param_routes": 0,
         "server_only": 42,
         "server_only_sha": "d347abf9d8bc1b48",
         "registry_only": 0,
@@ -49,7 +50,7 @@ BASELINE = {
     },
     "confluence": {
         "matched": 35,
-        "undeclared_param_routes": 27,
+        "undeclared_param_routes": 0,
         "server_only": 10,
         "server_only_sha": "26ce100d3a9c143a",
         "registry_only": 0,
@@ -58,7 +59,7 @@ BASELINE = {
     },
     "jira": {
         "matched": 105,
-        "undeclared_param_routes": 33,
+        "undeclared_param_routes": 0,
         "server_only": 68,
         "server_only_sha": "c3b41638baf41b02",
         "registry_only": 2,
@@ -66,28 +67,6 @@ BASELINE = {
         "wadl_sha256": "1106c2469ec3dca8",
     },
 }
-
-
-def normalize(path: str) -> str:
-    """Collapse placeholder contents and repeated or trailing slashes."""
-    collapsed = re.sub(r"/+", "/", PLACEHOLDER.sub("{}", path)).rstrip("/")
-    return collapsed or "/"
-
-
-def route_variants(path: str) -> set[str]:
-    """Return every route one declaration covers.
-
-    A WADL writes an optional path suffix glued to the segment
-    (``diff{path:.*}``), which covers both ``/diff`` and ``/diff/{path}``. That
-    is expanded into both forms instead of being stripped: stripping would make
-    ``/attachment/{id}`` equal to ``/attachment``, hiding a real difference.
-    """
-    normalized = normalize(path)
-    glued = re.search(r"(?<=[^/{}])\{\}+$", normalized)
-    if glued is None:
-        return {normalized}
-    bare = normalized[: glued.start()]
-    return {bare, f"{bare}/{{}}"}
 
 
 def registry_index() -> dict[str, dict[tuple[str, str], set[str]]]:

@@ -50,6 +50,9 @@ jobs:
       - name: API surface documents
         run: python -B tools/build_api_surface_docs.py --check
 
+      - name: Documented query parameters
+        run: python -B tools/build_query_surface.py --check
+
       - name: Registry against the servers' own API surface
         run: python -B tools/check_api_surface.py --check
         env:

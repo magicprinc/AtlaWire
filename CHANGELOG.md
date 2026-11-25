@@ -10,6 +10,32 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.5] - 2026-11-25
+
+### Added
+
+- **Every query parameter the deployments document is now usable through
+  `read`.** The parameters come from each server's own WADL, not from a docs
+  page, so the name and type are what that deployment actually accepts.
+  113 operations now declare query fields (358 in total) instead of 22, and
+  `tools/check_api_surface.py` reports **zero** matched routes where the server
+  documents a parameter we do not declare.
+- Each described query field carries `source`: `server-wadl` for a generated
+  parameter, `atlawire` for a hand-written one. A hand-written declaration always
+  wins, because it can carry constraints the WADL does not state.
+- `tools/build_query_surface.py` regenerates `src/atlawire/query_params.json`
+  from the stored WADL, with `--check` for CI.
+- `tools/wadl_surface.py`: one shared reader for the WADL, now used by all three
+  tools. A normalisation bug can no longer exist in one and be fixed in another,
+  which is what happened once when a trailing-placeholder strip merged distinct
+  routes.
+
+### Fixed
+
+- The query-surface generator read the registry it feeds, so a second run treated
+  its own output as a hand-written declaration and produced fewer rows. Generated
+  fields are now marked, and the file is a fixed point.
+
 ## [0.9.4] - 2026-11-25
 
 ### Added

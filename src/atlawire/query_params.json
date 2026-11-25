@@ -1,0 +1,1431 @@
+{
+  "note": "Query parameters each deployment documents for a registered route, taken from its own WADL. Merged into the registry only for names a hand-written declaration does not already cover. Regenerate with tools/build_query_surface.py.",
+  "operations": {
+    "bitbucket.dashboard.pull-request-suggestions": [
+      {
+        "default": "172800",
+        "name": "changesSince",
+        "type": "string"
+      },
+      {
+        "default": "3",
+        "name": "limit",
+        "type": "integer"
+      }
+    ],
+    "bitbucket.dashboard.pull-requests": [
+      {
+        "name": "closedSince",
+        "type": "string"
+      },
+      {
+        "name": "order",
+        "type": "string"
+      },
+      {
+        "name": "participantStatus",
+        "type": "string"
+      },
+      {
+        "name": "role",
+        "type": "string"
+      },
+      {
+        "name": "state",
+        "type": "string"
+      }
+    ],
+    "bitbucket.hooks.avatar": [
+      {
+        "name": "version",
+        "type": "string"
+      }
+    ],
+    "bitbucket.inbox.pull-requests": [
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "default": "reviewer",
+        "name": "role",
+        "type": "string"
+      },
+      {
+        "default": "0",
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "bitbucket.profile.recent-repositories": [
+      {
+        "name": "permission",
+        "type": "string"
+      }
+    ],
+    "bitbucket.project.avatar": [
+      {
+        "default": "0",
+        "name": "s",
+        "type": "integer"
+      }
+    ],
+    "bitbucket.projects": [
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "permission",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.branches": [
+      {
+        "name": "base",
+        "type": "string"
+      },
+      {
+        "name": "details",
+        "type": "string"
+      },
+      {
+        "name": "filterText",
+        "type": "string"
+      },
+      {
+        "name": "orderBy",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.browse": [
+      {
+        "default": "",
+        "name": "at",
+        "type": "string"
+      },
+      {
+        "name": "blame",
+        "type": "string"
+      },
+      {
+        "name": "noContent",
+        "type": "string"
+      },
+      {
+        "default": "false",
+        "name": "type",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.browse.path": [
+      {
+        "default": "",
+        "name": "at",
+        "type": "string"
+      },
+      {
+        "name": "blame",
+        "type": "string"
+      },
+      {
+        "name": "noContent",
+        "type": "string"
+      },
+      {
+        "default": "false",
+        "name": "type",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.changes": [
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "name": "until",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.commits": [
+      {
+        "default": "false",
+        "name": "followRenames",
+        "type": "string"
+      },
+      {
+        "default": "false",
+        "name": "ignoreMissing",
+        "type": "string"
+      },
+      {
+        "name": "merges",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "name": "until",
+        "type": "string"
+      },
+      {
+        "default": "false",
+        "name": "withCounts",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid": [
+      {
+        "name": "path",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.changes": [
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withComments",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff": [
+      {
+        "default": "false",
+        "name": "autoSrcPath",
+        "type": "string"
+      },
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withComments",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff.path": [
+      {
+        "default": "false",
+        "name": "autoSrcPath",
+        "type": "string"
+      },
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withComments",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.compare.diff-path": [
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "name": "from",
+        "type": "string"
+      },
+      {
+        "default": "",
+        "name": "fromRepo",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "to",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.diff": [
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "until",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.diff.path": [
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "name": "since",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "until",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.files": [
+      {
+        "name": "at",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.files.path": [
+      {
+        "name": "at",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.last-modified": [
+      {
+        "name": "at",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.last-modified.path": [
+      {
+        "name": "at",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests": [
+      {
+        "name": "at",
+        "type": "string"
+      },
+      {
+        "default": "incoming",
+        "name": "direction",
+        "type": "string"
+      },
+      {
+        "name": "order",
+        "type": "string"
+      },
+      {
+        "name": "state",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withAttributes",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withProperties",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.changes": [
+      {
+        "default": "ALL",
+        "name": "changeScope",
+        "type": "string"
+      },
+      {
+        "name": "sinceId",
+        "type": "string"
+      },
+      {
+        "name": "untilId",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withComments",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments": [
+      {
+        "default": "ACTIVE",
+        "name": "anchorState",
+        "type": "string"
+      },
+      {
+        "name": "diffType",
+        "type": "string"
+      },
+      {
+        "name": "fromHash",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "name": "toHash",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.commits": [
+      {
+        "name": "withCounts",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff": [
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "default": "EFFECTIVE",
+        "name": "diffType",
+        "type": "string"
+      },
+      {
+        "name": "sinceId",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "untilId",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withComments",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff.path": [
+      {
+        "default": "-1",
+        "name": "contextLines",
+        "type": "integer"
+      },
+      {
+        "default": "EFFECTIVE",
+        "name": "diffType",
+        "type": "string"
+      },
+      {
+        "name": "sinceId",
+        "type": "string"
+      },
+      {
+        "name": "srcPath",
+        "type": "string"
+      },
+      {
+        "name": "untilId",
+        "type": "string"
+      },
+      {
+        "name": "whitespace",
+        "type": "string"
+      },
+      {
+        "default": "true",
+        "name": "withComments",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.raw.path": [
+      {
+        "name": "at",
+        "type": "string"
+      },
+      {
+        "name": "hardwrap",
+        "type": "string"
+      },
+      {
+        "name": "htmlEscape",
+        "type": "string"
+      },
+      {
+        "name": "markup",
+        "type": "string"
+      }
+    ],
+    "bitbucket.projects.projectkey.repos.repositoryslug.tags": [
+      {
+        "name": "filterText",
+        "type": "string"
+      },
+      {
+        "name": "orderBy",
+        "type": "string"
+      }
+    ],
+    "bitbucket.repos": [
+      {
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "name": "permission",
+        "type": "string"
+      },
+      {
+        "name": "projectname",
+        "type": "string"
+      },
+      {
+        "name": "visibility",
+        "type": "string"
+      }
+    ],
+    "bitbucket.repository.archive": [
+      {
+        "name": "at",
+        "type": "string"
+      },
+      {
+        "name": "filename",
+        "type": "string"
+      },
+      {
+        "name": "format",
+        "type": "string"
+      },
+      {
+        "name": "path",
+        "type": "string"
+      },
+      {
+        "name": "prefix",
+        "type": "string"
+      }
+    ],
+    "bitbucket.repository.pull-request-activity": [
+      {
+        "name": "fromId",
+        "type": "integer"
+      },
+      {
+        "name": "fromType",
+        "type": "string"
+      }
+    ],
+    "bitbucket.repository.raw": [
+      {
+        "name": "at",
+        "type": "string"
+      },
+      {
+        "name": "hardwrap",
+        "type": "string"
+      },
+      {
+        "name": "htmlEscape",
+        "type": "string"
+      },
+      {
+        "name": "markup",
+        "type": "string"
+      }
+    ],
+    "confluence.content.by-title": [
+      {
+        "name": "postingDay",
+        "type": "string"
+      },
+      {
+        "name": "status",
+        "type": "string"
+      },
+      {
+        "default": "page",
+        "name": "type",
+        "type": "string"
+      }
+    ],
+    "confluence.content.convert": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.content.id": [
+      {
+        "default": "history,space,version",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "status",
+        "type": "string"
+      },
+      {
+        "name": "version",
+        "type": "integer"
+      }
+    ],
+    "confluence.content.id.child.comment": [
+      {
+        "default": "",
+        "name": "depth",
+        "type": "string"
+      },
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "location",
+        "type": "string"
+      },
+      {
+        "default": "0",
+        "name": "parentVersion",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.content.id.child.type": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "default": "0",
+        "name": "parentVersion",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.content.id.descendant": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.content.id.descendant.type": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.content.id.history": [
+      {
+        "default": "previousVersion,nextVersion,lastUpdated",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.content.id.label": [
+      {
+        "default": "200",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "prefix",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.content.id.property.key": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.content.id.restriction.byoperation": [
+      {
+        "default": "update.restrictions.user,read.restrictions.group,read.restrictions.user,update.restrictions.group",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.content.id.restriction.byoperation.operationkey": [
+      {
+        "default": "restrictions.user,restrictions.group",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "100",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.content.search": [
+      {
+        "name": "cqlcontext",
+        "type": "string"
+      }
+    ],
+    "confluence.group": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "200",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.group.groupname": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.group.groupname.member": [
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "200",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.longtask": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "100",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.longtask.id": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.search": [
+      {
+        "name": "cql",
+        "type": "string"
+      },
+      {
+        "name": "cqlcontext",
+        "type": "string"
+      },
+      {
+        "default": "highlight",
+        "name": "excerpt",
+        "type": "string"
+      },
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "false",
+        "name": "includeArchivedSpaces",
+        "type": "string"
+      },
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.space": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "favourite",
+        "type": "string"
+      },
+      {
+        "name": "label",
+        "type": "string"
+      },
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "spaceKey",
+        "type": "string"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      },
+      {
+        "name": "status",
+        "type": "string"
+      },
+      {
+        "name": "type",
+        "type": "string"
+      }
+    ],
+    "confluence.space.get": [
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.space.spacekey.content.type": [
+      {
+        "default": "all",
+        "name": "depth",
+        "type": "string"
+      },
+      {
+        "default": "",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "25",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.space.spacekey.property": [
+      {
+        "default": "version",
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "default": "10",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "confluence.space.spacekey.property.key": [
+      {
+        "default": "version",
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.user.current": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "confluence.user.memberof": [
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "default": "200",
+        "name": "limit",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "confluence.user.watch.content.contentid": [
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "confluence.user.watch.space.spacekey": [
+      {
+        "name": "contentType",
+        "type": "string"
+      },
+      {
+        "name": "key",
+        "type": "string"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.filter.id": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "jira.groups.picker": [
+      {
+        "name": "exclude",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "query",
+        "type": "string"
+      },
+      {
+        "name": "userName",
+        "type": "string"
+      }
+    ],
+    "jira.groupuserpicker": [
+      {
+        "name": "fieldId",
+        "type": "string"
+      },
+      {
+        "name": "issueTypeId",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "projectId",
+        "type": "string"
+      },
+      {
+        "name": "query",
+        "type": "string"
+      },
+      {
+        "name": "showAvatar",
+        "type": "string"
+      }
+    ],
+    "jira.issue.createmeta": [
+      {
+        "name": "issuetypeIds",
+        "type": "string"
+      },
+      {
+        "name": "issuetypeNames",
+        "type": "string"
+      },
+      {
+        "name": "projectIds",
+        "type": "string"
+      },
+      {
+        "name": "projectKeys",
+        "type": "string"
+      }
+    ],
+    "jira.issue.createmeta.projectidorkey.issuetypes": [
+      {
+        "default": "50",
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "default": "0",
+        "name": "startAt",
+        "type": "integer"
+      }
+    ],
+    "jira.issue.createmeta.projectidorkey.issuetypes.issuetypeid": [
+      {
+        "default": "50",
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "default": "0",
+        "name": "startAt",
+        "type": "integer"
+      }
+    ],
+    "jira.issue.issueidorkey": [
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "fields",
+        "type": "string"
+      },
+      {
+        "name": "properties",
+        "type": "string"
+      },
+      {
+        "name": "updateHistory",
+        "type": "string"
+      }
+    ],
+    "jira.issue.issueidorkey.comment": [
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "orderBy",
+        "type": "string"
+      },
+      {
+        "name": "startAt",
+        "type": "integer"
+      }
+    ],
+    "jira.issue.issueidorkey.remotelink": [
+      {
+        "name": "globalId",
+        "type": "string"
+      }
+    ],
+    "jira.issue.issueidorkey.transitions": [
+      {
+        "name": "transitionId",
+        "type": "string"
+      }
+    ],
+    "jira.issue.picker": [
+      {
+        "name": "currentIssueKey",
+        "type": "string"
+      },
+      {
+        "name": "currentJQL",
+        "type": "string"
+      },
+      {
+        "name": "currentProjectId",
+        "type": "string"
+      },
+      {
+        "name": "query",
+        "type": "string"
+      },
+      {
+        "name": "showSubTaskParent",
+        "type": "string"
+      },
+      {
+        "name": "showSubTasks",
+        "type": "string"
+      }
+    ],
+    "jira.jql.autocompletedata.suggestions": [
+      {
+        "name": "fieldName",
+        "type": "string"
+      },
+      {
+        "name": "fieldValue",
+        "type": "string"
+      },
+      {
+        "name": "predicateName",
+        "type": "string"
+      },
+      {
+        "name": "predicateValue",
+        "type": "string"
+      }
+    ],
+    "jira.mypreferences": [
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "jira.password.policy": [
+      {
+        "default": "false",
+        "name": "hasOldPassword",
+        "type": "string"
+      }
+    ],
+    "jira.project": [
+      {
+        "name": "browseArchive",
+        "type": "string"
+      },
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "includeArchived",
+        "type": "string"
+      },
+      {
+        "name": "recent",
+        "type": "integer"
+      }
+    ],
+    "jira.project.get": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "jira.project.projectidorkey.version": [
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "orderBy",
+        "type": "string"
+      },
+      {
+        "name": "startAt",
+        "type": "integer"
+      }
+    ],
+    "jira.project.versions": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "jira.projects.picker": [
+      {
+        "default": "",
+        "name": "query",
+        "type": "string"
+      }
+    ],
+    "jira.projectvalidate.key": [
+      {
+        "name": "key",
+        "type": "string"
+      }
+    ],
+    "jira.search": [
+      {
+        "name": "expand",
+        "type": "string"
+      },
+      {
+        "name": "fields",
+        "type": "string"
+      },
+      {
+        "name": "jql",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "startAt",
+        "type": "integer"
+      },
+      {
+        "default": "true",
+        "name": "validateQuery",
+        "type": "string"
+      }
+    ],
+    "jira.serverinfo": [
+      {
+        "name": "doHealthCheck",
+        "type": "string"
+      }
+    ],
+    "jira.user.assignable.multiprojectsearch": [
+      {
+        "default": "50",
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "projectKeys",
+        "type": "string"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.user.avatars": [
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.user.columns": [
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.user.get": [
+      {
+        "default": "false",
+        "name": "includeDeleted",
+        "type": "string"
+      }
+    ],
+    "jira.user.picker": [
+      {
+        "name": "exclude",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "query",
+        "type": "string"
+      },
+      {
+        "name": "showAvatar",
+        "type": "string"
+      }
+    ],
+    "jira.user.properties": [
+      {
+        "name": "userKey",
+        "type": "string"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.user.properties.propertykey": [
+      {
+        "name": "userKey",
+        "type": "string"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.user.search": [
+      {
+        "name": "includeActive",
+        "type": "string"
+      },
+      {
+        "name": "includeInactive",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "startAt",
+        "type": "integer"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.user.viewissue.search": [
+      {
+        "name": "issueKey",
+        "type": "string"
+      },
+      {
+        "name": "maxResults",
+        "type": "integer"
+      },
+      {
+        "name": "projectKey",
+        "type": "string"
+      },
+      {
+        "name": "username",
+        "type": "string"
+      }
+    ],
+    "jira.version.id": [
+      {
+        "name": "expand",
+        "type": "string"
+      }
+    ],
+    "jira.version.remotelink": [
+      {
+        "name": "globalId",
+        "type": "string"
+      }
+    ]
+  },
+  "schema": "atlawire-query-surface/v1",
+  "source": {
+    "bitbucket": {
+      "server_version": "5.10.0",
+      "wadl_sha256": "9942abd00c3aedafafea1c7d4694cc4fdcfb0dd9d99f175a9aeaed36419a1145"
+    },
+    "confluence": {
+      "server_version": "",
+      "wadl_sha256": "f5c08e2b952650f132c44776fa7194c189a2478c5e6eb326a50cd596a0082261"
+    },
+    "jira": {
+      "server_version": "8.22.2",
+      "wadl_sha256": "1106c2469ec3dca8dfe3b76c28cff34916d0b76c9afc6e0c9e1f06eec509cbdb"
+    }
+  }
+}

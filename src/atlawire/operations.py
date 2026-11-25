@@ -38,7 +38,7 @@ Documented routes:
 import json
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, cast
 from urllib.parse import quote
@@ -118,6 +118,11 @@ _BINARY_TARGET = "This operation writes a file; pass an explicit destination."
 _NOT_BINARY = "This operation is not a binary read."
 _INVALID_BODY = "The request body is invalid."
 _MAX_QUERY_INTEGER = 2**31 - 1
+# A generated string parameter is an ordinary documented value: bounded, free of
+# controls, and allowed to contain the spaces that search terms need.
+_MAX_QUERY_TEXT = 2048
+_SAFE_QUERY_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
+_GENERATED_QUERY_NOTE = "Documented by the deployment's own API description (WADL)."
 
 _JIRA_PROJECT_ID_OR_KEY = re.compile(r"(?:[A-Z][A-Z0-9_]*|[1-9][0-9]*)")
 _JIRA_ISSUE_ID_OR_KEY = re.compile(r"(?:[A-Z][A-Z0-9_]*-[1-9][0-9]*|[1-9][0-9]*)")
@@ -151,6 +156,9 @@ CANONICAL_IDS = frozenset(
 )
 
 _MANIFEST_PATH = Path(__file__).with_name("manifest.json")
+# Query parameters each deployment documents for a registered route, generated
+# from its own WADL by tools/build_query_surface.py.
+_QUERY_SURFACE_PATH = _MANIFEST_PATH.with_name("query_params.json")
 
 # Safe example values for the canonical read examples. A missing entry means
 # the description returns no example rather than inventing an identifier.
@@ -200,6 +208,11 @@ class _QueryField:
     allow_spaces: bool = False
     # Other query fields that must also be present when this one is used.
     depends_on: tuple[str, ...] = ()
+    # True when the parameter was merged from the deployment's own WADL rather
+    # than written here. The generator reads this to stay idempotent: without it,
+    # a second run would treat its own output as a hand-written declaration and
+    # silently produce fewer rows.
+    generated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1689,7 +1702,93 @@ def _install_manifest_operations() -> int:
     return added
 
 
+def _query_surface() -> dict[str, object]:
+    """Load the packaged query surface; a broken package is a fatal error.
+
+    Silently returning an empty mapping would shrink every advertised parameter
+    list back to the hand-written subset without saying so, which is the failure
+    this file exists to prevent.
+    """
+    try:
+        document = json.loads(_QUERY_SURFACE_PATH.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        raise AtlaWireError(
+            "The packaged query surface is missing or invalid.",
+            category="validation",
+        ) from None
+    operations = document.get("operations") if isinstance(document, dict) else None
+    if not isinstance(operations, dict):
+        raise AtlaWireError(
+            "The packaged query surface is missing or invalid.",
+            category="validation",
+        ) from None
+    return operations
+
+
+def _documented_field(name: object, kind: object) -> _QueryField | None:
+    """Build one generated query field, or ``None`` when the row is malformed."""
+    if not isinstance(name, str) or not name or len(name) > 64:
+        return None
+    if not _SAFE_QUERY_NAME.fullmatch(name):
+        return None
+    if kind not in {"integer", "string"}:
+        return None
+    if kind == "integer":
+        # The server's own default may be negative (diffs default to -1), so no
+        # lower bound is imposed here; the server owns that rule.
+        return _QueryField(
+            name,
+            "integer",
+            False,
+            _GENERATED_QUERY_NOTE,
+            maximum=_MAX_QUERY_INTEGER,
+            generated=True,
+        )
+    return _QueryField(
+        name,
+        "string",
+        False,
+        _GENERATED_QUERY_NOTE,
+        max_length=_MAX_QUERY_TEXT,
+        allow_spaces=True,
+        generated=True,
+    )
+
+
+def _install_documented_query() -> int:
+    """Add every server-documented query parameter a route does not declare.
+
+    A hand-written declaration always wins: it can carry constraints the WADL
+    does not state (an enum, a path-shaped value, "one of these" rules), and a
+    generated row must never loosen one.
+    """
+    added = 0
+    for operation_id, rows in _query_surface().items():
+        operation = (
+            _OPERATIONS.get(operation_id) if isinstance(operation_id, str) else None
+        )
+        if operation is None or not isinstance(rows, list):
+            continue
+        known = {field.name for field in operation.query}
+        extra: list[_QueryField] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            field = _documented_field(row.get("name"), row.get("type"))
+            if field is None or field.name in known:
+                continue
+            known.add(field.name)
+            extra.append(field)
+        if extra:
+            _OPERATIONS[operation.id] = replace(
+                operation, query=operation.query + tuple(extra)
+            )
+            added += len(extra)
+    return added
+
+
 _install_manifest_operations()
+_install_documented_query()
 
 
 def list_operations() -> list[dict[str, object]]:
@@ -1767,6 +1866,7 @@ def _describe(operation: _Operation) -> dict[str, object]:
                     else None
                 ),
                 "enum": list(field.allowed),
+                "source": "server-wadl" if field.generated else "atlawire",
             }
             for field in operation.query
         ],

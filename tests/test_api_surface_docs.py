@@ -116,7 +116,7 @@ def test_two_groups_that_slug_to_one_file_fail_instead_of_overwriting(monkeypatc
     assert builder._slug("projects--repos") == builder._slug("projects-repos")
 
     def colliding(product):
-        method = builder.Method(verb="GET", route="/x", doc="", query=[])
+        method = builder.wadl.Method(verb="GET", route="/x", doc="", query=[])
         return {
             "projects--repos": builder.Paths(group="projects--repos", methods=[method]),
             "projects-repos": builder.Paths(group="projects-repos", methods=[method]),

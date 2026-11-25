@@ -30,7 +30,9 @@ def test_describe_flags_a_route_with_declared_query_fields():
 
 
 def test_describe_reports_an_unreconciled_route_as_null_not_false():
-    described = _described("jira.project.get")
+    # A route whose WADL declares no query parameter keeps `None`: the deployment
+    # documents no parameter for it, which is not proof the route takes none.
+    described = _described("bitbucket.project.get")
 
     assert described["query"] == []
     assert described["query_documented"] is None
@@ -41,7 +43,7 @@ def test_describe_output_round_trips_through_strict_json():
     declared = CliRunner().invoke(
         cli, ["--describe", "bitbucket.profile.recent-repositories"]
     )
-    unreconciled = CliRunner().invoke(cli, ["--describe", "jira.project.get"])
+    unreconciled = CliRunner().invoke(cli, ["--describe", "bitbucket.project.get"])
 
     assert declared.exit_code == unreconciled.exit_code == 0
     assert json.loads(declared.stdout)["query_documented"] is True
@@ -63,9 +65,14 @@ def test_no_operation_claims_a_verified_parameter_free_route():
 
 
 def test_query_documented_matches_the_registry_census():
-    """22 declared, 180 unreconciled, 202 total; drift must be deliberate."""
+    """113 declared, 89 unreconciled, 202 total; drift must be deliberate.
+
+    The declared count rose from 22 when the parameters each deployment documents
+    in its own WADL were merged in; the rest are routes with no documented query
+    surface, which stay ``None`` rather than claiming to take no parameters.
+    """
     described = operations.list_operations()
 
     assert len(described) == 202
-    assert sum(1 for entry in described if entry["query_documented"] is True) == 22
-    assert sum(1 for entry in described if entry["query_documented"] is None) == 180
+    assert sum(1 for entry in described if entry["query_documented"] is True) == 113
+    assert sum(1 for entry in described if entry["query_documented"] is None) == 89
