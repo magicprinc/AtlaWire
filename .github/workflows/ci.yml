@@ -47,6 +47,14 @@ jobs:
       - name: Read manifest projection
         run: python -B tools/build_read_manifest.py --check
 
+      - name: API surface documents
+        run: python -B tools/build_api_surface_docs.py --check
+
+      - name: Registry against the servers' own API surface
+        run: python -B tools/check_api_surface.py --check
+        env:
+          PYTHONPATH: src
+
       - name: Offline suite
         run: python -B -m pytest -q -p no:cacheprovider tests
 

@@ -1,0 +1,30 @@
+{
+  "fetched_at": "2026-11-25T07:16:14Z",
+  "products": {
+    "bitbucket": {
+      "artifact": ".development/bitbucket/source/application.wadl",
+      "bytes": 529438,
+      "host_redacted": true,
+      "server_version": "5.10.0",
+      "sha256": "9942abd00c3aedafafea1c7d4694cc4fdcfb0dd9d99f175a9aeaed36419a1145",
+      "wadl_path": "/rest/api/1.0/application.wadl"
+    },
+    "confluence": {
+      "artifact": ".development/confluence/source/application.wadl",
+      "bytes": 34481,
+      "host_redacted": true,
+      "server_version": "",
+      "sha256": "f5c08e2b952650f132c44776fa7194c189a2478c5e6eb326a50cd596a0082261",
+      "wadl_path": "/rest/api/application.wadl"
+    },
+    "jira": {
+      "artifact": ".development/jira/source/application.wadl",
+      "bytes": 1045351,
+      "host_redacted": true,
+      "server_version": "8.22.2",
+      "sha256": "1106c2469ec3dca8dfe3b76c28cff34916d0b76c9afc6e0c9e1f06eec509cbdb",
+      "wadl_path": "/rest/api/2/application.wadl"
+    }
+  },
+  "schema": "atlawire-api-surface-source/v1"
+}

@@ -203,7 +203,7 @@ def get_issue(
     key_or_url: str,
     *,
     token: str,
-    expand: str = "renderedFields",
+    expand: str | None = "renderedFields",
     fields: str | None = None,
     properties: str | None = None,
     update_history: bool = False,
@@ -212,13 +212,15 @@ def get_issue(
 ) -> dict[str, object]:
     """Return the Jira issue JSON expanded by ``expand``; rendered fields by default.
 
-    ``fields`` and ``properties`` are sent verbatim when given. ``update_history``
+    ``fields`` and ``properties`` are sent verbatim when given. ``expand=None``
+    omits the parameter, so the server's own default applies; the default
+    ``"renderedFields"`` is this library's choice, not Jira's. ``update_history``
     and ``fail_fast`` are sent as ``true`` only when requested, so a default call
     keeps the server's own defaults instead of pinning them.
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    params = {"expand": expand}
+    params: dict[str, str] = {} if expand is None else {"expand": expand}
     if fields is not None:
         params["fields"] = fields
     if properties is not None:
