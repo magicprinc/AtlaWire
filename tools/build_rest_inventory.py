@@ -20,9 +20,11 @@ Run it from the repository root:
 """
 
 import argparse
+import hashlib
 import json
 import re
 import sys
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -83,6 +85,21 @@ _EXPECTED = {
     "unresolved": 0,
     "runtime_operations": 202,
 }
+# Per-product counts. Without them a global total could be satisfied by two
+# compensating mistakes, one product short and another long.
+_EXPECTED_PRODUCT = {
+    "jira": {"required": 108, "excluded": 5},
+    "confluence": {"required": 36, "excluded": 0},
+    "bitbucket": {"required": 57, "excluded": 42},
+}
+# Digest of the sorted normalized exclusions per product. Counting excluded rows
+# is not enough: swapping one for another keeps every total identical, so the
+# identity of what was excluded has to be pinned too.
+_EXPECTED_EXCLUDED_DIGEST: dict[str, str] = {
+    "jira": "fe0a49d5fb2048de60981768d7a5bc9cab410630ff1788e67b1caf42d2abfa2c",
+    "confluence": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bitbucket": "864595cb50f98f93704cbe56854ed5dbaffa67ebf483dd06b1dd4ec175602460",
+}
 
 _REASON_TEXT = {
     "administrative": "Administrative, project-admin or system route.",
@@ -105,6 +122,27 @@ class _Row:
 def normalize_path(path: str) -> str:
     """Collapse placeholder names so two spellings of one route compare equal."""
     return _PLACEHOLDER.sub("{}", path.rstrip("/"))
+
+
+def _is_audit_path(path: str) -> bool:
+    """Match only the four audit routes the mapping names, exactly.
+
+    A prefix test would also exclude an unseen child such as
+    ``/rest/audit/records`` as administrative, which is a decision the mapping
+    never made. Narrower is safer: an unnamed route stays required, and the
+    two-way check forces an explicit decision the moment it appears.
+    """
+    return path in _CONFLUENCE_AUDIT
+
+
+def _excluded_digest(rows: Sequence[Mapping[str, object]]) -> str:
+    """Return a stable digest over the identity of the excluded rows."""
+    keys = sorted(
+        f"{row['method']} {normalize_path(str(row['path']))} {row.get('reason', '?')}"
+        for row in rows
+        if row["disposition"] == "excluded"
+    )
+    return hashlib.sha256("\n".join(keys).encode("utf-8")).hexdigest()
 
 
 def _registered_additions() -> dict[tuple[str, str, str], str]:
@@ -204,7 +242,7 @@ def _disposition(row: _Row) -> tuple[str, str]:
         return "excluded", "documented-inconsistently"
     if row.mapping_status in {"instance-admin", "project-admin"}:
         return "excluded", "administrative"
-    if row.product == "confluence" and row.path.startswith("/rest/audit"):
+    if row.product == "confluence" and _is_audit_path(row.path):
         return "excluded", "administrative"
     if row.product == "bitbucket":
         segments = {part for part in row.path.split("/") if part}
@@ -230,6 +268,29 @@ def _registry() -> dict[tuple[str, str, str], list[dict[str, object]]]:
     return index
 
 
+def _rule_text_names(rule: str, path: str) -> bool:
+    """Match one audit path as a whole token, never as a prefix of a longer one.
+
+    A plain substring test lets `/rest/audit` be "found" inside
+    `/rest/audit/export`, so prose that dropped the bare path would still pass.
+    """
+    pattern = rf"{re.escape(path)}(?![\w/-])"
+    return re.search(pattern, rule) is not None
+
+
+def _rule_text_extra_paths() -> list[str]:
+    """Return audit routes the prose names but the constant does not carry."""
+    document = _read("confluence", "mapping-confluence.json")
+    provenance = _mapping(document, "inventory_provenance")
+    rule = provenance.get("exclusion_rule")
+    if not isinstance(rule, str):
+        return []
+    named = {
+        match.rstrip(".") for match in re.findall(r"/rest/[A-Za-z0-9_./{}\-]+", rule)
+    }
+    return sorted(named - set(_CONFLUENCE_AUDIT))
+
+
 def _rule_text_names_every_audit_path() -> list[str]:
     """Prove the hard-coded audit exclusion still matches the mapping prose."""
     document = _read("confluence", "mapping-confluence.json")
@@ -240,7 +301,7 @@ def _rule_text_names_every_audit_path() -> list[str]:
     return [
         f"confluence exclusion_rule does not name {path}"
         for path in _CONFLUENCE_AUDIT
-        if path not in rule
+        if not _rule_text_names(rule, path)
     ]
 
 
@@ -309,6 +370,15 @@ def build_document() -> dict[str, object]:
         for row in _rows_of(block)
         if row["disposition"] == "required"
     }
+    missing_additions = [key for key in _registered_additions() if key not in registry]
+    if missing_additions:
+        raise SystemExit(f"declared additions are not registered: {missing_additions}")
+    promoted = [key for key in _registered_additions() if key in required_keys]
+    if promoted:
+        raise SystemExit(
+            "declared additions are now documented required rows; remove them "
+            f"from _REGISTERED_ADDITIONS_SOURCE: {promoted}"
+        )
     additions = [
         {
             "runtime_operation_id": described[0]["id"],
@@ -335,7 +405,13 @@ def build_document() -> dict[str, object]:
             if isinstance(block, dict)
         )
         + len(_CONFLUENCE_AUDIT),
-        "unresolved": 0,
+        "unresolved": sum(
+            1
+            for block in products.values()
+            if isinstance(block, dict)
+            for row in _rows_of(block)
+            if row["disposition"] not in {"required", "excluded"}
+        ),
         "runtime_operations": sum(len(value) for value in registry.values()),
     }
     return {
@@ -370,6 +446,14 @@ def verify(document: Mapping[str, object]) -> list[str]:
             problems.append(f"{name}: expected {expected}, built {actual}")
 
     registry = _registry()
+    census = [
+        (str(item["product"]), str(item["method"]), normalize_path(str(item["path"])))
+        for item in operations_census()
+    ]
+    duplicated = [key for key, count in Counter(census).items() if count > 1]
+    if duplicated:
+        problems.append(f"duplicate registry keys: {duplicated}")
+
     seen: set[tuple[str, str, str]] = set()
     products = document["products"]
     if not isinstance(products, dict):
@@ -416,8 +500,128 @@ def verify(document: Mapping[str, object]) -> list[str]:
             problems.append(
                 f"runtime operation unaccounted for: {key[0]} {key[1]} {key[2]}"
             )
+
+    required_keys = {
+        (product, str(row["method"]), normalize_path(str(row["path"])))
+        for product, block in products.items()
+        if isinstance(block, dict)
+        for row in _rows_of(block)
+        if row["disposition"] == "required"
+    }
+    addition_keys = {
+        (str(item["product"]), str(item["method"]), normalize_path(str(item["path"])))
+        for item in additions
+        if isinstance(item, dict)
+    }
+    masked = addition_keys & required_keys
+    if masked:
+        problems.append(f"an addition masks a required row: {sorted(masked)}")
+
+    for product, expected in _EXPECTED_PRODUCT.items():
+        block = products.get(product)
+        counts = block.get("counts") if isinstance(block, dict) else None
+        if not isinstance(block, dict) or not isinstance(counts, dict):
+            problems.append(f"{product}: missing counts")
+            continue
+        rows = _rows_of(block)
+        # Recompute from the rows, not from the document's own self-report, so a
+        # tampered artifact cannot pass by agreeing with itself.
+        actual_required = sum(1 for row in rows if row["disposition"] == "required")
+        actual_excluded = sum(1 for row in rows if row["disposition"] == "excluded")
+        if actual_required != expected["required"]:
+            problems.append(
+                f"{product} required: expected {expected['required']}, "
+                f"rows say {actual_required}"
+            )
+        if actual_excluded != expected["excluded"]:
+            problems.append(
+                f"{product} excluded: expected {expected['excluded']}, "
+                f"rows say {actual_excluded}"
+            )
+        if counts.get("required") != actual_required:
+            problems.append(
+                f"{product} counts.required disagrees with its rows: "
+                f"{counts.get('required')} vs {actual_required}"
+            )
+        if counts.get("excluded") != actual_excluded:
+            problems.append(
+                f"{product} counts.excluded disagrees with its rows: "
+                f"{counts.get('excluded')} vs {actual_excluded}"
+            )
+        if counts.get("rows") != len(rows):
+            problems.append(
+                f"{product} counts.rows disagrees with its rows: "
+                f"{counts.get('rows')} vs {len(rows)}"
+            )
+        recomputed_reasons: dict[str, int] = {}
+        for row in rows:
+            key = (product, str(row["method"]), normalize_path(str(row["path"])))
+            matches = registry.get(key)
+            expected_id = matches[0]["id"] if matches else None
+            if row["registered"] is not bool(matches):
+                problems.append(
+                    f"{product} {row['method']} {row['path']}: registered flag "
+                    "disagrees with the registry"
+                )
+            if row["runtime_operation_id"] != expected_id:
+                problems.append(
+                    f"{product} {row['method']} {row['path']}: runtime id "
+                    "disagrees with the registry"
+                )
+            if matches and row["response_kind"] != matches[0]["response"]["kind"]:
+                problems.append(
+                    f"{product} {row['method']} {row['path']}: response_kind "
+                    "disagrees with the registry"
+                )
+            if row["disposition"] == "excluded":
+                reason = row.get("reason")
+                if not isinstance(reason, str) or not reason:
+                    problems.append(
+                        f"{product} {row['method']} {row['path']}: excluded row "
+                        "states no reason"
+                    )
+                    continue
+                recomputed_reasons[reason] = recomputed_reasons.get(reason, 0) + 1
+        if counts.get("excluded_by_reason") != dict(sorted(recomputed_reasons.items())):
+            problems.append(
+                f"{product} counts.excluded_by_reason disagrees with its rows"
+            )
+        digest = _excluded_digest(rows)
+        pinned = _EXPECTED_EXCLUDED_DIGEST.get(product)
+        if pinned is None or digest != pinned:
+            problems.append(
+                f"{product} excluded set changed: {digest} (pinned {pinned}); "
+                "review the swap, then update _EXPECTED_EXCLUDED_DIGEST"
+            )
+
+    actual_unresolved = sum(
+        1
+        for block in products.values()
+        if isinstance(block, dict)
+        for row in _rows_of(block)
+        if row["disposition"] not in {"required", "excluded"}
+    )
+    if actual_unresolved:
+        problems.append(
+            f"rows with no final disposition: {actual_unresolved}; every row "
+            "must be required or excluded"
+        )
+
     problems.extend(_rule_text_names_every_audit_path())
+    extra = _rule_text_extra_paths()
+    if extra:
+        problems.append(
+            "confluence exclusion_rule names audit routes missing from the "
+            f"constant: {extra}"
+        )
     return problems
+
+
+def operations_census() -> list[dict[str, object]]:
+    """Return the live registry rows used by the duplicate-key guard."""
+    from atlawire import operations
+
+    return operations.list_operations()
 
 
 def render(document: Mapping[str, object]) -> str:
@@ -444,7 +648,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     rendered = render(document)
     problems = verify(document)
     status = 0
-    if args.check:
+    if problems and not args.check:
+        # A failing build must not overwrite a reviewed artifact.
+        print("refusing to write: the two-way check failed")
+    elif args.check:
         try:
             current = args.output.read_text(encoding="utf-8")
         except OSError:

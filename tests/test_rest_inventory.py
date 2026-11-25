@@ -143,6 +143,71 @@ def test_verify_catches_a_drifted_total(built):
     )
 
 
+def test_verify_catches_a_compensating_per_product_shift(built):
+    """201 must not be reachable by one product short and another long."""
+    generator = _load_generator()
+    broken = json.loads(json.dumps(built))
+    broken["products"]["jira"]["counts"]["required"] = 107
+    broken["products"]["confluence"]["counts"]["required"] = 37
+
+    problems = generator.verify(broken)
+
+    assert any("jira counts.required disagrees" in problem for problem in problems)
+    assert any(
+        "confluence counts.required disagrees" in problem for problem in problems
+    )
+
+
+def test_verify_catches_an_addition_that_masks_a_required_row(built):
+    """A named addition must never stand in for a required row."""
+    generator = _load_generator()
+    broken = json.loads(json.dumps(built))
+    masked = next(
+        row
+        for block in broken["products"].values()
+        for row in block["rows"]
+        if row["disposition"] == "required"
+    )
+    broken["registered_additions"].append(
+        {
+            "runtime_operation_id": masked["runtime_operation_id"],
+            "product": next(
+                product
+                for product, block in broken["products"].items()
+                if masked in block["rows"]
+            ),
+            "method": masked["method"],
+            "path": masked["path"],
+            "reason": "duplicate of a required row",
+        }
+    )
+
+    assert any(
+        "masks a required row" in problem for problem in generator.verify(broken)
+    )
+
+
+def test_verify_catches_a_duplicate_registry_key(monkeypatch, built):
+    """Two operations on one route would hide a lost row behind a stable total."""
+    generator = _load_generator()
+    census = generator.operations_census()
+    monkeypatch.setattr(
+        generator, "operations_census", lambda: [*census, dict(census[0])]
+    )
+
+    problems = generator.verify(built)
+
+    assert any("duplicate registry keys" in problem for problem in problems)
+
+
+def test_per_product_required_counts_are_pinned(built):
+    """The split is part of the freeze, not just the global total."""
+    assert {
+        product: block["counts"]["required"]
+        for product, block in built["products"].items()
+    } == {"jira": 108, "confluence": 36, "bitbucket": 57}
+
+
 def test_verify_checks_the_confluence_rule_against_the_mapping_prose(built):
     """The hard-coded audit paths must still be named in the mapping itself."""
     generator = _load_generator()
