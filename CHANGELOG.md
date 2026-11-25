@@ -2,14 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
-intends to use [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once releases begin.
-No version has been released yet.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
+project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Changes below cover the unreleased read-only surface: the initial command batch and the
-subsequent agent-facing batch (the latter spans commits `2960a43..a4efee1`).
+No package has been published to an index. `v0.9.0` and `v0.9.1` are local git tags;
+installation is from this checkout or from a wheel built here. The entries below cover
+the read-only surface: the initial command batch, the agent-facing batch (commits
+`2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
-## [Unreleased]
+## [0.9.1] - 2026-11-25
+
+### Added
+
+- `.development/rest-inventory.json` freezes the release denominator: 252
+  documented rows, 201 required, 51 excluded with a stated reason, 0
+  unresolved. `tools/build_rest_inventory.py --check` verifies both directions,
+  so a required row without a registered operation, or a registered operation
+  with no disposition, fails the check. One runtime operation with no
+  documented row (`jira.attachment.content`) is recorded as a named addition.
+- `--describe` and `list_operations()` report `query_documented: true | null`.
+  `true` means query fields are declared; `null` means the route's query surface
+  is not reconciled with the versioned reference yet, so `read` rejects query
+  values for it and an ad-hoc parameter has to go through `api-get`. `false` is
+  reserved for a verified parameter-free route and no operation claims it.
+
+### Changed
+
+- README states the frozen inventory numbers and the 22/180 query census
+  instead of describing the inventory as unfrozen.
+
+### Removed
+
+- `.development/full_api_matrix.md`, a stale snapshot of an earlier commit. The
+  denominator now lives in `rest-inventory.json`; `operations` and `--catalog`
+  describe the public surface, and `bbk-parity.md` holds the BBK dispositions.
+
+## [0.9.0] - 2026-11-24
 
 ### Added
 

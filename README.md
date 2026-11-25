@@ -41,10 +41,18 @@ not replace opening the underlying issue, page, or file as evidence.
   with 0 failed). They prove neither production scale nor other deployments; recheck
   bearer authentication, permissions, TLS, and the relevant reads elsewhere. No
   supported-version matrix is published.
-- The required REST inventory is not frozen: 180 of the 202 registered
-  operations declare no query fields and 152 use the generic JSON shape, so
-  their documented parameters and response contracts remain unverified. The
-  registry is an inventory, not proof of complete REST coverage.
+- The required REST inventory is frozen in `.development/rest-inventory.json`:
+  252 documented rows, **201 required**, 51 excluded with a stated reason, 0
+  unresolved. `tools/build_rest_inventory.py --check` verifies both directions,
+  so a required row without a registered operation, or a registered operation
+  with no disposition, fails. The registry is an inventory, not proof of
+  complete REST coverage, and the inventory and the registry share one input.
+- Query surfaces are mostly unreconciled: 22 of the 202 registered operations
+  declare query fields and 180 declare none. `--describe` reports that as
+  `query_documented: true | null`; `null` means "not reconciled with the
+  versioned reference", not "the route takes no parameters", and `read` rejects
+  query values for such an operation. 152 operations also use the generic JSON
+  response shape, so their response contracts remain unverified.
 - Use JSON for exact values. TSV keeps the documented column order but escapes
   text for display; Markdown is for reading.
 
@@ -92,6 +100,26 @@ import BBK, does not use BBK's optional user or password entries, and never
 falls back to another product's entry. The file and token are never printed.
 The saved URL must be HTTPS (or an explicitly allowed loopback URL in tests),
 and the token must fit the bearer header.
+
+To set the file up by hand, create it with one matched pair per product you use;
+the other entries are optional and AtlaWire never reads BBK's user/password
+fields:
+
+```json
+{
+  "jira_url": "https://jira.example.com",
+  "jira_token": "…",
+  "confluence_url": "https://confluence.example.com",
+  "confluence_token": "…",
+  "bitbucket_url": "https://bitbucket.example.com",
+  "bitbucket_token": "…"
+}
+```
+
+Keep it readable only by you (`chmod 600` on POSIX). Every value is a bearer
+token; a BBK entry with a user and password but no token is not usable here.
+`atlawire auth login` does not exist yet, so this file, `BBK_CREDENTIALS`, or the
+`ATLAWIRE_*` environment pair is the only setup path.
 
 Pass `--token-from-env` to switch to environment-only mode. In that mode AtlaWire
 does not open the saved file: set both variables from the table in the invoking
