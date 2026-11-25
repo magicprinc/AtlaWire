@@ -44,6 +44,7 @@ from typing import Literal, cast
 from urllib.parse import quote
 
 from atlawire.http import (
+    SIDE_EFFECT_QUERY,
     AtlaWireError,
     bearer_session,
     get_json_any,
@@ -2309,7 +2310,12 @@ def _validated_query(
     else:
         raise _invalid(_INVALID_QUERY, operation)
     fields = {field.name: field for field in operation.query}
-    if any(not isinstance(name, str) or name not in fields for name in supplied):
+    if any(
+        not isinstance(name, str)
+        or name not in fields
+        or name.lower() in SIDE_EFFECT_QUERY
+        for name in supplied
+    ):
         raise _invalid(_INVALID_QUERY, operation)
     present = set(supplied)
     if sum(name in present for name in operation.query_at_most_one) > 1:

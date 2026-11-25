@@ -604,7 +604,7 @@ def search_cql_with_metadata(
     ``list`` that existing callers index, iterate, and serialize; widening
     that shape would break them, so completeness-aware callers opt in here.
     """
-    if not query.strip():
+    if not isinstance(query, str) or not query.strip():
         raise AtlaWireError("Expected a non-empty CQL query.")
     _validate_limit(limit, CQL_LIMIT_MIN, CQL_LIMIT_MAX)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
@@ -1461,6 +1461,10 @@ def _read_typed_space_content(
     seen_ids: set[str] = set()
     seen_fallback_pages: set[bytes] = set()
     offset = 0
+    # The endpoint may omit totalSize on a later page; an earlier usable total is
+    # retained, exactly as the shared row reader does, so a short listing cannot
+    # pass for a complete one.
+    known_total: int | None = None
     url = f"{base}{_SPACE_CONTENT_TYPE_PATH.format(key=space_key, type=content_type)}"
     while len(rows) < limit:
         requested = limit - len(rows)
@@ -1470,18 +1474,28 @@ def _read_typed_space_content(
             params={"expand": _CONTENT_EXPAND, "start": offset, "limit": requested},
         )
         results, total = _page(page, offset, requested, "space content")
+        if total is not None:
+            if known_total is not None and total != known_total:
+                raise AtlaWireError(
+                    "Confluence space content totalSize changed between pages."
+                )
+            known_total = total
+        if known_total is not None and offset + len(results) > known_total:
+            raise AtlaWireError(
+                "Inconsistent Confluence space content pagination metadata."
+            )
         if not results:
-            if total is not None and total > offset:
+            if known_total is not None and known_total > offset:
                 raise AtlaWireError(
                     "Confluence space content returned an empty page before all matches."
                 )
             return ContentRows(rows=rows, truncated=False)
         _append_content_rows(results, rows, seen_ids, seen_fallback_pages)
         offset += len(results)
-        if len(rows) >= limit:
-            return ContentRows(rows=rows, truncated=_page_has_more(page, total, offset))
-        if not _page_has_next(page):
-            return ContentRows(rows=rows, truncated=_page_has_more(page, total, offset))
+        if len(rows) >= limit or not _page_has_next(page):
+            return ContentRows(
+                rows=rows, truncated=_page_has_more(page, known_total, offset)
+            )
     return ContentRows(rows=rows, truncated=False)
 
 

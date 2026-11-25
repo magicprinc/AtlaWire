@@ -127,7 +127,6 @@ def test_get_issue_sends_every_documented_query_option(server):
             expand="names",
             fields="summary,status",
             properties="alpha,beta",
-            update_history=True,
             fail_fast=True,
             allow_http_loopback=True,
         )
@@ -137,6 +136,5 @@ def test_get_issue_sends_every_documented_query_option(server):
         "expand": ["names"],
         "fields": ["summary,status"],
         "properties": ["alpha,beta"],
-        "updateHistory": ["true"],
         "failFast": ["true"],
     }

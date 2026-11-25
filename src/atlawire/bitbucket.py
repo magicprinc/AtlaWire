@@ -365,8 +365,7 @@ def list_repositories(
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if not _PROJECT_KEY.fullmatch(project):
         raise AtlaWireError("Expected a Bitbucket project key or ~user project.")
-    if not 1 <= max_pages <= 1000:
-        raise AtlaWireError("The page limit must be between 1 and 1000.")
+    _validate_page_limit(max_pages)
     _check_row_limit(limit)
     url = f"{base}/rest/api/1.0/projects/{project}/repos"
     with bearer_session(token, product="bitbucket") as session:
@@ -2689,6 +2688,8 @@ def _diff_context(value: int) -> int:
 
 def _split_repo(repo: str) -> tuple[str, str]:
     """Split ``PROJECT/slug`` into two safe path segments."""
+    if not isinstance(repo, str):
+        raise AtlaWireError("Expected a repository as PROJECT/slug.")
     project, separator, slug = repo.partition("/")
     if (
         not separator

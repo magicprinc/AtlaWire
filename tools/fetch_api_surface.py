@@ -6,8 +6,10 @@ deployment. Every Atlassian product instead publishes a machine-readable WADL at
 a fixed read-only path, generated from the running code: routes, methods, query
 parameters with types and defaults, and prose for most methods.
 
-This tool only reads. It never prints or stores a token, and it replaces the
-internal host with ``example.com`` so the artifact can be reviewed or committed.
+This tool only reads the servers. It never prints or stores a token, and it
+replaces the internal host with ``example.com`` so the artifact can be reviewed
+or committed. ``--check`` fetches into memory, compares, and writes nothing: a
+verification run must not replace the artifact it is verifying.
 
     python -B tools/fetch_api_surface.py --live
     python -B tools/fetch_api_surface.py --live --check
@@ -32,12 +34,14 @@ WADL_PATH = {
     "bitbucket": "/rest/api/1.0/application.wadl",
 }
 # A cheap read that states the running release, so the artifact is tied to a
-# version instead of to "whatever was installed that day".
+# version instead of to "whatever was installed that day". Confluence exposes no
+# such endpoint over this REST API, so it is absent here and its version is
+# recorded as empty rather than guessed.
 VERSION_PATH = {
     "jira": "/rest/api/2/serverInfo",
-    "confluence": "/rest/api/application.wadl",
     "bitbucket": "/rest/api/1.0/application-properties",
 }
+RECORD_NAME = "api-surface-source.json"
 
 
 def _credentials(product: str):
@@ -83,14 +87,19 @@ def _host_needles(base_url: str) -> tuple[bytes, ...]:
     return tuple(item.encode() for item in sorted(raw, key=len, reverse=True) if item)
 
 
-def fetch() -> dict[str, object]:
-    """Download every WADL, redact the host, and return the provenance record."""
+def collect() -> tuple[dict[str, object], dict[Path, bytes]]:
+    """Download every WADL in memory and return the record with its payloads.
+
+    Nothing is written here, so the caller decides whether this run replaces the
+    artifacts (write) or only compares them (``--check``).
+    """
     record: dict[str, object] = {
         "fetched_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "schema": "atlawire-api-surface-source/v1",
         "products": {},
     }
     products: dict[str, object] = {}
+    payloads: dict[Path, bytes] = {}
     for product, path in WADL_PATH.items():
         saved = _credentials(product)
         base = saved.base_url.rstrip("/")
@@ -117,16 +126,17 @@ def fetch() -> dict[str, object]:
                 f"{product}: refusing to write a WADL that still names the host"
             )
         target = OUTPUT / product / "source" / "application.wadl"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(redacted)
+        payloads[target] = redacted
 
         version = ""
-        try:
-            probe = _get(base + VERSION_PATH[product], saved.token, "application/json")
-            if probe.status_code == 200:
-                version = str(probe.json().get("version", ""))[:40]
-        except ValueError, KeyError, requests.RequestException:
-            version = ""
+        version_path = VERSION_PATH.get(product)
+        if version_path is not None:
+            try:
+                probe = _get(base + version_path, saved.token, "application/json")
+                if probe.status_code == 200:
+                    version = str(probe.json().get("version", ""))[:40]
+            except ValueError, KeyError, requests.RequestException:
+                version = ""
 
         products[product] = {
             "wadl_path": path,
@@ -137,19 +147,46 @@ def fetch() -> dict[str, object]:
             "host_redacted": True,
         }
         print(
-            f"{product:10} {len(redacted):>9,} B  sha256 {_digest(redacted)[:16]}  version={version or '?'}"
+            f"{product:10} {len(redacted):>9,} B  sha256 {_digest(redacted)[:16]}  "
+            f"version={version or '?'}"
         )
     record["products"] = products
-    return record
+    return record, payloads
 
 
-def write_record(record: dict[str, object]) -> Path:
-    target = OUTPUT / "api-surface-source.json"
-    target.write_text(
-        json.dumps(record, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return target
+def render_record(record: dict[str, object]) -> str:
+    return json.dumps(record, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+
+
+def _display(path: Path) -> str:
+    """Return a repository-relative path when possible, else the path itself."""
+    try:
+        return str(path.relative_to(ROOT)).replace("\\", "/")
+    except ValueError:
+        return str(path)
+
+
+def drift(record: dict[str, object], payloads: dict[Path, bytes]) -> list[str]:
+    """Return one line per stored artifact whose bytes differ from this fetch."""
+    problems: list[str] = []
+    for target, payload in payloads.items():
+        if not target.exists() or target.read_bytes() != payload:
+            problems.append(_display(target))
+    record_path = OUTPUT / RECORD_NAME
+    expected = render_record(record)
+    current = record_path.read_text(encoding="utf-8") if record_path.exists() else None
+    if current != expected:
+        problems.append(_display(record_path))
+    return problems
+
+
+def write_all(record: dict[str, object], payloads: dict[Path, bytes]) -> Path:
+    for target, payload in payloads.items():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+    record_path = OUTPUT / RECORD_NAME
+    record_path.write_text(render_record(record), encoding="utf-8")
+    return record_path
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -165,11 +202,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Refusing: pass --live to contact the configured servers.")
         return 2
 
-    record = fetch()
-    target = write_record(record)
-    print(f"record: {target.relative_to(ROOT)}")
+    record, payloads = collect()
     if args.check:
+        problems = drift(record, payloads)
+        if problems:
+            print(f"api surface source outdated: {len(problems)} file(s)")
+            for item in problems:
+                print(f"  {item}")
+            return 1
+        print("api surface source current")
         return 0
+
+    target = write_all(record, payloads)
+    print(f"record: {target.relative_to(ROOT)}")
     return 0
 
 

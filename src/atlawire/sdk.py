@@ -37,6 +37,7 @@ from atlawire.http import (
     normalize_base_url,
     read_encoded_limited,
     reject_credential_echo,
+    reject_side_effect_query,
 )
 
 __all__ = [
@@ -718,6 +719,7 @@ def _checked_params(
     params: Mapping[str, object] | None, *, product: str
 ) -> dict[str, str | int]:
     """Accept only scalar query values, so encoding is predictable."""
+    reject_side_effect_query(params, product=product)
     checked: dict[str, str | int] = {}
     for name, value in (params or {}).items():
         if isinstance(value, bool) or not isinstance(value, (str, int)):

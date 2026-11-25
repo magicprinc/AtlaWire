@@ -33,6 +33,12 @@ PREFIX = wadl.REST_PREFIX
 normalize = wadl.normalize
 route_variants = wadl.route_variants
 
+# Parameters deliberately not offered on a read surface because sending them
+# changes state. They are neither declared nor counted as an undeclared gap: the
+# question "can a caller send what the server documents?" is answered "no, on
+# purpose", and `check_read_only.py` fails if one ever reappears in the registry.
+NOT_OFFERED_PARAMS = frozenset({"updatehistory"})
+
 # `route_variants` is re-exported for the tests, which pin the rule that a glued
 # optional suffix covers two routes while a trailing placeholder stays distinct.
 
@@ -96,10 +102,13 @@ def compare() -> dict[str, object]:
         # almost nothing, so both sides go through the same normalizer.
         served: dict[tuple[str, str], set[str]] = {}
         for method in block["methods"]:
+            offered = {
+                name
+                for name in method["query"]
+                if str(name).lower() not in NOT_OFFERED_PARAMS
+            }
             for route in route_variants(method["route"]):
-                served.setdefault((method["verb"], route), set()).update(
-                    method["query"]
-                )
+                served.setdefault((method["verb"], route), set()).update(offered)
         ours = registry.get(product, {})
         served_get = {key for key in served if key[0] == "GET"}
         registered_get = {key for key in ours if key[0] == "GET"}

@@ -1101,10 +1101,6 @@
       {
         "name": "properties",
         "type": "string"
-      },
-      {
-        "name": "updateHistory",
-        "type": "string"
       }
     ],
     "jira.issue.issueidorkey.comment": [

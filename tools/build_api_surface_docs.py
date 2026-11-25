@@ -184,7 +184,6 @@ def build(*, check_only: bool = False) -> tuple[dict[str, object], dict[Path, st
         version = source.get("server_version") or None
         grouped = _groups(product)
         folder = BASE / product / "api"
-        folder.mkdir(parents=True, exist_ok=True)
         # `_slug` is not injective (`a--b` and `a-b` both become `a-b`), so two
         # groups could claim one filename and one of them would vanish while the
         # index still listed both. Fail instead of overwriting.
@@ -192,6 +191,9 @@ def build(*, check_only: bool = False) -> tuple[dict[str, object], dict[Path, st
         if len(produced) != len(grouped):
             raise SystemExit(f"{product}: two groups map to one file name")
         if not check_only:
+            # A verification run must not create or delete anything under the
+            # tree it is checking.
+            folder.mkdir(parents=True, exist_ok=True)
             for stale_file in folder.glob("*.md"):
                 if stale_file.name not in produced:
                     stale_file.unlink()

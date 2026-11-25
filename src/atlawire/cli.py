@@ -1194,16 +1194,22 @@ def read_command(
             click.echo(json.dumps(exc.to_dict(product=product, token=token)))
             raise click.exceptions.Exit(1) from None
         except AtlaWireError as exc:
+            validation = exc.category in {
+                "validation",
+                "unknown_operation",
+                "credentials",
+            }
             click.echo(
                 json.dumps(
                     _error_envelope(
                         product,
-                        code="validation_error",
+                        code="validation_error" if validation else "read_error",
+                        classification=exc.category or "client_error",
                         message=str(exc),
                     )
                 )
             )
-            raise click.exceptions.Exit(2) from None
+            raise click.exceptions.Exit(2 if validation else 1) from None
         click.echo(json.dumps({"ok": True, "product": product, "data": receipt}))
         return
 
@@ -1300,20 +1306,12 @@ def api_get_command(
     except AtlaWireError as exc:
         click.echo(
             json.dumps(
-                {
-                    "ok": False,
-                    "product": product,
-                    "error": {
-                        "status": None,
-                        "code": "validation_error",
-                        "classification": "client_error",
-                        "message": str(exc),
-                        "path": path,
-                        "content_type": None,
-                        "body": None,
-                        "body_json": None,
-                    },
-                },
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message=str(exc),
+                    path=path,
+                ),
                 ensure_ascii=False,
             )
         )
@@ -1370,20 +1368,12 @@ def api_request_command(
     except AtlaWireError as exc:
         click.echo(
             json.dumps(
-                {
-                    "ok": False,
-                    "product": product,
-                    "error": {
-                        "status": None,
-                        "code": "validation_error",
-                        "classification": "client_error",
-                        "message": str(exc),
-                        "path": path,
-                        "content_type": None,
-                        "body": None,
-                        "body_json": None,
-                    },
-                },
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message=str(exc),
+                    path=path,
+                ),
                 ensure_ascii=False,
             )
         )
@@ -3900,11 +3890,6 @@ def related_repos(
     help="Issue property keys sent verbatim as properties.",
 )
 @click.option(
-    "--update-history",
-    is_flag=True,
-    help="Ask Jira to include the changelog of the updated fields.",
-)
-@click.option(
     "--fail-fast",
     is_flag=True,
     help="Stop at the first field error instead of returning partial data.",
@@ -3922,7 +3907,6 @@ def issue(
     expand: str | None,
     fields: str | None,
     properties: str | None,
-    update_history: bool,
     fail_fast: bool,
     allow_http_loopback: bool,
 ) -> None:
@@ -3930,8 +3914,10 @@ def issue(
 
     ``--expand`` replaces the default ``renderedFields`` expansion and is sent
     verbatim as the expand query parameter; without it the issue is read with
-    rendered fields as before. ``--fields``, ``--properties``, ``--update-history``
-    and ``--fail-fast`` map to the remaining documented get-issue query parameters.
+    rendered fields as before. ``--fields``, ``--properties`` and ``--fail-fast``
+    map to the documented get-issue query parameters that only read; Jira's
+    ``updateHistory`` is not offered because it adds the issue to the current
+    user's view history.
     ``--json`` selects the default JSON output and refuses --markdown/--wiki.
     """
     if as_json and (markdown or wiki):
@@ -3947,7 +3933,6 @@ def issue(
             expand="renderedFields" if expand is None else expand,
             fields=fields,
             properties=properties,
-            update_history=update_history,
             fail_fast=fail_fast,
             allow_http_loopback=allow_http_loopback,
         )

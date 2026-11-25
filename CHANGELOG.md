@@ -10,6 +10,35 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.7] - 2026-11-25
+
+### Fixed
+
+- **A query parameter with a documented side effect is refused everywhere.**
+  Jira documents `updateHistory` on `GET /issue/{key}` as adding the issue to the
+  current user's issue history, which is an addition rather than a read. It is
+  removed from the generated query surface, from `get_issue`, and from the
+  `--update-history` CLI flag, and the name is refused by the registry, by
+  `api-get`/`api-request` and by the public `request_json` before any request.
+- The read-only audit no longer passes silently for the 56 operations whose
+  route has no WADL documentation: for those it judges the path segments, so a
+  state-changing GET of the `subtask/move` shape is reported instead of accepted.
+  It also reports a declared parameter that changes state.
+- `list_space_content(type=...)` keeps the `totalSize` an earlier page reported.
+  A later page that omits it could make a short listing look complete.
+- `bitbucket.list_repositories` validates `max_pages` by type, so a string or a
+  bool raises `AtlaWireError` instead of `TypeError` or passing silently.
+  `jira.search_issues_with_metadata` and `confluence.search_cql_with_metadata`
+  validate that the query is text before reading it, and the three copies of the
+  repository validator now share one verdict for every input.
+- `api-get` and `api-request` print the canonical error envelope, so
+  `body_truncated` is present. A local destination failure during a binary read is
+  reported as `read_error` with exit 1 instead of a caller validation error.
+- `tools/fetch_api_surface.py --check` fetches into memory, compares and writes
+  nothing; it used to overwrite the artifacts and then exit 0. Confluence no
+  longer issues a pointless WADL request to discover a version it does not
+  expose. `tools/build_api_surface_docs.py --check` no longer creates directories.
+
 ## [0.9.6] - 2026-11-25
 
 ### Added

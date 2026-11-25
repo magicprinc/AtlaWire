@@ -28,6 +28,12 @@ _GZIP_CODINGS = frozenset({"gzip", "x-gzip"})
 _BIDI_CONTROLS = frozenset(
     "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 )
+# Query parameters whose documented effect is not a read. Jira's `updateHistory`
+# adds the retrieved issue to the current user's issue history, which is an
+# addition rather than a read, so a read-only tool must never send it. The list
+# is short and explicit on purpose: it marks the boundary between research and
+# change, and every entry needs a documented effect, not a guess.
+SIDE_EFFECT_QUERY = frozenset({"updatehistory"})
 
 type _JsonValue = (
     bool | int | float | str | Sequence[_JsonValue] | Mapping[str, _JsonValue] | None
@@ -549,6 +555,31 @@ def _token_needles(tokens: Iterable[str]) -> tuple[str, ...]:
         if isinstance(token, str) and token:
             needles.extend(_echo_needles(token))
     return tuple(dict.fromkeys(needles))
+
+
+def reject_side_effect_query(
+    params: Mapping[str, object] | None, *, product: str | None = None
+) -> None:
+    """Refuse a query parameter whose documented effect changes state.
+
+    Checked at every entry point that can send query values — the operation
+    registry, `api-get`/`api-request` and the public `request_json` — so a
+    read-only call cannot be steered into an addition by its parameter list.
+    The message names only the parameter, never its value.
+    """
+    if not params:
+        return
+    offenders = sorted(
+        str(name) for name in params if str(name).lower() in SIDE_EFFECT_QUERY
+    )
+    if offenders:
+        raise AtlaWireError(
+            "A read-only request cannot send the "
+            + ", ".join(offenders)
+            + " parameter.",
+            category="validation",
+            product=product,
+        )
 
 
 def reject_credential_echo(value: object, *, tokens: Iterable[str]) -> None:

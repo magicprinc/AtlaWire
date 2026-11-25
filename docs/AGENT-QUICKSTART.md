@@ -40,8 +40,9 @@ Every command makes one bounded read; none of them writes. Output and failure sh
 - **`--fields`, `--expand`.** `jql --fields/--expand` prints one raw
   `/rest/api/2/search` envelope with those values sent verbatim instead of the short
   projection. `issue --expand` replaces the default `renderedFields` expansion, while
-  `--fields`, `--properties`, `--update-history` and `--fail-fast` pass the remaining
-  documented get-issue query parameters through verbatim;
+  `--fields`, `--properties` and `--fail-fast` pass documented get-issue query
+  parameters through verbatim; Jira's `updateHistory` is not offered because the
+  server documents it as adding the issue to the current user's view history;
   `cql --expand` prints one raw search page; `page --expand` prints one raw page and
   cannot be combined with `--markdown`/`--storage`. `convert-body --expand` is
   optional.

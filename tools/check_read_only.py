@@ -52,6 +52,41 @@ MUTATING_OPENER = re.compile(
     re.IGNORECASE,
 )
 
+# A route whose own documentation is absent cannot be judged by its prose, so
+# the path segments carry the signal: the shapes that change state almost always
+# name the change (`.../subtask/move`, `.../transition`). Only this fallback uses
+# them, because many documented reads legitimately contain such a word.
+MUTATING_SEGMENTS = frozenset(
+    {
+        "move",
+        "transition",
+        "delete",
+        "create",
+        "update",
+        "assign",
+        "grant",
+        "revoke",
+        "attach",
+        "upload",
+        "merge",
+        "decline",
+        "approve",
+        "reopen",
+        "reindex",
+        "restore",
+        "purge",
+        "rename",
+        "enable",
+        "disable",
+        "deactivate",
+        "activate",
+        "reset",
+    }
+)
+
+# Query parameters whose documented effect is a change, never a read.
+SIDE_EFFECT_PARAMS = frozenset({"updatehistory"})
+
 # Routes whose documented opener reads as a change but which only return data.
 DOCUMENTED_EXCEPTIONS = {
     "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.merge": (
@@ -96,13 +131,17 @@ def _documented_methods() -> dict[tuple[str, str, str], str]:
     return docs
 
 
-def audit() -> list[str]:
-    """Return one line per operation that is not provably a read."""
+def audit(described: list[dict[str, object]] | None = None) -> list[str]:
+    """Return one line per operation that is not provably a read.
+
+    ``described`` defaults to the live registry and exists so a test can feed a
+    single synthetic operation without touching the registry.
+    """
     problems: list[str] = []
     docs = _documented_methods()
-    for described in operations.list_operations():
-        operation_id = str(described["id"])
-        method = str(described["method"])
+    for entry in operations.list_operations() if described is None else described:
+        operation_id = str(entry["id"])
+        method = str(entry["method"])
         if method == "POST":
             if operation_id not in AUDITED_POSTS:
                 problems.append(f"{operation_id}: POST without an audited reason")
@@ -110,19 +149,44 @@ def audit() -> list[str]:
         if method != "GET":
             problems.append(f"{operation_id}: method {method} is not a read")
             continue
+        for field in cast_list(entry.get("query")):
+            name = str(field.get("name", ""))
+            if name.lower() in SIDE_EFFECT_PARAMS:
+                problems.append(
+                    f"{operation_id}: offers the side-effect parameter {name}"
+                )
         if operation_id in DOCUMENTED_EXCEPTIONS:
             continue
-        product = str(described["product"])
-        relative = str(described["path"]).removeprefix(wadl.REST_PREFIX[product])
+        product = str(entry["product"])
+        relative = str(entry["path"]).removeprefix(wadl.REST_PREFIX[product])
         doc = ""
         for variant in wadl.route_variants(relative):
             doc = docs.get((product, "GET", variant), "")
             if doc:
                 break
         word = _first_word(doc)
-        if word and MUTATING_OPENER.match(word):
-            problems.append(f"{operation_id}: documentation opens with '{word}'")
+        if word:
+            if MUTATING_OPENER.match(word):
+                problems.append(f"{operation_id}: documentation opens with '{word}'")
+            continue
+        named = {
+            segment.lower()
+            for segment in relative.split("/")
+            if segment and not segment.startswith("{")
+        }
+        hits = sorted(named & MUTATING_SEGMENTS)
+        if hits:
+            problems.append(
+                f"{operation_id}: no documentation, and the path names a change: {hits}"
+            )
     return problems
+
+
+def cast_list(value: object) -> list[dict[str, object]]:
+    """Return the query rows of one description, tolerating a foreign shape."""
+    if not isinstance(value, list):
+        return []
+    return [row for row in value if isinstance(row, dict)]
 
 
 def main() -> int:

@@ -31,6 +31,10 @@ BASE = ROOT / ".development"
 OUTPUT = ROOT / "src" / "atlawire" / "query_params.json"
 
 SCHEMA = "atlawire-query-surface/v1"
+# Parameters whose documented effect is not a read. Jira's `updateHistory` adds
+# the retrieved issue to the current user's issue history, so it is never offered
+# as part of a read surface even though the WADL lists it.
+SIDE_EFFECT_PARAMS = frozenset({"updatehistory"})
 PREFIX = wadl.REST_PREFIX
 
 
@@ -88,6 +92,8 @@ def build() -> dict[str, object]:
         seen: set[str] = set()
         for param in params:
             if param.name in already or param.name in seen:
+                continue
+            if param.name.lower() in SIDE_EFFECT_PARAMS:
                 continue
             seen.add(param.name)
             row: dict[str, object] = {"name": param.name, "type": param.kind}

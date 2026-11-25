@@ -206,7 +206,6 @@ def get_issue(
     expand: str | None = "renderedFields",
     fields: str | None = None,
     properties: str | None = None,
-    update_history: bool = False,
     fail_fast: bool = False,
     allow_http_loopback: bool = False,
 ) -> dict[str, object]:
@@ -214,9 +213,13 @@ def get_issue(
 
     ``fields`` and ``properties`` are sent verbatim when given. ``expand=None``
     omits the parameter, so the server's own default applies; the default
-    ``"renderedFields"`` is this library's choice, not Jira's. ``update_history``
-    and ``fail_fast`` are sent as ``true`` only when requested, so a default call
-    keeps the server's own defaults instead of pinning them.
+    ``"renderedFields"`` is this library's choice, not Jira's. ``fail_fast`` is
+    sent as ``true`` only when requested, so a default call keeps the server's
+    own default.
+
+    ``updateHistory`` is deliberately not offered: the server documents it as
+    adding the retrieved issue to the current user's issue history, which is an
+    addition rather than a read.
     """
     key = _issue_key(key_or_url)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
@@ -225,8 +228,6 @@ def get_issue(
         params["fields"] = fields
     if properties is not None:
         params["properties"] = properties
-    if update_history:
-        params["updateHistory"] = "true"
     if fail_fast:
         params["failFast"] = "true"
     with bearer_session(token, product="jira") as session:
@@ -872,7 +873,7 @@ def search_issues_with_metadata(
     Дополнительного запроса ради признака неполноты не делается; ``total`` —
     последнее значение, которое прислал сервер (``None``, если не прислал).
     """
-    if not query.strip():
+    if not isinstance(query, str) or not query.strip():
         raise AtlaWireError("Expected a non-empty JQL query.")
     selected = _search_fields_value(fields)
     if (

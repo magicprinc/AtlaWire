@@ -219,7 +219,6 @@ def test_issue_forwards_fields_and_properties_and_history_flags(server) -> None:
             "summary,status",
             "--properties",
             "alpha",
-            "--update-history",
             "--fail-fast",
         ),
         "jira",
@@ -231,7 +230,6 @@ def test_issue_forwards_fields_and_properties_and_history_flags(server) -> None:
         "expand": ["renderedFields"],
         "fields": ["summary,status"],
         "properties": ["alpha"],
-        "updateHistory": ["true"],
         "failFast": ["true"],
     }
 
