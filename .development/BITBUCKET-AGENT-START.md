@@ -54,7 +54,6 @@ bbk local <KEY/slug>         # где локальная копия репози
 | граф кода | `codebase-memory-mcp cli index_repository --repo-path <path> --mode fast` (+ MCP) |
 | Kafka | `kcl` (`-B broker` после подкоманды), `kafkactl` (нужен контекст), kafka-ui API |
 | NATS | `nats` (`stream ls/info`), мониторинг `:8222` |
-| MSSQL | DBX MCP (`mssql-TEST.devinotest.local`, копия прода) |
 | ревью PR | `bbk review <url> --refresh --out review.md` |
 
 ## 5. Правила

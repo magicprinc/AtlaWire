@@ -11,7 +11,7 @@ Goal: use the same **local stdio** Bitbucket MCP server as OpenCode, with the sa
 
 **Locally = the server package is already on this PC and is started from an absolute on-disk path. It is not fetched from the web on each invocation.**
 
-Every client runs `node <absolute path>\build\index.js`. There is no `npx`, no `npm exec`, no `@latest`, and no package download at MCP startup. The only network traffic is the Bitbucket API calls to `https://git.platform-s.com`.
+Every client runs `node <absolute path>\build\index.js`. There is no `npx`, no `npm exec`, no `@latest`, and no package download at MCP startup. The only network traffic is the Bitbucket API calls to `https://bitbucket.example.com`.
 
 Verified state:
 
@@ -22,7 +22,7 @@ Verified state:
 | Entry point | `...\build\index.js` |
 | Transport | local **stdio** process, not HTTP and not a remote MCP |
 | Node requirement | Node.js **22 or newer** |
-| Bitbucket base URL | `https://git.platform-s.com` |
+| Bitbucket base URL | `https://bitbucket.example.com` |
 | Username | `a.fink` |
 | OpenCode | configured as `"type": "local"`, command `node .../build/index.js` |
 | DSH | configured as `transport: stdio`, `node.exe .../build/index.js` |
@@ -85,7 +85,7 @@ The token is not reproduced here by design. If the read is blocked by a sandbox 
 Server environment:
 
 ```text
-BITBUCKET_BASE_URL=https://git.platform-s.com
+BITBUCKET_BASE_URL=https://bitbucket.example.com
 BITBUCKET_USERNAME=a.fink
 BITBUCKET_TOKEN=<read from the existing config>
 BITBUCKET_READ_ONLY=false
@@ -115,7 +115,7 @@ $config = @{
   command   = "node"
   args      = @("C:/Users/magic/AppData/Roaming/npm/node_modules/@nexus2520/bitbucket-mcp-server/build/index.js")
   env       = @{
-    BITBUCKET_BASE_URL  = "https://git.platform-s.com"
+    BITBUCKET_BASE_URL  = "https://bitbucket.example.com"
     BITBUCKET_USERNAME  = "a.fink"
     BITBUCKET_TOKEN     = $token
     BITBUCKET_READ_ONLY = "false"
@@ -152,7 +152,7 @@ Fallback if `add-json` is unavailable: add this key inside `mcpServers` in `C:\U
     "C:/Users/magic/AppData/Roaming/npm/node_modules/@nexus2520/bitbucket-mcp-server/build/index.js"
   ],
   "env": {
-    "BITBUCKET_BASE_URL": "https://git.platform-s.com",
+    "BITBUCKET_BASE_URL": "https://bitbucket.example.com",
     "BITBUCKET_USERNAME": "a.fink",
     "BITBUCKET_TOKEN": "<read from the existing OpenCode config; do not paste into this file>",
     "BITBUCKET_READ_ONLY": "false"
@@ -189,7 +189,7 @@ Expected block:
         args:
           - 'C:/Users/magic/AppData/Roaming/npm/node_modules/@nexus2520/bitbucket-mcp-server/build/index.js'
         env:
-          BITBUCKET_BASE_URL: 'https://git.platform-s.com'
+          BITBUCKET_BASE_URL: 'https://bitbucket.example.com'
           BITBUCKET_USERNAME: 'a.fink'
           BITBUCKET_TOKEN: '<existing value>'
           BITBUCKET_READ_ONLY: 'false'

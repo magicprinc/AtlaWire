@@ -1,6 +1,6 @@
 # Jira Server 8.22.2 — REST, JQL, грабли
 
-Инстанс: `https://jira.platform-s.com`, версия 8.22.2 (build 822002), `deploymentType: Server`.
+Инстанс: `https://jira.example.com`, версия 8.22.2 (build 822002), `deploymentType: Server`.
 
 ## Частые вызовы
 

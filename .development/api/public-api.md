@@ -15,9 +15,9 @@
 | контур | что там | как искать |
 |---|---|---|
 | **Публичное API** (docs.devino.online) | что видит клиент: методы, параметры, ответы | открыть справочник нужной версии |
-| **Bitbucket** (`git.platform-s.com`) | реализация сервисов | `bbk search "<метод/поле>"`, `bbk grep KEY/slug`, `bbk file` |
-| **Confluence** (`cf.platform-s.com`) | описание сервисов, схемы, договорённости | `bbk cql 'text ~ "…"'`, `bbk page <id>` |
-| **Jira** (`jira.platform-s.com`) | работы: задачи, дефекты, решения | `bbk jql 'text ~ "…" ORDER BY created DESC'` |
+| **Bitbucket** (`bitbucket.example.com`) | реализация сервисов | `bbk search "<метод/поле>"`, `bbk grep KEY/slug`, `bbk file` |
+| **Confluence** (`confluence.example.com`) | описание сервисов, схемы, договорённости | `bbk cql 'text ~ "…"'`, `bbk page <id>` |
+| **Jira** (`jira.example.com`) | работы: задачи, дефекты, решения | `bbk jql 'text ~ "…" ORDER BY created DESC'` |
 
 Типовой маршрут вопроса «как это работает у клиента и почему так»:
 справочник → (внешнее поведение) → Bitbucket (где реализовано) → Confluence (почему так спроектировано)

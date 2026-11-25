@@ -1,6 +1,6 @@
 # Bitbucket Server 5.10.0: MCP vs atlassian-python-api vs REST
 
-Research date 2026-11-18, server `https://git.platform-s.com` → **5.10.0** (build 5010000),
+Research date 2026-11-18, server `https://bitbucket.example.com` → **5.10.0** (build 5010000),
 40 accessible projects, 551 repositories. Token from the Bitbucket MCP config, read at runtime,
 never printed.
 
@@ -179,7 +179,7 @@ malformed `KEY/slug` → exit 2; a requested path with no changes prints a note 
 mixed batch still prints the real diffs.
 ## 9. Confluence and Jira: access, and how the Markdown is produced
 
-**Access.** `jira.platform-s.com` is **Jira Server 8.22.2** (build 822002); `cf.platform-s.com` is
+**Access.** `jira.example.com` is **Jira Server 8.22.2** (build 822002); `confluence.example.com` is
 Confluence DC. Anonymous access reaches `/rest/api/2/serverInfo` (200) and `/rest/api/space` (200, but
 0 spaces visible), while the issue `PLAT-3901` and the page `7307751` answer *login required*
 (`401 / 404`, and the HTML URLs redirect to `login.jsp` / `login.action`). The **Bitbucket token is
