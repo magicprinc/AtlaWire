@@ -194,14 +194,15 @@ def test_success_preserves_server_fields(
 
 def test_empty_collections(server):
     # Jira 8.22.2 returns collection envelopes for worklog, changelog and transitions;
-    # the reference endpoints return arrays. /myself has no empty collection response.
+    # the reference endpoints return arrays. Pairing is by function name so a new
+    # CASES entry cannot be skipped silently.
     httpd, base = server
-    empty = [
-        (
+    empty = {
+        "get_issue_worklogs": (
             {"startAt": 0, "maxResults": 20, "total": 0, "worklogs": []},
             {"startAt": 0, "maxResults": 20, "total": 0, "worklogs": []},
         ),
-        (
+        "get_issue_changelog": (
             {
                 "changelog": {
                     "startAt": 0,
@@ -212,15 +213,21 @@ def test_empty_collections(server):
             },
             {"startAt": 0, "maxResults": 20, "total": 0, "histories": []},
         ),
-        ([], []),
-        ([], []),
-        ([], []),
-        ([], []),
-        ([], []),
-        ({"transitions": []}, []),
-        ([], []),
-    ]
-    for (function, issue, path, _, _), (payload, expected) in zip(CASES, empty):
+        "list_statuses": ([], []),
+        "list_priorities": ([], []),
+        "list_resolutions": ([], []),
+        "list_issue_types": ([], []),
+        "list_jira_projects": ([], []),
+        "list_transitions": ({"transitions": []}, []),
+        "list_issue_remote_links": ([], []),
+    }
+    # /myself answers with an identity object, not a collection, so it has no
+    # empty-collection case; any other new entry must add one.
+    assert {case[0].__name__ for case in CASES} - set(empty) == {"get_current_user"}
+    for function, issue, path, _, _ in CASES:
+        if function.__name__ not in empty:
+            continue
+        payload, expected = empty[function.__name__]
         httpd.paths.clear()
         httpd.response = payload
         assert invoke(function, issue, base) == expected, function.__name__

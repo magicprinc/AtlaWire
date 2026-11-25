@@ -86,7 +86,7 @@ def test_120_unique_keys_use_three_ordered_batches(server):
     # contract the duplicate collapses in input order, so the batches are
     # exactly 50/50/20 and cost exactly three GETs (jira.py:398; bbk:309).
     keys = [f"SPEC-{number}" for number in range(1, 121)]
-    requested = keys[:60] + [keys[5]] + keys[60:]
+    requested = [*keys[:60], keys[5], *keys[60:]]
     assert len(requested) == 121
     assert len(set(requested)) == 120
     missing = keys[110]

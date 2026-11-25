@@ -29,7 +29,7 @@ def test_every_visible_command_takes_json_except_the_documented_exception():
             missing.append(name)
 
     assert missing == []
-    assert _JSON_FLAG_EXCEPTIONS == frozenset({"attachment-get"})
+    assert frozenset({"attachment-get"}) == _JSON_FLAG_EXCEPTIONS
 
 
 @pytest.fixture

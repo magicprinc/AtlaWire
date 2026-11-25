@@ -7,6 +7,7 @@ response or a wrong route fails the test. No test reads an internal counter,
 monkeypatches a guard, opens a real network connection or depends on time.
 """
 
+import contextlib
 import json
 import threading
 import traceback
@@ -45,12 +46,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        try:
-            self.wfile.write(body)
-        except BrokenPipeError, ConnectionResetError:
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
             # The client closes the connection on an error status before reading
             # the body, so a reset here is expected and not a test failure.
-            pass
+            self.wfile.write(body)
 
     def finish(self):
         try:

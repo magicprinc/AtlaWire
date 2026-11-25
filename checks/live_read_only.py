@@ -292,7 +292,7 @@ def _json(raw: bytes, limit: int = 4 * 1024 * 1024) -> object:
     try:
         return json.loads(raw.decode("utf-8"))
     except UnicodeDecodeError, ValueError, RecursionError:
-        raise LiveCheckError("invalid_output")
+        raise LiveCheckError("invalid_output") from None
 
 
 def _string(value: object, *, numbers: bool = False) -> str:
@@ -446,9 +446,9 @@ def _execute(
             stdin=subprocess.DEVNULL,
         )
     except subprocess.TimeoutExpired:
-        raise LiveCheckError("timeout")
+        raise LiveCheckError("timeout") from None
     except OSError, UnicodeError:
-        raise LiveCheckError("cli_unavailable")
+        raise LiveCheckError("cli_unavailable") from None
     if completed.returncode != 0:
         raise LiveCheckError("cli_failed")
     if not isinstance(completed.stdout, bytes):

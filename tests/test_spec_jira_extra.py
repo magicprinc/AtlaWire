@@ -113,7 +113,7 @@ def test_comments_follow_server_cap_and_project_fields(server):
         {"id": "2", "author": None, "body": "two", "created": None, "updated": None},
     ]
     assert len(httpd.calls) == 2
-    for call, start in zip(httpd.calls, ("0", "1")):
+    for call, start in zip(httpd.calls, ("0", "1"), strict=True):
         assert_call(
             call,
             "/rest/api/2/issue/EX-1/comment",

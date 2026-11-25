@@ -40,7 +40,14 @@ target-version = "py315"
 line-length = 88
 
 [tool.ruff.lint]
-extend-select = ["S"]
+# Wider families than the default subset. Complexity (C90) and pytest style (PT)
+# are inspected ad hoc, not gated: the codebase intentionally follows the
+# repository's own limits, and PT's findings here are presentation-only.
+extend-select = ["B", "I", "UP", "SIM", "RUF", "ASYNC", "S"]
+# RUF001-003 flag Cyrillic letters that resemble Latin ones. Comments, docstrings
+# and the Russian transliteration table are intentionally Russian, so the
+# ambiguity is expected text, not a typo.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests and live checks assert by design and hold only synthetic credentials.

@@ -1,3 +1,4 @@
+import contextlib
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -30,10 +31,10 @@ def server():
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            try:
+            with contextlib.suppress(
+                ConnectionResetError, ConnectionAbortedError, BrokenPipeError
+            ):
                 self.wfile.write(body)
-            except ConnectionResetError, ConnectionAbortedError, BrokenPipeError:
-                pass
 
         def log_message(self, *args):
             pass

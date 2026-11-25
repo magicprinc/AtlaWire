@@ -18,6 +18,7 @@ without hard links the publication fails with a generic error instead of
 risking data loss; the temporary file remains the caller's to clean up.
 """
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -52,10 +53,8 @@ def create_temporary_file(destination: str | Path) -> Path:
 
 def discard_temporary_file(temporary: str | Path) -> None:
     """Remove an unpublished temporary file, ignoring an already-absent path."""
-    try:
+    with contextlib.suppress(OSError):
         Path(temporary).unlink()
-    except OSError:
-        pass
 
 
 def publish_new_file(temporary: str | Path, destination: str | Path) -> None:
@@ -76,9 +75,7 @@ def publish_new_file(temporary: str | Path, destination: str | Path) -> None:
         raise AtlaWireError(_EXISTS) from None
     except OSError:
         raise AtlaWireError(_UNPUBLISHED) from None
-    try:
-        source.unlink()
-    except OSError:
+    with contextlib.suppress(OSError):
         # The destination is complete and published; a leftover staging name
         # is not a reason to report the download as failed.
-        pass
+        source.unlink()

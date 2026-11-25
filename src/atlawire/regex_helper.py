@@ -24,12 +24,13 @@ catastrophic backtracking. An in-flight subprocess is not cancelable except by
 the documented kill-on-timeout path.
 """
 
+import contextlib
 import json
 import math
 import os
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 __all__ = [
     "HelperFailure",
@@ -280,7 +281,7 @@ def _decode_json(stdout: bytes) -> dict[str, object]:
     return value
 
 
-def _run(request: dict[str, object], timeout_s: float) -> bytes:
+def _run(request: Mapping[str, object], timeout_s: float) -> bytes:
     payload = json.dumps(request, ensure_ascii=True).encode("utf-8")
     executable = sys.executable
     if not executable:
@@ -320,7 +321,7 @@ def _run(request: dict[str, object], timeout_s: float) -> bytes:
     return stdout
 
 
-def _stop_helper(process: subprocess.Popen) -> None:
+def _stop_helper(process: subprocess.Popen[bytes]) -> None:
     """Attempt to kill and reap within bounded waits; reaping is not guaranteed.
 
     A process that remains unresponsive after ``kill`` and the bounded
@@ -329,20 +330,14 @@ def _stop_helper(process: subprocess.Popen) -> None:
     """
     if process.poll() is None:
         process.kill()
-    try:
+    with contextlib.suppress(subprocess.TimeoutExpired):
         process.communicate(timeout=_KILL_WAIT_SECONDS)
-    except subprocess.TimeoutExpired:
-        process.kill()
-    try:
+    with contextlib.suppress(subprocess.TimeoutExpired):
         process.wait(timeout=_KILL_WAIT_SECONDS)
-    except subprocess.TimeoutExpired:
-        pass
     for stream in (process.stdin, process.stdout, process.stderr):
         if stream is not None:
-            try:
+            with contextlib.suppress(OSError):
                 stream.close()
-            except OSError:
-                pass
 
 
 def _helper_environment() -> dict[str, str]:

@@ -538,7 +538,7 @@ def _read_thread_pages(
             "Jira comment thread exceeded the page limit; raise the budget "
             "or narrow the query."
         )
-    if total is None or start != total:
+    if start != total:
         raise AtlaWireError("Jira comments ended before the thread was complete.")
     if total < block_total:
         raise AtlaWireError("Inconsistent Jira comment thread metadata.")

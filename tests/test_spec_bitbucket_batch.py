@@ -1,3 +1,4 @@
+import contextlib
 import json
 import threading
 import traceback
@@ -54,10 +55,8 @@ def server(request):
         protocol_version = "HTTP/1.1"
 
         def handle(self):
-            try:
+            with contextlib.suppress(ConnectionResetError, ConnectionAbortedError):
                 super().handle()
-            except ConnectionResetError, ConnectionAbortedError:
-                pass
 
         def finish(self):
             try:

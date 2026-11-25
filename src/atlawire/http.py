@@ -30,7 +30,7 @@ _BIDI_CONTROLS = frozenset(
 )
 
 type _JsonValue = (
-    None | bool | int | float | str | Sequence[_JsonValue] | Mapping[str, _JsonValue]
+    bool | int | float | str | Sequence[_JsonValue] | Mapping[str, _JsonValue] | None
 )
 
 
