@@ -10,6 +10,16 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.3] - 2026-11-25
+
+### Changed
+
+- Commit rows now name fields the way the Bitbucket schema does: `id` for the
+  full SHA-1 and `displayId` for the shortened form. The custom `short_id` from
+  0.9.2 is gone before it ever shipped to a caller. `hash` is retained as a
+  deprecated alias of `id` so code written before 0.9.2 keeps working; new code
+  should read `id`, and the alias will be removed in the next major version.
+
 ## [0.9.2] - 2026-11-25
 
 ### Added
@@ -39,13 +49,14 @@ the read-only surface: the initial command batch, the agent-facing batch (commit
   adapter layer (`api-get`, `api-request`) share one parser, so `detail` matches
   whichever entry point failed. `detail` is filled only for HTTP 400, the status
   the products actually returned for a malformed request in the live run.
-- **Breaking:** `Commit` and `PrReviewCommit` rows expose `id` (the full commit
-  identifier from the documented schema) and optionally `short_id` (the server's
-  `displayId`) instead of the invented `hash`. The `commits` and `pr commits`
-  TSV views print `id` first. The library keeps vendor names for `displayName`
-  because that field is the author's label; the short commit form is named
-  `short_id` because it is a git concept, and `id` + `short_id` is the pair git
-  libraries use.
+- `Commit` and `PrReviewCommit` rows now use the names the Bitbucket schema
+  uses: `id` for the full identifier and `displayId` for the server's shortened
+  form. The invented `hash` is kept as a **deprecated alias of `id`**, so code
+  written before 0.9.2 keeps working unchanged; it will be removed in the next
+  major version. New code should read `id` and `displayId`. One value is no
+  longer reachable under two documentation names, which is what made the field
+  ambiguous in the first place. The `commits` and `pr commits` TSV views print
+  `id` first.
 
 ### Fixed
 

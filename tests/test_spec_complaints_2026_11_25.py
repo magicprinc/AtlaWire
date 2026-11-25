@@ -234,7 +234,8 @@ def test_c3_commit_row_exposes_id_and_hash_with_one_value(server):
     )
 
     assert rows[0]["id"] == SHA
-    assert rows[0]["short_id"] == SHA[:12]
+    assert rows[0]["displayId"] == SHA[:12]
+    assert rows[0]["hash"] == SHA
 
 
 # C7: the review header states the real whitespace mode and the truncation fact.

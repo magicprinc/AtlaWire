@@ -199,7 +199,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 
 **`list_pull_request_commits(base_url, repo, pr_id, *, token, max_pages=100, allow_http_loopback=False) -> list[Commit]`** — `bitbucket.py:1316`
 - REST: `GET .../pull-requests/{id}/commits`; query `start=0`, `limit=100`.
-- → `Commit` (`id` — полный идентификатор коммита, `short_id` — присланный сервером `displayId`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
+- → `Commit` (`id` — полный SHA-1 из схемы `/commits`, `displayId` — сокращённая форма от сервера, `hash` — устаревший алиас `id` для кода до 0.9.2, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
   `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
   пустой строкой), `displayName` — `author.displayName` (на 5.10 всегда `None`: сервер
   документирует для автора только `name` и `emailAddress`), `message`).
@@ -254,7 +254,7 @@ URL-кодируются). Страница списка — `limit` ≤ 100, ч
 - REST: `GET .../commits`; query `until` (из `at`), `path` (если непустой), `start`, `limit`;
   `author` фильтруется на стороне клиента по точному git-имени (серверный фильтр 5.10 не
   документирован), поэтому читаются страницы до `limit` совпадений.
-- → `Commit` (`id` — полный идентификатор коммита, `short_id` — присланный сервером `displayId`, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
+- → `Commit` (`id` — полный SHA-1 из схемы `/commits`, `displayId` — сокращённая форма от сервера, `hash` — устаревший алиас `id` для кода до 0.9.2, `date` — UTC `YYYY-MM-DD HH:MM`, `timestamp` — исходные epoch-мс
   `authorTimestamp`, `author` — git-имя, `email` — `author.emailAddress` (на 5.10 бывает
   пустой строкой), `displayName` — `author.displayName` (на 5.10 всегда `None`: сервер
   документирует для автора только `name` и `emailAddress`), `message` — сырое сообщение).

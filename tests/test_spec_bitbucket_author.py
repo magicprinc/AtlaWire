@@ -104,7 +104,8 @@ def raw_commit(sha, author, message):
 def projected_commit(sha, author, message):
     return {
         "id": sha,
-        "short_id": None,
+        "displayId": None,
+        "hash": sha,
         "date": None,
         "timestamp": None,
         "author": author,

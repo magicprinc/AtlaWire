@@ -214,15 +214,20 @@ class Commit(TypedDict):
     ``authorTimestamp`` в миллисекундах epoch без округления; отсутствующее
     поле даёт ``None`` в обоих.
 
-    ``id`` — полный идентификатор коммита из документированной схемы
-    ``/commits``; ``short_id`` — присланный сервером ``displayId`` для показа
-    человеку, без обрезки строки на стороне вызывающего. Поле ``hash`` не
-    используется: одно значение под двумя именами заставляет угадывать, какое
-    читать.
+    Идентификатор коммита отдаётся под теми именами, что в документации
+    ``/commits``: ``id`` — полный SHA-1, ``displayId`` — сокращённая форма для
+    показа человеку. Своё имя для сокращённой формы (например ``short_id``) не
+    вводится: одно значение под двумя именами заставляет потом вспоминать, чем
+    они различаются.
+
+    ``hash`` остаётся только для совместимости с кодом, написанным до 0.9.2, и
+    содержит то же, что ``id``. Новый код должен читать ``id``; алиас будет
+    удалён в следующей мажорной версии.
     """
 
     id: str
-    short_id: str | None
+    displayId: str | None
+    hash: str
     date: str | None
     timestamp: int | None
     author: str | None
@@ -4194,9 +4199,11 @@ def _commit(value: object) -> Commit:
     short = value.get("displayId")
     if short is not None and (not isinstance(short, str) or not short):
         raise AtlaWireError("Invalid fields in a Bitbucket commit.")
+    full = _require_encodable(identifier, "commit id")
     return Commit(
-        id=_require_encodable(identifier, "commit id"),
-        short_id=_optional_encodable(short, "commit short id"),
+        id=full,
+        displayId=_optional_encodable(short, "commit display id"),
+        hash=full,
         date=_commit_date(moment),
         timestamp=timestamp,
         author=_optional_encodable(author, "commit author"),

@@ -141,7 +141,8 @@ def test_projection_keeps_email_display_name_and_raw_milliseconds(server):
         "commits": [
             {
                 "id": SHA_A,
-                "short_id": None,
+                "displayId": None,
+                "hash": SHA_A,
                 "date": "2025-04-16 07:40",
                 "timestamp": 1744789253123,
                 "author": "ada",
@@ -151,7 +152,8 @@ def test_projection_keeps_email_display_name_and_raw_milliseconds(server):
             },
             {
                 "id": SHA_B,
-                "short_id": None,
+                "displayId": None,
+                "hash": SHA_B,
                 "date": "2025-04-16 08:01",
                 "timestamp": 1744790460000,
                 "author": "bob",
@@ -194,7 +196,8 @@ def test_missing_author_fields_are_none(server):
     assert rows == [
         {
             "id": SHA_C,
-            "short_id": None,
+            "displayId": None,
+            "hash": SHA_C,
             "date": None,
             "timestamp": None,
             "author": None,
@@ -204,7 +207,8 @@ def test_missing_author_fields_are_none(server):
         },
         {
             "id": SHA_A,
-            "short_id": None,
+            "displayId": None,
+            "hash": SHA_A,
             "date": None,
             "timestamp": None,
             "author": None,
@@ -270,7 +274,8 @@ def test_author_selection_keeps_single_list_request(server):
     assert rows == [
         {
             "id": SHA_A,
-            "short_id": None,
+            "displayId": None,
+            "hash": SHA_A,
             "date": "2025-04-16 07:40",
             "timestamp": 1744789253123,
             "author": "ada",

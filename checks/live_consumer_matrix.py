@@ -179,7 +179,8 @@ def main(argv: list[str]) -> int:
         first = rows[0]
         detail = bitbucket.get_commit(bb[0], repo_key, first["id"], token=bb[1])
         assert detail["id"] == first["id"], "commit id mismatch"
-        assert first.get("short_id"), "commit row carries no short id"
+        assert first.get("displayId"), "commit row carries no displayId"
+        assert first["hash"] == first["id"], "deprecated hash alias diverged"
         return f"{len(rows)} commit(s)"
 
     def bb_changes() -> str | None:
