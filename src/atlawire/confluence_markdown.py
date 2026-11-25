@@ -390,6 +390,32 @@ def _literal_fallback(heading: str, marker: str, source: str) -> str:
     return heading + "\n\n" + marker + "\n\n" + fenced_block(source, "xml") + "\n"
 
 
+def render_storage_markdown(source: str) -> str:
+    """Convert raw storage-format XHTML to Markdown.
+
+    Same element rules as [render_page_markdown][atlawire.confluence_markdown.render_page_markdown]
+    without the page title. A body above the documented size bound falls back to
+    a literal fenced block so a pathological page cannot exhaust the converter.
+    """
+    if not isinstance(source, str):
+        raise TypeError("Expected Confluence storage XHTML as text.")
+    if not source.strip():
+        return ""
+    if len(source) > _MAX_STORAGE_CHARS:
+        return _literal_fallback("", _SIZE_FALLBACK, source).lstrip()
+    rendered = convert_html(
+        source,
+        _ConfluenceMarkdownConverter(
+            escape_misc=True,
+            heading_style="atx",
+            bullets="-",
+        ),
+    )
+    if rendered is None:
+        return _literal_fallback("", _RECURSION_FALLBACK, source).lstrip()
+    return collapse_blank_lines(rendered) if rendered else ""
+
+
 def render_page_markdown(page: dict[str, object]) -> str:
     """Return a self-contained Markdown representation of a fetched page.
 

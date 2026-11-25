@@ -437,6 +437,48 @@ class _AnalysisBundle(NamedTuple):
     notes: list[str]
 
 
+def file_links(
+    base_url: str,
+    repo: str,
+    path: str,
+    *,
+    from_hash: str,
+    to_hash: str,
+    pr_id: int | None = None,
+    line: int | None = None,
+) -> PrReviewFileLinks:
+    """Return browser links for one file between two commits, without I/O.
+
+    ``from_hash`` is the newer side and ``to_hash`` the older one, matching the
+    packet's ``fromRef``/``toRef``. The ``diff`` link points at the pull request
+    diff when ``pr_id`` is given, otherwise at the repository compare view;
+    ``line`` appends a line anchor.
+    """
+    if pr_id is not None:
+        return _file_links(
+            base_url,
+            repo,
+            pr_id,
+            _Ref("", from_hash, repo),
+            _Ref("", to_hash, repo),
+            before_path=path,
+            after_path=path,
+            exists_before=bool(to_hash),
+            exists_after=bool(from_hash),
+        )
+    project, _, slug = repo.partition("/")
+    compare = (
+        f"{base_url}/projects/{quote(project, safe='')}"
+        f"/repos/{quote(slug, safe='')}/compare/diff"
+        f"?from={quote(to_hash, safe='')}&to={quote(from_hash, safe='')}"
+    )
+    return PrReviewFileLinks(
+        before=_browse_link(base_url, repo, path, at=to_hash) if to_hash else "",
+        after=_browse_link(base_url, repo, path, at=from_hash) if from_hash else "",
+        diff=f"{compare}#L{line}" if isinstance(line, int) and line > 0 else compare,
+    )
+
+
 def collect_pr_review(
     base_url: str,
     repo: str,
@@ -2399,6 +2441,153 @@ def render_markdown(packet: PrReviewPacket) -> str:
 
 def _link(label: str, url: str) -> str:
     return f"[{label}]({url})" if url else "—"
+
+
+def java_members(source: str) -> list[PrReviewSymbol]:
+    """Return the heuristic Java/Kotlin type and method declarations in ``source``.
+
+    This is a regex heuristic, not a parser: overloads are paired by name and
+    kind, and the result is meant as review leads, not compiler truth.
+    """
+    if not isinstance(source, str):
+        raise AtlaWireError("Expected Java/Kotlin source as text.")
+    rows: list[PrReviewSymbol] = []
+    for member in _java_members(source):
+        rows.append(
+            PrReviewSymbol(
+                file="",
+                name=member["name"],
+                kind=member["kind"],
+                status="present",
+                lines_before=member["lines"],
+                lines_after=member["lines"],
+                complexity=member["complexity"],
+                javadoc=member["javadoc"],
+                line=member["line"],
+            )
+        )
+    return rows
+
+
+def red_flags(source: str, *, path: str = "") -> list[dict[str, object]]:
+    """Return review red-flag hits for every line of ``source``.
+
+    The same rules the packet uses apply here; ``path`` labels the rows. Line
+    numbers are 1-based.
+    """
+    if not isinstance(source, str):
+        raise AtlaWireError("Expected source text.")
+    changes = tuple(
+        _LineChange(number, line)
+        for number, line in enumerate(source.splitlines(), start=1)
+    )
+    return _red_flags(changes, path)
+
+
+def changed_symbols(
+    before: str,
+    after: str,
+    *,
+    path: str = "",
+    before_lines: set[int] | None = None,
+    after_lines: set[int] | None = None,
+) -> list[PrReviewSymbol]:
+    """Compare two versions of one source file and list changed declarations.
+
+    ``before`` may be empty for an added file and ``after`` empty for a deleted
+    one. ``before_lines``/``after_lines`` optionally restrict the comparison to
+    specific changed line numbers; by default every declaration counts.
+    """
+    if not isinstance(before, str) or not isinstance(after, str):
+        raise AtlaWireError("Expected both source versions as text.")
+    removed = (
+        before_lines
+        if before_lines is not None
+        else {number for number in range(1, len(before.splitlines()) + 1)}
+    )
+    added = (
+        after_lines
+        if after_lines is not None
+        else {number for number in range(1, len(after.splitlines()) + 1)}
+    )
+    return _symbol_rows(
+        path, _java_members(before), _java_members(after), removed, added
+    )
+
+
+def find_ticket(info: dict[str, object], commits: Sequence[object] = ()) -> str | None:
+    """Return the first key-shaped ticket found in a pull request, or ``None``.
+
+    Branches are checked first, then commit messages, then the title and
+    description; obvious standards such as ``UTF-8`` are ignored.
+    """
+    if not isinstance(info, dict):
+        raise AtlaWireError("Expected a pull request object.")
+    return _find_ticket(info, commits)
+
+
+def fetch_ticket(
+    base_url: str,
+    key: str,
+    *,
+    token: str,
+    max_description: int = 2500,
+    allow_http_loopback: bool = False,
+) -> PrReviewTicket:
+    """Read one Jira ticket and return the bounded ticket projection.
+
+    A failed read is returned as an unverified ticket with a reason, so a caller
+    can keep the rest of a review. The description is bounded by
+    ``max_description`` characters and flagged when shortened.
+    """
+    if not isinstance(max_description, int) or max_description < 1:
+        raise AtlaWireError("Expected a positive ticket description limit.")
+    packet = _ticket_packet(
+        key,
+        _JiraConfig(base_url, token),
+        allow_http_loopback,
+    )
+    if packet is None:
+        raise AtlaWireError("Expected a Jira ticket key.")
+    if len(packet["description"]) > max_description:
+        packet["description"] = packet["description"][:max_description]
+        packet["description_truncated"] = True
+    return packet
+
+
+def review(
+    base_url: str,
+    repo_or_url: str,
+    pr_id: str | int | None = None,
+    *,
+    token: str,
+    context: int = 2,
+    include_diff: bool = True,
+    allow_http_loopback: bool = False,
+    jira_base_url: str | None = None,
+    jira_token: str | None = None,
+) -> str:
+    """Collect a review packet and render it as Markdown in one call.
+
+    Accepts ``REPO`` plus an ID or one Bitbucket pull request URL, like
+    ``pr-review markdown`` on the CLI.
+    """
+    if pr_id is None:
+        repo, identifier = parse_pr_link(repo_or_url)
+    else:
+        repo, identifier = repo_or_url, pr_id
+    packet = collect_pr_review(
+        base_url,
+        repo,
+        identifier,
+        token=token,
+        include_diff=include_diff,
+        context=context,
+        allow_http_loopback=allow_http_loopback,
+        jira_base_url=jira_base_url,
+        jira_token=jira_token,
+    )
+    return render_markdown(packet)
 
 
 def _code(value: str) -> str:
