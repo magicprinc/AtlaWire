@@ -1,28 +1,29 @@
-"""Read-only facade over atlassian-python-api.
+"""Read-only HTTP facade for the standard product REST surface.
 
-The library owns client construction, authentication, the base URL and the
-session. This module adds the read-only boundary the library does not provide:
-one validated route per call, refused redirects, a bounded streamed body, one
+One validated route per call, refused redirects, a bounded streamed body, one
 retry policy, and an error object that keeps the HTTP status and a sanitized
-diagnostic excerpt.
+diagnostic excerpt. The transport is [atlawire.http.new_session][], which
+already sends the bearer token and never resolves a redirect, so this module
+only adds the per-attempt retry loop and the JSON/file readers.
+
+The facade deliberately builds no third-party client. ``atlassian-python-api``
+was evaluated and removed: see "Why the transport is ours" in README.md.
 """
 
 import hashlib
 import json
-import logging
 import math
 import re
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 from urllib.parse import unquote
 
 import requests
-from atlassian import Bitbucket, ConfluenceServer, Jira
-from atlassian.rest_client import AtlassianRestAPI
 
 from atlawire.file_publication import (
     create_temporary_file,
@@ -32,8 +33,8 @@ from atlawire.file_publication import (
 from atlawire.http import (
     _TRANSPORT_MESSAGE,
     AtlaWireError,
-    _NoRedirectSession,
     error_detail,
+    new_session,
     normalize_base_url,
     read_encoded_limited,
     reject_credential_echo,
@@ -78,22 +79,16 @@ _ADMIN_SEGMENTS = frozenset(
         "workflowscheme",
     }
 )
-logging.getLogger("atlassian").setLevel(logging.WARNING)
-
-_CLIENTS = {
-    "jira": Jira,
-    "confluence": ConfluenceServer,
-    "bitbucket": Bitbucket,
-}
+_PRODUCTS = frozenset({"jira", "confluence", "bitbucket"})
 
 
 def _supported_product(product: object) -> str | None:
     """Return the product name only when it is one of the fixed supported names.
 
-    Pre-request errors run before ``_raw_client_for`` validates the product, so
-    an arbitrary caller string must not reach structured metadata.
+    Pre-request errors run before the destination is validated, so an arbitrary
+    caller string must not reach structured metadata.
     """
-    return product if isinstance(product, str) and product in _CLIENTS else None
+    return product if isinstance(product, str) and product in _PRODUCTS else None
 
 
 # Each semantic-read POST belongs to exactly one product. A Confluence
@@ -253,95 +248,31 @@ def _classify(status: int | None) -> tuple[str, str]:
     return f"http_{status}", "unexpected_status"
 
 
-def _raw_client_for(
-    product: str,
-    base_url: str,
-    token: str,
-    *,
-    allow_http_loopback: bool = False,
-) -> AtlassianRestAPI:
-    """Create the underlying library client for the internal facade.
+@dataclass(slots=True)
+class ApiClient:
+    """One product's base URL and read-only bearer session.
 
-    The library builds a stock [requests.Session][requests.Session] unless one
-    is supplied. Such a session honours ambient ``netrc``/proxy/CA settings and
-    its ``resolve_redirects`` generator pre-reads a refused redirect body before
-    the status reaches this adapter. The session is therefore created here as a
-    no-redirect session with ``trust_env`` disabled and handed to the library,
-    which then applies its own headers, auth, verify/cert and proxy state on top
-    of it.
-    """
-    client_class = _CLIENTS.get(product)
-    if client_class is None:
-        raise AtlaWireError("Unknown Atlassian product.", category="validation")
-    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
-    session = _NoRedirectSession()
-    # Ambient netrc/proxy/CA state must not alter the explicit transport.
-    session.trust_env = False
-    return client_class(
-        url=base,
-        token=token,
-        cloud=False,
-        timeout=_TIMEOUT[1],
-        verify_ssl=True,
-        session=session,
-        # The library must not retry: this module owns attempts and delays.
-        backoff_and_retry=False,
-    )
+    The session is created by [atlawire.http.new_session][], which sends the
+    bearer token and never resolves or drains a redirect. ``close`` releases it.
 
-
-_MUTATING = re.compile(
-    r"(?:^|_)(?:add|create|delete|update|set|remove|archive|restore|move|"
-    r"assign|transition|do|post|put|upload|edit|rename|merge|close|disable|"
-    r"enable|register|unregister|pin|unpin|watch|unwatch|vote|unvote|mark|"
-    r"unmark|bulk|change|copy|reset|clean|reindex|start|cancel|approve|"
-    r"decline|write|deactivate|reopen|open|grant|attach|trigger|revoke|"
-    r"publish|schedule|execute|send|notify|invite|subscribe|unsubscribe|"
-    r"follow|unfollow|save|push|sync|import|install|uninstall|migrate|"
-    r"login|logout|apply|rollback|detach|unlink)(?:_|$)",
-    re.IGNORECASE,
-)
-_RAW_TRANSPORT = frozenset({"request", "get", "post", "put", "delete", "patch"})
-# Plain metadata that is safe to read from a caller; every other non-callable
-# attribute stays private, including the underlying transport session.
-_SAFE_METADATA = frozenset(
-    {"timeout", "cloud", "backoff_and_retry", "verify_ssl", "url"}
-)
-
-
-class ReadOnlyClient:
-    """Proxy that exposes only non-mutating library methods and safe metadata.
-
-    A named attribute is forwarded only when it is a callable library method and
-    its name passes the mutating-name and raw-verb filters. ``timeout``,
-    ``cloud``, ``backoff_and_retry``, ``verify_ssl`` and ``url`` are exposed as
-    read-only metadata. Every other name, including the underlying
-    ``session``/``_session`` transport state, raises ``AttributeError``; the raw
-    client stays reachable only through the private ``_client`` attribute.
+    The session is private by convention, matching the name boundary the removed
+    ``ReadOnlyClient`` proxy enforced: no public attribute leads to the raw
+    ``request`` verb, so a caller reads through [get_json][], [request_json][]
+    or [download_to_file][] and those restrict the method to GET or one of the
+    audited semantic-read POSTs. Python has no private attributes, so the
+    operative guarantee remains the read-only token; this boundary is the second
+    layer, exactly as before.
     """
 
-    # Класс-аннотация обязательна: без неё обращение к ``self._client``
-    # разрешается через ``__getattr__`` и получает выведенный тип возврата,
-    # а не реальный близкий клиент библиотеки.
-    _client: AtlassianRestAPI
-
-    def __init__(self, client: AtlassianRestAPI) -> None:
-        object.__setattr__(self, "_client", client)
-
-    def __getattr__(self, name: str):
-        client = object.__getattribute__(self, "_client")
-        if name in _SAFE_METADATA:
-            return getattr(client, name)
-        if name.startswith("_") or name in _RAW_TRANSPORT or _MUTATING.search(name):
-            raise AttributeError(f"Read-only client does not expose {name}.")
-        candidate = getattr(client, name)
-        if callable(candidate):
-            return candidate
-        raise AttributeError(f"Read-only client does not expose {name}.")
+    url: str
+    _session: requests.Session = field(repr=False)
+    product: str
 
     def close(self) -> None:
-        self._client.close()
+        """Release the transport session."""
+        self._session.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -354,16 +285,30 @@ def client_for(
     token: str,
     *,
     allow_http_loopback: bool = False,
-) -> ReadOnlyClient:
-    """Create one read-only library client; the caller must close it."""
-    return ReadOnlyClient(
-        _raw_client_for(
-            product,
-            base_url,
-            token,
-            allow_http_loopback=allow_http_loopback,
-        )
+) -> ApiClient:
+    """Create one read-only client; the caller must close it.
+
+    The product name is validated here because this is the single construction
+    point: an unknown name is refused before a session exists, so a caller
+    string never reaches the transport.
+
+    ``new_session`` validates the destination, applies the bearer header and
+    disables ``trust_env``, so ambient ``netrc``, proxy and CA settings cannot
+    alter the explicit transport. It also returns a session that refuses to
+    follow or pre-read a redirect.
+    """
+    if product not in _PRODUCTS:
+        raise AtlaWireError("Unknown Atlassian product.", category="validation")
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
+    session = new_session(
+        base,
+        token,
+        follow_redirects=False,
+        trust_env=False,
+        timeout=_TIMEOUT[1],
+        allow_http_loopback=allow_http_loopback,
     )
+    return ApiClient(url=base, _session=session, product=product)
 
 
 def get_json(
@@ -375,7 +320,7 @@ def get_json(
     params: Mapping[str, object] | None = None,
     allow_http_loopback: bool = False,
 ) -> object:
-    """Read one standard non-admin JSON GET through the library client."""
+    """Read one standard non-admin JSON GET through the read-only client."""
     return request_json(
         product,
         base_url,
@@ -483,7 +428,7 @@ def request_json_with_status(
             method="POST",
         )
 
-    client = _raw_client_for(
+    client = client_for(
         product, base_url, token, allow_http_loopback=allow_http_loopback
     )
     try:
@@ -544,7 +489,7 @@ def download_to_file(
             category="validation",
             product=_supported_product(product),
         )
-    client = _raw_client_for(
+    client = client_for(
         product, base_url, token, allow_http_loopback=allow_http_loopback
     )
     temporary: Path | None = None
@@ -581,7 +526,7 @@ def _create_staging_file(target: Path) -> Path:
 
 
 def _send_binary(
-    client: AtlassianRestAPI,
+    client: ApiClient,
     path: str,
     params: dict[str, str | int],
     *,
@@ -733,7 +678,7 @@ def _checked_params(
 
 
 def _attempt_loop(
-    client: AtlassianRestAPI,
+    client: ApiClient,
     method: str,
     path: str,
     *,
@@ -860,16 +805,16 @@ def _pause(attempt: int, waited: float, retry_after: float | None) -> float | No
 
 
 def _send(
-    client: AtlassianRestAPI,
+    client: ApiClient,
     method: str,
     path: str,
     *,
     params: dict[str, str | int],
     body: dict[str, object] | None,
 ) -> requests.Response:
-    """Send one request through the library session, without following it."""
-    url = f"{str(client.url).rstrip('/')}{path}"
-    return client.session.request(
+    """Send one request through the read-only session, without following it."""
+    url = f"{client.url.rstrip('/')}{path}"
+    return client._session.request(
         method,
         url,
         params=params or None,

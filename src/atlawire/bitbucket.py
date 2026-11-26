@@ -11,6 +11,8 @@ import requests
 
 from atlawire.http import (
     _TRANSPORT_MESSAGE,
+    TEXT_LIMIT,
+    TEXT_LIMIT_MESSAGE,
     AtlaWireError,
     _check_status,
     _decode_utf8_text,
@@ -48,10 +50,6 @@ _ARCHIVE_FORMATS = frozenset({"zip", "tar", "tar.gz", "tgz"})
 _ARCHIVE_LIMIT_DEFAULT = 64 * 1024 * 1024
 # The shared reader requires an integer limit; None opts out of the byte cap.
 _ARCHIVE_LIMIT_UNBOUNDED = 2**63 - 1
-# Decoded-size bound for one raw text file, matching the shared text limit in
-# atlawire.http; the raw-file reader below keeps that bound.
-_TEXT_LIMIT = 1024 * 1024
-_TEXT_LIMIT_MESSAGE = "The text response exceeds the 1 MiB limit."
 _COMMIT_LIMIT_DEFAULT = 25
 _FIND_LIMIT_DEFAULT = 25
 _PULL_REQUEST_LIMIT_DEFAULT = 25
@@ -2854,7 +2852,7 @@ def _read_raw_file_text(
             _check_status(response.status_code, method="GET", product="bitbucket")
             _check_raw_file_media_type(response.headers.get("Content-Type"))
             payload = read_encoded_limited(
-                response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
+                response, limit=TEXT_LIMIT, message=TEXT_LIMIT_MESSAGE
             )
     except requests.Timeout:
         raise AtlaWireError(

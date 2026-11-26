@@ -31,6 +31,7 @@ from typing import TypedDict
 from atlawire.bitbucket import list_my_pull_requests
 from atlawire.federated import ProductTarget
 from atlawire.http import (
+    BEARER_TOKEN_GRAMMAR,
     AtlaWireError,
     bearer_session,
     get_json_object,
@@ -47,7 +48,6 @@ __all__ = [
 ]
 
 CONFLUENCE_CURRENT_USER_PATH = "/rest/api/user/current"
-_BEARER_TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]+")
 _HTTP_STATUS = re.compile(r"HTTP ([0-9]{3}):")
 _NO_IDENTITY = "Expected an authenticated identity with readable text."
 _TIMEOUT = "Request timed out."
@@ -318,7 +318,7 @@ def _target(product: str, value: object, allow_http_loopback: bool) -> ProductTa
             category="validation",
             product=product,
         ) from None
-    if _BEARER_TOKEN.fullmatch(value.token) is None:
+    if BEARER_TOKEN_GRAMMAR.fullmatch(value.token) is None:
         raise _InvalidTarget(
             f"The {product} token is missing or invalid.",
             category="credentials",

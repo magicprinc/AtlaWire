@@ -34,6 +34,7 @@ from atlawire._markdown import (
     one_line,
 )
 from atlawire.http import (
+    BEARER_TOKEN_GRAMMAR,
     AtlaWireError,
     normalize_base_url,
 )
@@ -141,9 +142,6 @@ _JIRA_PAIR_INVALID = "Jira base URL and token must be supplied together."
 _PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _PR_ID_TEXT = re.compile(r"[1-9][0-9]*")
-# Mirrors atlawire.http.bearer_session; the adapter remains the transport
-# authority, but a bad token must not reach it as a surprise TypeError.
-_TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]+")
 
 _PR_URL = re.compile(
     r"/projects/(?P<project>[^/]+)/repos/(?P<slug>[^/]+)"
@@ -871,7 +869,11 @@ def _require_repo(value: object) -> str:
 
 
 def _require_token(value: object, *, product: str) -> str:
-    if not isinstance(value, str) or not value or _TOKEN.fullmatch(value) is None:
+    if (
+        not isinstance(value, str)
+        or not value
+        or BEARER_TOKEN_GRAMMAR.fullmatch(value) is None
+    ):
         raise AtlaWireError(_TOKEN_INVALID, category="credentials", product=product)
     return value
 

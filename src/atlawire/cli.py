@@ -134,6 +134,7 @@ from atlawire.file_publication import (
     publish_new_file,
 )
 from atlawire.http import (
+    BEARER_TOKEN_GRAMMAR,
     AtlaWireError,
     bearer_session,
     get_json_array,
@@ -478,10 +479,8 @@ _PRODUCT_ENVIRONMENT = {
     "jira": ("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN"),
 }
 
-# The exact spelling accepted by [atlawire.http.bearer_session]. Environment
-# mode checks it before any session or client exists, so an empty or malformed
-# value fails as configuration instead of reaching the server.
-_BEARER_TOKEN_GRAMMAR = re.compile(r"[A-Za-z0-9._~+/=-]+")
+# Environment mode checks the token before any session or client exists, so an
+# empty or malformed value fails as configuration instead of reaching the server.
 
 
 def _product_base_url_and_token(
@@ -512,7 +511,7 @@ def _product_base_url_and_token(
                 f"Missing --base-url or {url_name} when using --token-from-env."
             )
         token = os.environ.get(token_name, "")
-        if not _BEARER_TOKEN_GRAMMAR.fullmatch(token):
+        if not BEARER_TOKEN_GRAMMAR.fullmatch(token):
             raise click.ClickException(
                 f"Missing or invalid bearer token in {token_name} "
                 "when using --token-from-env."
@@ -1281,7 +1280,7 @@ def api_get_command(
     token_from_env: bool,
     allow_http_loopback: bool,
 ) -> None:
-    """Read one standard non-admin JSON GET through atlassian-python-api."""
+    """Read one standard non-admin JSON GET through the read-only client."""
     params = _operation_json_object(raw_params) if raw_params is not None else None
     resolved_url, token = _product_base_url_and_token(
         product, base_url, token_from_env, allow_http_loopback
@@ -1340,7 +1339,7 @@ def api_request_command(
     token_from_env: bool,
     allow_http_loopback: bool,
 ) -> None:
-    """Run one read-only GET or POST through atlassian-python-api."""
+    """Run one read-only GET or POST through the read-only client."""
     params = _operation_json_object(raw_params) if raw_params is not None else None
     body = _operation_json_object(raw_body) if raw_body is not None else None
     resolved_url, token = _product_base_url_and_token(

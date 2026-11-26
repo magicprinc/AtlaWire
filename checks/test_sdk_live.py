@@ -1,4 +1,4 @@
-"""Opt-in real-server checks for the library-backed api-request command.
+"""Opt-in real-server checks for the api-request command.
 
 Run explicitly::
 

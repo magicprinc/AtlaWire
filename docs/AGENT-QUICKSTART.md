@@ -273,7 +273,7 @@ response links are never followed (attachment metadata does not download
 content). A 204 prints `null`. This is a fixed allowlist, not general REST
 coverage.
 
-### Library-backed standard REST
+### Standard REST reads
 
 ```shell
 C:/Python315/python.exe -P -B -m atlawire api-get jira /rest/api/2/myself
@@ -282,8 +282,9 @@ C:/Python315/python.exe -P -B -m atlawire api-request jira POST /rest/api/2/sear
   --body '{"jql":"order by created DESC","maxResults":1}'
 ```
 
-`api-get`/`api-request` use `atlassian-python-api==5.0.5`. Any standard
-non-administrative `/rest/` GET is accepted. The only read-only POSTs are Jira
+`api-get`/`api-request` send HTTP through `atlawire.http` with a bearer header
+and no redirect following. Any standard non-administrative `/rest/` GET is
+accepted. The only read-only POSTs are Jira
 search/worklog-list, Bitbucket markup preview, and Confluence content-body
 conversion. Mutating POSTs and admin paths are rejected before a request.
 

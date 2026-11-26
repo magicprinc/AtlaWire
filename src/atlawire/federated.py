@@ -34,14 +34,18 @@ The result is deliberately incomplete: every product is capped per term, and
 Bitbucket can return only indexed code, so ``limitations`` is always present.
 """
 
-import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TypedDict
 
 from atlawire.bitbucket_search import MatchEvidence, SearchRow, search_code
 from atlawire.confluence import ContentRow, search_cql
-from atlawire.http import AtlaWireError, normalize_base_url
+from atlawire.http import (
+    BEARER_TOKEN_GRAMMAR,
+    BIDI_CONTROLS,
+    AtlaWireError,
+    normalize_base_url,
+)
 from atlawire.jira import IssueRow as JiraIssueRow
 from atlawire.jira import search_issues
 
@@ -89,15 +93,11 @@ LIMITATIONS = (
     ),
 )
 
-_BEARER_TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]+")
 _EVIDENCE_RANK: dict[MatchEvidence, int] = {
     "highlight": 2,
     "context-only": 1,
     "none": 0,
 }
-_BIDI_CONTROLS = frozenset(
-    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-)
 _INVALID_TERM = (
     "A search term must be plain text without double quotes, backslashes, or "
     "control characters."
@@ -704,7 +704,7 @@ def _check_term(term: object) -> None:
             or 0x7F <= code <= 0x9F
             or 0xD800 <= code <= 0xDFFF
             or code in {0x2028, 0x2029}
-            or char in _BIDI_CONTROLS
+            or char in BIDI_CONTROLS
         ):
             raise AtlaWireError(_INVALID_TERM)
 
@@ -767,7 +767,7 @@ def _target(
             category="validation",
             product=slot,
         ) from None
-    if _BEARER_TOKEN.fullmatch(value.token) is None:
+    if BEARER_TOKEN_GRAMMAR.fullmatch(value.token) is None:
         raise AtlaWireError(
             f"The {product} token is missing or invalid.",
             category="credentials",

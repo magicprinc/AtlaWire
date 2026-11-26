@@ -738,27 +738,35 @@ CLI печатает её второй строкой, потому что те�
 
 ## SDK и транспорт (`src/atlawire/sdk.py`, `http.py`)
 
-`atlawire.sdk` — тонкая read-only обёртка над `atlassian-python-api==5.0.5`; таймауты
+`atlawire.sdk` — тонкий read-only HTTP-фасад без сторонних клиентов; таймауты
 `(5, 30)`, редиректы запрещены, административные и мутирующие маршруты отсекаются до запроса.
+Транспорт — `atlawire.http.new_session`: он же ставит `Authorization: Bearer`, отключает
+`trust_env` (netrc/proxy/CA) и не разворачивает redirect.
 
-**`client_for(product, base_url, token, *, allow_http_loopback=False) -> ReadOnlyClient`** — `sdk.py:347`
-- → библиотечный клиент (`Jira`, `ConfluenceServer` или `Bitbucket`); закрывает вызывающий.
+`atlassian-python-api` (https://github.com/atlassian-api/atlassian-python-api) удалён в
+0.9.8: он давал один заголовок и 249 продуктовых методов, которые приходилось скрывать
+фильтрующим прокси, и тянул 5 неиспользуемых пакетов. Причины и границы применимости —
+в разделе README «Why the transport is ours».
 
-**`get_json(product, base_url, path, *, token, params=None, allow_http_loopback=False) -> object`** — `sdk.py:365`
+**`client_for(product, base_url, token, *, allow_http_loopback=False) -> ApiClient`**
+- → `ApiClient(url, session, product)`; закрывает вызывающий. Продуктовых методов нет
+  вовсе: изменяющие операции недостижимы по построению, а не по фильтру.
+
+**`get_json(product, base_url, path, *, token, params=None, allow_http_loopback=False) -> object`**
 - REST: стандартный неадминистративный `GET /rest/...`; → распарсенный JSON.
 
-**`get_json_with_status(...) -> tuple[int, object]`** — `sdk.py:386`
+**`get_json_with_status(...) -> tuple[int, object]`**
 - То же, но → `(status, payload)`.
 
-**`request_json(product, base_url, path, *, method, token, params=None, body=None, allow_http_loopback=False) -> object`** — `sdk.py:407`
+**`request_json(product, base_url, path, *, method, token, params=None, body=None, allow_http_loopback=False) -> object`**
 - REST: GET или разрешённый read-only POST (Jira `/rest/api/2/search`, Jira
   `/rest/api/2/worklog/list`, Bitbucket `/rest/api/1.0/markup/preview`, Confluence
   `/rest/api/contentbody/convert/{to}`); → payload.
 
-**`request_json_with_status(...) -> tuple[int, object]`** — `sdk.py:431`
+**`request_json_with_status(...) -> tuple[int, object]`**
 - То же, но → `(status, payload)`.
 
-**`download_to_file(product, base_url, path, *, token, destination, params=None, max_bytes=33554432, allow_http_loopback=False) -> tuple[str | None, int, str]`** — `sdk.py:498`
+**`download_to_file(product, base_url, path, *, token, destination, params=None, max_bytes=33554432, allow_http_loopback=False) -> tuple[str | None, int, str]`**
 - → `(content_type, bytes, sha256)`; файл публикуется атомарно, на ошибке не остаётся.
 
 Публичные функции `http.py`: `normalize_base_url` (`135`), `new_session` (`153`),

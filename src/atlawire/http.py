@@ -12,12 +12,12 @@ from urllib.parse import unquote, urlsplit
 import requests
 import urllib3.exceptions
 
-_TEXT_LIMIT = 1024 * 1024
+TEXT_LIMIT = 1024 * 1024
 # Allow more room for structured documents than raw source while bounding
 # each response independently.
 _JSON_LIMIT = 8 * 1024 * 1024
 _CHUNK_SIZE = 64 * 1024
-_TEXT_LIMIT_MESSAGE = "The text response exceeds the 1 MiB limit."
+TEXT_LIMIT_MESSAGE = "The text response exceeds the 1 MiB limit."
 _JSON_LIMIT_MESSAGE = "The JSON response exceeds the 8 MiB limit."
 _TRANSPORT_MESSAGE = "Request failed; check connectivity and TLS settings."
 _PARTIAL_RESPONSE_MESSAGE = "HTTP 206: partial content is not supported."
@@ -25,7 +25,11 @@ _SECRET_ECHO_MESSAGE = "The response contained the session bearer token."  # noq
 _NO_CONTENT = object()
 _GZIP_WBITS = 16 + zlib.MAX_WBITS
 _GZIP_CODINGS = frozenset({"gzip", "x-gzip"})
-_BIDI_CONTROLS = frozenset(
+# The one spelling a bearer token may have. Every entry point that accepts a
+# caller-supplied token checks it against this, so a token is never accepted in
+# one command and rejected in another.
+BEARER_TOKEN_GRAMMAR = re.compile(r"[A-Za-z0-9._~+/=-]+")
+BIDI_CONTROLS = frozenset(
     "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
 )
 # Query parameters whose documented effect is not a read. Jira's `updateHistory`
@@ -245,7 +249,7 @@ def _new_session(
     product: str | None = None,
 ) -> requests.Session:
     """Build the one session policy shared by the public factories."""
-    if token is not None and not re.fullmatch(r"[A-Za-z0-9._~+/=-]+", token):
+    if token is not None and BEARER_TOKEN_GRAMMAR.fullmatch(token) is None:
         raise AtlaWireError("Missing or invalid bearer token.", category="credentials")
     session: _PolicySession = (
         _PolicySession(default_timeout=timeout, product=product)
@@ -842,7 +846,7 @@ def get_text(session: requests.Session, url: str, *, params: Mapping[str, str]) 
             )
             _check_text_type(response.headers.get("Content-Type"))
             payload = read_encoded_limited(
-                response, limit=_TEXT_LIMIT, message=_TEXT_LIMIT_MESSAGE
+                response, limit=TEXT_LIMIT, message=TEXT_LIMIT_MESSAGE
             )
     except requests.Timeout:
         raise AtlaWireError(
@@ -995,6 +999,6 @@ def _has_safe_text_chars(text: str) -> bool:
                 return False
             continue
         code = ord(char)
-        if code < 0x20 or 0x7F <= code <= 0x9F or char in _BIDI_CONTROLS:
+        if code < 0x20 or 0x7F <= code <= 0x9F or char in BIDI_CONTROLS:
             return False
     return True

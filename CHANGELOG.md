@@ -10,6 +10,27 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.8] - 2026-11-25
+
+### Changed
+
+- **`atlassian-python-api` is no longer a dependency.** It supplied one header
+  (`Authorization: Bearer` plus a no-op auth handler) while every request already
+  went through `client.session.request`, and its 249 product methods included
+  dozens of mutating calls that the shipped `ReadOnlyClient` proxy had to filter
+  by name. `atlawire.sdk` now holds the base URL and the session directly, so
+  mutating operations are absent by construction instead of by filtering. The
+  `ReadOnlyClient` proxy, its 60-verb regex and its tests are removed. The
+  project's own `atlawire.http.new_session` already disables `trust_env`, which
+  makes `requests` skip `.netrc`; the library's `_ExplicitTokenAuth` guard was
+  correct but redundant here.
+- Dependency count drops by six: `oauthlib`, `requests_oauthlib`,
+  `beautifulsoup4`, `soupsieve`, `jmespath` and `deprecated` leave with it.
+  AtlaWire uses bearer tokens only, so the library's OAuth support was unused.
+- `client_for` returns `ApiClient(url, session, product)` instead of a proxy over
+  a library client. It exposes no product method; `README.md` explains the
+  decision and when the library is still the right choice.
+
 ## [0.9.7] - 2026-11-25
 
 ### Fixed

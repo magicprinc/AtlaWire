@@ -8,17 +8,15 @@ generic: a failed read never echoes the file, its contents, or a token.
 
 import json
 import os
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from atlawire.http import AtlaWireError, normalize_base_url
+from atlawire.http import BEARER_TOKEN_GRAMMAR, AtlaWireError, normalize_base_url
 
 PRODUCTS = ("bitbucket", "confluence", "jira")
 CREDENTIALS_ENV = "BBK_CREDENTIALS"
 _DEFAULT_PATH = Path(".config") / "atlassian" / "credentials.json"
 _MAX_FILE_SIZE = 1024 * 1024
-_BEARER_TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]+")
 _UNAVAILABLE = "Saved BBK credentials are unavailable for {product}."
 _INVALID = "Saved BBK credentials are invalid for {product}."
 _MISMATCH = "The supplied base URL does not match saved BBK credentials for {product}."
@@ -85,7 +83,7 @@ def load_saved_credentials(
     if (
         not isinstance(url, str)
         or not isinstance(token, str)
-        or _BEARER_TOKEN.fullmatch(token) is None
+        or BEARER_TOKEN_GRAMMAR.fullmatch(token) is None
     ):
         raise AtlaWireError(
             _INVALID.format(product=product), category="credentials", product=product

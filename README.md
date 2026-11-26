@@ -7,7 +7,7 @@ Atlassian **Jira**, **Confluence**, and **Bitbucket**, including older **Server*
 
 ## Layers
 
-The per-product commands and the library-backed `api-get`/`api-request` surface are
+The per-product commands and the `api-get`/`api-request` surface are
 the supported layer for Jira, Confluence, and Bitbucket. The cross-product `find`
 command composes those readers into one bounded lead search; it is additive and does
 not replace opening the underlying issue, page, or file as evidence.
@@ -238,7 +238,7 @@ include `jira.project.get`, `jira.issue.watchers`, `jira.project.versions`,
 `bitbucket.repository.get`, `bitbucket.repository.compare-commits`, and
 `confluence.space.get`.
 
-## Library-backed standard REST
+## Standard REST reads
 
 ```shell
 atlawire api-get jira /rest/api/2/myself
@@ -247,35 +247,70 @@ atlawire api-request jira POST /rest/api/2/search \
   --body '{"jql":"order by created DESC","maxResults":1}'
 ```
 
-The Python surface exports the same library-backed clients:
+The Python surface exports the same clients:
 
 ```python
-from atlawire import client_for
+from atlawire import client_for, get_json
 
 with client_for("jira", "https://jira.example.com", token) as client:
-    issues = client.jql("project = DEMO ORDER BY created DESC", limit=10)
+    payload = get_json("jira", client.url, "/rest/api/2/myself", token=token)
 ```
 
-`client_for` returns a read-only wrapper around the library's `Jira`,
-`ConfluenceServer` or `Bitbucket` client: known mutating methods and the raw
-`request`/`get`/`post` verbs are refused, while the library's public read methods
-remain available. The wrapper is defense in depth; the read-only guarantee still
-comes from deploying with a read-only token. Use `get_json`/`request_json` when a
-route has no high-level method.
+`client_for` returns one base URL and one read-only session. It exposes no
+product methods at all: there is no `delete`, no `put`, no `post`, and no
+per-product method such as `attach_file`. Only `get_json`, `request_json` and
+`download_to_file` reach the network, and they accept a method that
+`request_json_with_status` has already restricted to GET or one of the audited
+semantic-read POSTs. The guarantee still comes from deploying with a read-only
+token; the code boundary is the second layer.
 
-`api-get` and `api-request` use `atlassian-python-api==5.0.5` for the HTTP,
-authentication, session and product client. `api-get` supports any standard
-non-administrative GET path under `/rest/`. `api-request` additionally supports
-these documented read-only POSTs: Jira `/rest/api/2/search`, Jira
-`/rest/api/2/worklog/list`, Bitbucket `/rest/api/1.0/markup/preview`, and
-Confluence `/rest/api/contentbody/convert/{to}`. Mutating POSTs and
-administrative paths are rejected before a request.
+`api-get` and `api-request` speak HTTP directly through `atlawire.http`, which
+sends the bearer header, disables ambient `netrc`/proxy/CA settings, and never
+resolves a redirect. `api-get` supports any standard non-administrative GET
+path under `/rest/`. `api-request` additionally supports these documented
+read-only POSTs: Jira `/rest/api/2/search`, Jira `/rest/api/2/worklog/list`,
+Bitbucket `/rest/api/1.0/markup/preview`, and Confluence
+`/rest/api/contentbody/convert/{to}`. Mutating POSTs and administrative paths
+are rejected before a request.
 
 Every successful command prints valid JSON: the server's JSON value unchanged,
-`null` for an empty response, or a JSON string when the library returns plain
-text. Each call is **page-first**: one library/API response is returned, with
-its own `start`/`limit`/`nextPageStart` metadata when present. No automatic
-full scan is performed; a returned page is not proof of completeness.
+`null` for an empty response, or a JSON string for a plain-text body. Each call
+is **page-first**: one API response is returned, with its own
+`start`/`limit`/`nextPageStart` metadata when present. No automatic full scan is
+performed; a returned page is not proof of completeness.
+
+## Why the transport is ours
+
+AtlaWire does not depend on
+[atlassian-python-api](https://github.com/atlassian-api/atlassian-python-api)
+(Apache-2.0, 5.0.5, the most maintained Python client with real Server/Data
+Center coverage). It was a dependency up to and including 0.9.7 and was removed
+because what it supplied here was smaller than what it cost:
+
+- **It supplied one header.** The library's only runtime contribution was
+  `session.auth = _ExplicitTokenAuth()` and `Authorization: Bearer <token>`;
+  every request already went through `client.session.request(...)`. Its
+  `_ExplicitTokenAuth` exists to stop `requests` from substituting `.netrc`
+  credentials, and `atlawire.http` already sets `trust_env = False`, which makes
+  `requests` skip `.netrc` entirely. The protection was correct but redundant.
+- **Its 249 product methods had to be hidden.** Dozens were mutating, so the
+  shipped `ReadOnlyClient` was a name-filtering proxy with a 60-verb regex and
+  its own tests. Removing the library removed the need for that guard instead of
+  maintaining it.
+- **It pulled five unused packages** into the supply chain: `oauthlib`,
+  `requests_oauthlib`, `beautifulsoup4`, `soupsieve`, `jmespath`, `deprecated`.
+  AtlaWire uses bearer tokens only, so OAuth support was dead weight, and
+  dependency count is exactly the surface this project tries to keep small.
+- **The client is still worth reading.** Its per-product modules remain a useful
+  reference for documented Server route shapes and field names, and
+  `tests/test_contract_oracles.py` cites line ranges from it as a contract
+  oracle.
+
+Use it directly if you need OAuth 1/2, Kerberos, or JSESSIONID cookie flows,
+or if you want high-level wrappers over many products at once. AtlaWire only
+reads with a bearer token and needs none of those.
+
+## Federated search across products
 
 Failures print one JSON object and exit nonzero:
 
