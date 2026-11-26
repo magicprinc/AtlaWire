@@ -118,8 +118,53 @@ fields:
 
 Keep it readable only by you (`chmod 600` on POSIX). Every value is a bearer
 token; a BBK entry with a user and password but no token is not usable here.
-`atlawire auth login` does not exist yet, so this file, `BBK_CREDENTIALS`, or the
-`ATLAWIRE_*` environment pair is the only setup path.
+
+### Save a token with `login`
+
+```shell
+atlawire login --product jira
+```
+
+The command asks for the base URL when neither `--base-url` nor a saved URL
+exists, then reads the token from a prompt without echo. The token therefore
+never appears in an argument list, in shell history, in the command's output, or
+in an error message. It is validated, checked against the product unless
+`--no-verify` is given, and written as the same `<product>_url` /
+`<product>_token` pair the read commands load. Entries for other products and
+unrelated keys are preserved, and a saved file that cannot be read as a JSON
+object is refused rather than overwritten. The file is staged beside the
+destination and renamed into place with owner-only permissions.
+
+Create the token with the smallest permissions that still let the agent read
+what it needs. A read-only token is what makes the read-only promise enforced by
+the server rather than only by this tool.
+
+| Product | Where to create a personal access token |
+| --- | --- |
+| Bitbucket | Profile picture → **Manage account** → **HTTP access tokens** → Create token |
+| Jira | Profile picture → **Profile** → **Personal Access Tokens** |
+| Confluence | Profile picture → **Settings** → **Personal Access Tokens** |
+
+Personal access tokens exist in Jira Core and Jira Software 8.14 and later, Jira
+Service Management 4.15 and later, and Confluence 7.9 and later; Bitbucket Data
+Center documents HTTP access tokens for user accounts. Menu labels differ
+slightly between versions, so navigate from the profile menu when a direct link
+is unknown. Official pages:
+[Bitbucket HTTP access tokens](https://confluence.atlassian.com/bitbucketserver/http-access-tokens-939515499.html)
+and
+[Using personal access tokens](https://confluence.atlassian.com/enterprise/using-personal-access-tokens-1026032365.html).
+
+For an agent helping a human set this up:
+
+1. Ask for the product and the base URL; do not ask for the token itself.
+2. Open the product's base URL in the browser and guide the human to the menu
+   path above.
+3. Run `atlawire login --product <name> --base-url <url>` in a terminal the
+   human controls, so the hidden prompt is theirs.
+4. Confirm the result with `atlawire whoami`.
+
+Never ask a human to paste a token into a chat, a file an agent writes, or a
+command argument: all three leave the value in a transcript or a history.
 
 Pass `--token-from-env` to switch to environment-only mode. In that mode AtlaWire
 does not open the saved file: set both variables from the table in the invoking

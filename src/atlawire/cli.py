@@ -117,7 +117,11 @@ from atlawire.confluence import (
 )
 from atlawire.confluence_conversion import convert_content_body
 from atlawire.confluence_markdown import render_page_markdown
-from atlawire.credentials import resolve_saved_credentials
+from atlawire.credentials import (
+    load_saved_credentials,
+    resolve_saved_credentials,
+    save_credentials,
+)
 from atlawire.federated import (
     LIMIT_DEFAULT as FEDERATED_LIMIT_DEFAULT,
 )
@@ -1425,6 +1429,135 @@ def whoami_command(
     click.echo(json.dumps(result))
     if any(check.get("ok") is not True for check in result.values()):
         context.exit(1)
+
+
+@cli.command("login")
+@click.option(
+    "--product",
+    type=click.Choice(["bitbucket", "confluence", "jira"]),
+    required=True,
+    help="Product whose personal access token is being saved.",
+)
+@click.option(
+    "--base-url",
+    default=None,
+    help=(
+        "Product base URL. Used when given, else the saved URL, else prompted. "
+        "A URL is not secret, so this option and its prompt are visible."
+    ),
+)
+@click.option(
+    "--no-verify",
+    "skip_verify",
+    is_flag=True,
+    help="Save without checking the token against the server.",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Accepted for symmetry; JSON is always printed.",
+)
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def login_command(
+    product: str,
+    base_url: str | None,
+    skip_verify: bool,
+    as_json: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Read one personal access token from a hidden prompt and save it.
+
+    The token is typed at a prompt without echo. It therefore never appears in
+    an argument list, in shell history, in this command's output, or in a log
+    line. It is validated, checked against the product unless --no-verify is
+    given, and written to the credentials file the read commands already load:
+    ~/.config/atlassian/credentials.json, or the path named by BBK_CREDENTIALS.
+
+    Existing entries for other products are preserved. A saved file that cannot
+    be read as a JSON object is refused rather than overwritten, because it may
+    hold another product's token.
+    """
+    resolved_url = _login_base_url(product, base_url, allow_http_loopback)
+    click.echo(
+        f"Create a token in {product}: {_LOGIN_HINTS[product]}",
+        err=True,
+    )
+    token = click.prompt("Personal access token", hide_input=True, err=True)
+    try:
+        if not skip_verify:
+            _verify_login(product, resolved_url, token, allow_http_loopback)
+        saved = save_credentials(
+            product,
+            resolved_url,
+            token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise _click_error(exc) from None
+    click.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "product": product,
+                "saved": str(saved),
+                "verified": not skip_verify,
+            },
+            ensure_ascii=False,
+        )
+    )
+
+
+# Official menu paths. A direct URL differs between product versions, so the
+# documented route is the instruction a human can always follow.
+_LOGIN_HINTS = {
+    "bitbucket": "Profile picture > Manage account > HTTP access tokens",
+    "confluence": "Profile picture > Settings > Personal Access Tokens",
+    "jira": "Profile picture > Profile > Personal Access Tokens",
+}
+
+
+def _login_base_url(
+    product: str, base_url: str | None, allow_http_loopback: bool
+) -> str:
+    """Return the URL to save against: explicit, else saved, else prompted."""
+    if base_url is not None:
+        return base_url
+    try:
+        saved = load_saved_credentials(product, allow_http_loopback=allow_http_loopback)
+    except AtlaWireError:
+        return click.prompt(f"Base URL for {product}", err=True)
+    return saved.base_url
+
+
+def _verify_login(
+    product: str, base_url: str, token: str, allow_http_loopback: bool
+) -> None:
+    """Check the token with the product's documented identity read.
+
+    The check reuses [whoami][atlawire.identity.whoami], so an anonymous
+    response cannot be mistaken for success. Only the named product is probed.
+    The failure message is the sanitized per-product reason whoami already
+    produces, so no token, URL, or body reaches the terminal.
+    """
+    targets: dict[str, ProductTarget | None] = {
+        "bitbucket": None,
+        "confluence": None,
+        "jira": None,
+    }
+    targets[product] = ProductTarget(base_url=base_url, token=token)
+    result = whoami(
+        confluence=targets["confluence"],
+        jira=targets["jira"],
+        bitbucket=targets["bitbucket"],
+        allow_http_loopback=allow_http_loopback,
+    )
+    check = result.get(product) or {}
+    if check.get("ok") is not True:
+        reason = check.get("error") or f"{product} check failed."
+        raise AtlaWireError(str(reason), category="credentials", product=product)
 
 
 @cli.command("search")

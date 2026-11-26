@@ -16,6 +16,11 @@ the caller's check, the link fails with ``FileExistsError`` and the existing
 bytes stay untouched. There is no check-then-replace fallback. On filesystems
 without hard links the publication fails with a generic error instead of
 risking data loss; the temporary file remains the caller's to clean up.
+
+[replace_file][atlawire.file_publication.replace_file] is the deliberate
+counterpart for a file this tool owns, such as the saved credentials: it
+replaces the destination atomically, so a reader sees either the old bytes or
+the new ones and never a half-written document.
 """
 
 import contextlib
@@ -29,6 +34,7 @@ __all__ = [
     "create_temporary_file",
     "discard_temporary_file",
     "publish_new_file",
+    "replace_file",
 ]
 
 _EXISTS = "The destination already exists."
@@ -79,3 +85,26 @@ def publish_new_file(temporary: str | Path, destination: str | Path) -> None:
         # The destination is complete and published; a leftover staging name
         # is not a reason to report the download as failed.
         source.unlink()
+
+
+def replace_file(
+    temporary: str | Path, destination: str | Path, *, mode: int | None = None
+) -> None:
+    """Replace ``destination`` with ``temporary`` in one atomic rename.
+
+    Use this only for a path this tool owns and intends to rewrite, such as the
+    saved credentials. A reader therefore sees the old document or the new one,
+    never a partial write. ``mode`` is applied to the staged file before the
+    rename, so the destination never exists with wider permissions than asked
+    for. On POSIX this restricts the file; on Windows it only toggles the
+    read-only bit, so the profile directory ACL remains the real boundary.
+    """
+    source = Path(temporary)
+    target = Path(destination)
+    if mode is not None:
+        with contextlib.suppress(OSError):
+            os.chmod(source, mode)
+    try:
+        os.replace(source, target)
+    except OSError:
+        raise AtlaWireError(_UNPUBLISHED) from None

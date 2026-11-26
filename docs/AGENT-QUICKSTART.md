@@ -157,6 +157,21 @@ On the BBK host, the saved-file mode needs no credential options:
 C:/Python315/python.exe -P -B -m atlawire jira-me
 ```
 
+**Saving a token for the human.** `login` reads the token from a prompt without
+echo, so it never becomes an argument, a shell-history entry, or output:
+
+```shell
+C:/Python315/python.exe -P -B -m atlawire login --product jira
+```
+
+Run it in a terminal the human controls and let them type. Ask for the product
+and base URL, open the product in the browser, and guide the human to
+Profile picture → Profile → **Personal Access Tokens** (Jira), Profile picture →
+Settings → **Personal Access Tokens** (Confluence), or Profile picture →
+**Manage account** → **HTTP access tokens** (Bitbucket). The command checks the
+token before saving; confirm afterwards with `atlawire whoami`. Never ask a human
+to paste a token into chat, a file, or a command argument.
+
 **Environment (explicit).** Pass `--token-from-env` to use environment-only mode;
 AtlaWire then does not open the saved file. Set both variables in the invoking
 shell and keep the pair together:

@@ -10,6 +10,27 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.9] - 2026-11-25
+
+### Added
+
+- **`atlawire login --product <name>`** reads a personal access token from a
+  prompt without echo and saves it as the same `<product>_url` /
+  `<product>_token` pair the read commands load. The token is never an argument,
+  so it cannot reach shell history, a process list, this tool's output, or an
+  error message. The command verifies the token with the product's documented
+  identity read unless `--no-verify` is given, and it saves only after the check
+  succeeds. Entries for other products, and unrelated keys, are preserved; a
+  saved file that cannot be read as a JSON object is refused instead of
+  replaced, because it may hold another product's token. The write is staged
+  beside the destination and renamed into place with owner-only permissions.
+- `atlawire.credentials.save_credentials` exposes the same write for library
+  callers, and `atlawire.file_publication.replace_file` provides the atomic
+  rename with a requested mode.
+- README documents how to obtain a read-only personal access token per product
+  (official menu paths and links) and the four-step workflow for an agent
+  helping a human save one.
+
 ## [0.9.8] - 2026-11-25
 
 ### Changed
