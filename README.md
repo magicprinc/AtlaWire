@@ -135,6 +135,10 @@ unrelated keys are preserved, and a saved file that cannot be read as a JSON
 object is refused rather than overwritten. The file is staged beside the
 destination and renamed into place with owner-only permissions.
 
+Run it in a real terminal window. A hidden prompt cannot read a pipe or a
+redirected file — on Windows it reads the console directly — so with a piped
+stdin the command refuses instead of blocking forever.
+
 Create the token with the smallest permissions that still let the agent read
 what it needs. A read-only token is what makes the read-only promise enforced by
 the server rather than only by this tool.

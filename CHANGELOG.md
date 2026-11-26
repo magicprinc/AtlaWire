@@ -31,6 +31,14 @@ the read-only surface: the initial command batch, the agent-facing batch (commit
   (official menu paths and links) and the four-step workflow for an agent
   helping a human save one.
 
+### Fixed
+
+- `login` refuses a piped or redirected stdin with an explanatory error instead
+  of blocking forever. On Windows a hidden prompt reads the console directly
+  rather than standard input, so a piped token was never consumed and the
+  command waited indefinitely. A hidden prompt is now offered only when standard
+  input is a terminal.
+
 ## [0.9.8] - 2026-11-25
 
 ### Changed

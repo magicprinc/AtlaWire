@@ -7,6 +7,9 @@ __pycache__/
 # Build and distribution artifacts
 build/
 dist/
+# Install trees published for testing: target/<version>/ holds one installed copy
+# of the package, rebuilt from the wheel for every release.
+/target/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/

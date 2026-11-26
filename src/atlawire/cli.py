@@ -1481,6 +1481,12 @@ def login_command(
     hold another product's token.
     """
     resolved_url = _login_base_url(product, base_url, allow_http_loopback)
+    if not _stdin_is_interactive():
+        raise click.ClickException(
+            "A hidden token prompt needs an interactive terminal. "
+            "Run this command in your own terminal window: a piped or "
+            "redirected stdin is never read, so the command would block."
+        )
     click.echo(
         f"Create a token in {product}: {_LOGIN_HINTS[product]}",
         err=True,
@@ -1508,6 +1514,29 @@ def login_command(
             ensure_ascii=False,
         )
     )
+
+
+def _stdin_is_interactive() -> bool:
+    """Return True only when a hidden prompt can actually be answered.
+
+    On Windows ``getpass`` reads the console through ``msvcrt`` rather than
+    standard input, so a piped or redirected token is never consumed and the
+    command blocks instead of failing. A hidden prompt is therefore offered only
+    for a real terminal.
+
+    A stream without a file descriptor has no console either: the Click test
+    runner wraps a ``BytesIO``, whose ``fileno`` raises. Treating that as
+    interactive keeps the tests exercising the prompt itself instead of the
+    refusal.
+    """
+    stream = sys.stdin
+    if stream is None:
+        return False
+    try:
+        descriptor = stream.fileno()
+    except AttributeError, OSError, ValueError:
+        return True
+    return os.isatty(descriptor)
 
 
 # Official menu paths. A direct URL differs between product versions, so the

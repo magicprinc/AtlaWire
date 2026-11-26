@@ -2,6 +2,9 @@
 
 import json
 import os
+import pathlib
+import subprocess
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -15,6 +18,7 @@ from atlawire.http import AtlaWireError
 TOKEN = "synthetic-login-token-abc"
 OTHER = "synthetic-other-product-token"
 JIRA_URL = "https://jira.example.com"
+SOURCE = pathlib.Path(__file__).resolve().parents[1] / "src"
 
 
 @pytest.fixture
@@ -182,3 +186,44 @@ def test_a_rejected_token_is_not_saved(credentials_file, jira_server):
     assert result.exit_code != 0
     assert not credentials_file.exists()
     assert "wrong-token" not in result.output
+
+
+def test_a_piped_stdin_is_refused_instead_of_blocking(credentials_file):
+    """Real subprocess: a hidden prompt cannot read a pipe, so it must not try.
+
+    On Windows ``getpass`` goes to the console even when stdin is a pipe, so
+    without this guard the command waits forever. The timeout turns a
+    regression into a failure instead of a hang.
+    """
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(SOURCE)
+    environment["BBK_CREDENTIALS"] = str(credentials_file)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            "-m",
+            "atlawire",
+            "login",
+            "--product",
+            "jira",
+            "--base-url",
+            JIRA_URL,
+            "--no-verify",
+        ],
+        input=f"{TOKEN}\n",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=environment,
+        timeout=120,
+        check=False,
+    )
+
+    assert completed.returncode != 0
+    assert "interactive terminal" in completed.stderr
+    assert TOKEN not in completed.stdout
+    assert TOKEN not in completed.stderr
+    assert not credentials_file.exists()
