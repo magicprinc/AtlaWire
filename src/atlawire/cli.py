@@ -186,7 +186,7 @@ from atlawire.jira import (
     list_status_categories,
     list_statuses,
     list_transitions,
-    search_issues,
+    search_issues_with_metadata,
     search_raw,
     search_users,
     titles,
@@ -293,18 +293,55 @@ def _error_envelope(
     }
 
 
-def _emit_catalog(context: click.Context) -> None:
+def _emit_catalog(context: click.Context, *, brief: bool = False) -> None:
     """Print the command catalog as one JSON document and exit.
 
     The catalog is derived from Click metadata plus the operation registry.
     No product URL or token is resolved, so neither the saved BBK file nor the
     environment is read and no network request is made.
+
+    ``brief`` prints the same facts without the parameter schema: one line per
+    command and operation IDs grouped by product. The full document is several
+    hundred kilobytes and too large to read; the brief one is what a caller
+    reads to choose a command, then asks `--describe <id>` for the details.
     """
     group = cast(click.Group, context.command)
     catalog = build_command_catalog(group)
-    catalog["operations"] = canonical_operations()
+    if brief:
+        catalog = _brief_catalog(catalog)
+    else:
+        catalog["operations"] = canonical_operations()
     click.echo(json.dumps(catalog))
     context.exit()
+
+
+def _brief_catalog(catalog: dict[str, object]) -> dict[str, object]:
+    """Keep only what choosing a command needs: names, one-line help, IDs.
+
+    The full catalog carries every parameter, type and default — several hundred
+    kilobytes. A caller that just needs to know *which* command exists reads this
+    instead, then asks `--describe <id>` for the details of the one it picked.
+    """
+    commands = cast(dict[str, dict[str, object]], catalog.get("commands") or {})
+    by_product: dict[str, list[str]] = {}
+    for entry in list_operations():
+        by_product.setdefault(str(entry["product"]), []).append(str(entry["id"]))
+    return {
+        "name": catalog.get("name"),
+        "help": catalog.get("help"),
+        "usage": (
+            "ask --describe <operation-id> for one operation's arguments, or "
+            "<command> --help for one command's options"
+        ),
+        "commands": {
+            name: entry.get("help") for name, entry in sorted(commands.items())
+        },
+        "operations": {product: ids for product, ids in sorted(by_product.items())},
+        "counts": {
+            "commands": len(commands),
+            "operations": sum(len(ids) for ids in by_product.values()),
+        },
+    }
 
 
 def _emit_description(context: click.Context, value: str) -> None:
@@ -382,6 +419,11 @@ def _reject_conflicting_root_actions(
     help="Print every command, parameter and canonical operation as JSON.",
 )
 @click.option(
+    "--brief",
+    is_flag=True,
+    help="With --catalog, print command names and operation IDs only, not their schema.",
+)
+@click.option(
     "--describe",
     "describe_id",
     metavar="OPERATION_ID",
@@ -399,6 +441,7 @@ def cli(
     context: click.Context,
     show_version: bool,
     catalog: bool,
+    brief: bool,
     describe_id: str | None,
     show_help: bool,
 ) -> None:
@@ -430,7 +473,7 @@ def cli(
         if describe_id is not None:
             _emit_description(context, describe_id)
         if catalog:
-            _emit_catalog(context)
+            _emit_catalog(context, brief=brief)
     if context.invoked_subcommand is None:
         click.echo(context.get_help())
 
@@ -1791,6 +1834,16 @@ def _verify_login(
 @click.option("--project", default=None, help="Limit results to one project key.")
 @click.option("--repo", default=None, help="Limit results to one KEY/slug.")
 @click.option(
+    "--context",
+    "context_lines",
+    type=click.IntRange(0, 100),
+    default=None,
+    help=(
+        "With --json, keep at most this many before/after context lines per hit "
+        "and drop the rest; 0 drops context entirely. Omitted keeps every line."
+    ),
+)
+@click.option(
     "--limit",
     type=click.IntRange(BB_SEARCH_LIMIT_MIN, BB_SEARCH_LIMIT_MAX),
     default=None,
@@ -1813,6 +1866,7 @@ def search_command(
     query: str,
     project: str | None,
     repo: str | None,
+    context_lines: int | None,
     limit: int | None,
     every_page: bool,
     base_url: str | None,
@@ -1823,7 +1877,10 @@ def search_command(
     """Search indexed Bitbucket code, optionally scoped to a project or repo.
 
     Without --all only the first result page is read. With --all the call
-    follows pages up to the row limit or the server's terminal page.
+    follows pages up to the row limit or the server's terminal page. Every row
+    carries its own context block, which dominates the payload, so --context
+    bounds it: this lane locates a file, and the file itself is read afterwards
+    with `file` or `grep-repo` at a pinned ref.
     """
     if project is not None and repo is not None:
         raise click.UsageError("Use --project or --repo, not both.")
@@ -1849,7 +1906,7 @@ def search_command(
             allow_http_loopback=allow_http_loopback,
         )
         if as_json:
-            rendered = json.dumps(rows)
+            rendered = json.dumps(_bounded_context(rows, context_lines))
         else:
             rendered = _render_search_results(rows, every_page=every_page)
         reject_credential_echo(rendered, tokens=(token,))
@@ -2715,6 +2772,25 @@ def _print_commits(rows: list[Commit], *, as_json: bool) -> None:
         message = " ".join(row["message"].split())[:_COMMIT_MESSAGE_MAX]
         values = (row["id"], row["date"], row["author"], message)
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+def _bounded_context(
+    rows: list[SearchRow], limit: int | None
+) -> list[dict[str, object]]:
+    """Keep at most ``limit`` lines of each context group; ``None`` keeps all.
+
+    Only the structured lane is affected, and only the surrounding lines: the
+    ``hits`` are the match evidence and are never trimmed. ``0`` empties every
+    group, which is what a caller that only needs the file location asks for.
+    """
+    if limit is None:
+        return [cast(dict[str, object], row) for row in rows]
+    bounded: list[dict[str, object]] = []
+    for row in rows:
+        trimmed = cast(dict[str, object], dict(row))
+        trimmed["context"] = [list(group[:limit]) for group in row.get("context") or []]
+        bounded.append(trimmed)
+    return bounded
 
 
 def _render_search_results(rows: list[SearchRow], *, every_page: bool) -> str:
@@ -4681,7 +4757,10 @@ def issue_link(
 @click.argument("query")
 @_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
-    "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Print rows plus truncation metadata as one JSON object instead of TSV.",
 )
 @click.option(
     "--limit",
@@ -4718,14 +4797,25 @@ def jql(
 ) -> None:
     """Search Jira with JQL and print short issue rows.
 
-    Without --fields/--expand one paginated search is projected to short rows
-    (TSV, or a JSON array with --json). Either option switches to one raw search
-    request: --limit becomes maxResults, --fields is sent verbatim when given
-    (the projection fields otherwise), --expand is sent verbatim, and the
-    unprojected JSON envelope is printed.
+    Without --fields/--expand one paginated search is projected to short rows:
+    TSV by default, or ``{"rows", "truncated", "total"}`` with --json. The
+    server's ``total`` is carried through, so a capped read never looks complete
+    — a limit that stops short of it prints a note on stderr naming the shown and
+    total counts. Either option switches to one raw search request instead:
+    --limit becomes maxResults, --fields is sent verbatim when given (the
+    projection fields otherwise), --expand is sent verbatim, and the unprojected
+    JSON envelope is printed.
     """
     if not query.strip():
         raise click.UsageError("Provide a non-empty JQL query.")
+    if as_json and (fields is not None or expand is not None):
+        # Both cannot be honoured: --fields/--expand answer with the server's raw
+        # search envelope, so --json would be silently ignored. Refusing keeps
+        # the output shape the caller asked for instead of changing it quietly.
+        raise click.UsageError(
+            "Use --json without --fields/--expand: those options print the raw "
+            "search envelope instead of the short-row projection."
+        )
     base_url, token = _product_base_url_and_token(
         "jira", base_url, token_from_env, allow_http_loopback
     )
@@ -4745,7 +4835,7 @@ def jql(
         click.echo(json.dumps(envelope))
         return
     try:
-        rows = search_issues(
+        found = search_issues_with_metadata(
             base_url,
             query,
             token=token,
@@ -4754,21 +4844,29 @@ def jql(
         )
     except AtlaWireError as exc:
         raise _click_error(exc) from None
+    rows = found["rows"]
     if as_json:
-        click.echo(json.dumps(rows))
-        return
-    click.echo(f"# {len(rows)} row(s)\n{_JQL_COLUMNS}")
-    for row in rows:
-        values = (
-            row["key"],
-            row["status"],
-            row["type"],
-            row["priority"],
-            row["assignee"],
-            row["updated"],
-            row["summary"],
+        click.echo(json.dumps(found))
+    else:
+        click.echo(f"# {len(rows)} row(s)\n{_JQL_COLUMNS}")
+        for row in rows:
+            values = (
+                row["key"],
+                row["status"],
+                row["type"],
+                row["priority"],
+                row["assignee"],
+                row["updated"],
+                row["summary"],
+            )
+            click.echo("\t".join(map(_tsv_cell, values)))
+    if found["truncated"]:
+        total = found["total"]
+        click.echo(
+            f"# showing {len(rows)} of {total if total is not None else 'an unknown number of'}"
+            " issue(s); the search is truncated.",
+            err=True,
         )
-        click.echo("\t".join(map(_tsv_cell, values)))
 
 
 @cli.command()

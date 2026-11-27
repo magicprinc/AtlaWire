@@ -5,6 +5,9 @@ AtlaWire — read-only CLI к Jira, Confluence, Bitbucket. Никаких зап
 
 Правила:
 - Источник истины по командам и флагам — `atlawire --catalog` и `atlawire <cmd> --help`.
+  `--catalog` печатает полную схему (сотни КБ). Чтобы просто узнать, что есть, бери
+  `atlawire --catalog --brief`: имена команд с одной строкой помощи и id операций по
+  продуктам, ~35 КБ. Детали выбранной операции — `atlawire --describe <id>` (~1.5 КБ).
   `--json` принимает каждая команда, кроме `attachment-get` (там `--base64`/`--out`);
   где JSON и так единственный вывод, флаг ничего не меняет.
 - Нет типизированной команды под задачу — есть реестр: `atlawire operations` печатает
@@ -43,7 +46,7 @@ AtlaWire — read-only CLI к Jira, Confluence, Bitbucket. Никаких зап
 | Задача | Команда | Что вернётся |
 |---|---|---|
 | Найти мои задачи | `atlawire mine --limit 20 --json` | JSON-массив коротких строк: `key`, `status`, `type`, `priority`, `assignee`, `updated`, `summary` |
-| Статус и название задачи | `atlawire jql "key = DEMO-42" --json` | одна короткая строка с `status` и `summary`; полная карточка — `atlawire issue DEMO-42` (сырой JSON с `fields` + `renderedFields`) |
+| Статус и название задачи | `atlawire jql "key = DEMO-42" --json` | `{"rows": [...], "truncated": bool, "total": int}`; карточка целиком — `atlawire issue DEMO-42` (12 КБ) или коротко `atlawire issue DEMO-42 --fields summary,status` (0.5 КБ) |
 | Комментарии и история задачи | `atlawire issue-comments DEMO-42 --json`; `atlawire issue-changelog DEMO-42` | `{"rows": [...], "truncated": bool, "total": int}`; changelog — сырой документ `{startAt, maxResults, total, histories}`, одна серверная страница |
 | Комментарии страницы Confluence | `atlawire page-comments 12345 --json` | `{"rows": [...], "truncated": bool, "total": int}`; в библиотеке — `confluence.get_page_comments` |
 | Версии страницы Confluence | `atlawire page-history 12345 --json`; `atlawire page-version 12345 --version 4 --json` | список версий со сводками; одна запрошенная версия отдельно; в библиотеке — `confluence.get_page_history`, `get_page_version` |
@@ -51,11 +54,40 @@ AtlaWire — read-only CLI к Jira, Confluence, Bitbucket. Никаких зап
 | Diff по нескольким файлам PR одним вызовом | `atlawire pr DEMO/widgets 7 diff src/a.py src/b.py src/c.py` (в библиотеке — `get_pull_request_diffs`, текст — `get_pull_request_diffs_text`) | один вызов N файлов в порядке аргументов; `--json` — массив объектов diff; из библиотеки один вызов возвращает список |
 | Файл в репозитории | `atlawire file DEMO/widgets src/app.py --at main` | точный UTF-8 текст файла на ревизии; список путей — `files` / `ls` |
 | Кто менял файл (blame) | `atlawire blame DEMO/widgets src/app.py --at main --json` | массив `{line, author, email, date, commit}` по строкам |
-| Поиск по коду | `atlawire grep DEMO/widgets "WidgetService" --at main --glob '*.java' --json`; `atlawire search "WidgetService" --repo DEMO/widgets --json` | `grep`: `GrepResult` с `hits`, `truncated`, `complete`, `status`; `search`: индексные строки с `matchEvidence` (`highlight` — совпадение, `context-only`/`none` — нет; индекс обычно только default-ветка). `grep` читает каждый файл по HTTP и потому линеен по объёму репозитория: на одном стенде полный репозиторий занял ~35 с, тогда как индексный `search` — доли секунды. Для поиска «где встречается» сначала `search`/`repo-search --engine index`, а `grep` — когда нужен точный regex или файл вне индекса; сужайте `--glob`/PATH |
+| Поиск по коду | `atlawire grep DEMO/widgets "WidgetService" --at main --glob '*.java' --json`; `atlawire search "WidgetService" --repo DEMO/widgets --json --context 0` | `grep`: `GrepResult` с `hits`, `truncated`, `complete`, `status`; `search`: индексные строки с `matchEvidence` (`highlight` — совпадение, `context-only`/`none` — нет; индекс обычно только default-ветка). У `search --json` каждая строка несёт контекст, и он же — 60% объёма: `--context 0` оставляет только совпадения (69 КБ → 28 КБ), `--context N` — N строк вокруг. `grep` читает каждый файл по HTTP и потому линеен по объёму репозитория: на одном стенде полный репозиторий занял ~35 с, тогда как индексный `search` — доли секунды. Для поиска «где встречается» сначала `search`/`repo-search --engine index`, а `grep` — когда нужен точный regex или файл вне индекса; сужайте `--glob`/PATH |
 | Поиск по многим репозиториям | `atlawire repo-search "WidgetService" --project DEMO --engine index --json`; `atlawire repo-search "Widget\\w+" --max-repos 10 --engine bytes --json` | `{rows, engine, status, truncated, complete, repositories_scanned, repositories_total, budget}`; `index` — один быстрый поиск плагина, `bytes` — regex по default-веткам, `--fetch archive` — один zip на репозиторий |
 | Страница Confluence в Markdown | `atlawire page 12345 --markdown` | Markdown со ссылками, картинками и параметрами макросов; сырой storage XHTML — `--storage`, JSON — по умолчанию |
 | Проверить доступ | `atlawire whoami --json` (алиас `atlawire selftest --json`) | по записи на продукт; exit 0 только если все три `ok: true`, иначе 1 |
 | Что делать при обрезке | смотри `truncated`, `complete`, `total`, `status` в JSON | `truncated=true` / `complete=false` значит «могло быть больше»: сузь запрос, подними `--limit`/`--max-pages`, для постраничных команд передай следующий `--start`; короткий список без признака обрезки не доказывает полноту |
+
+## Рецепт: «кто использует X, где код, какие тикеты, кто делал, где дока»
+
+Одной команды для этого нет и не нужно: четыре вызова ниже **независимы** — запускай их
+**параллельно** (одним ходом, четырьмя потоками) и склеивай по общему термину. Одна
+команда-«всё» считала бы их последовательно и была бы медленнее; к тому же агент видит,
+откуда каждая часть ответа, и может не делать лишних.
+
+```shell
+# 1. Где код: индексный поиск по всем репозиториям (низкий --limit — это локатор)
+atlawire repo-search "WidgetService" --engine index --limit 10 --json
+
+# 2. Какие тикеты это задевают (короткая проекция, total виден)
+atlawire jql 'text ~ "WidgetService" ORDER BY updated DESC' --limit 20 --json
+
+# 3. Какая дока это описывает
+atlawire cql 'text ~ "WidgetService"' --limit 10 --json
+
+# 4. Кто и когда менял — по конкретному репозиторию из шага 1
+atlawire commits DEMO/widgets --limit 20 --json
+```
+
+Порядок склейки: шаг 1 даёт `PROJECT/slug:file`, из него берутся `DEMO/widgets` для шагов
+2–4 и `--at <commit>` для точного чтения (`file`, `grep`, `blame`). Бюджет на реальном
+стенде: 4 вызова ≈ 20–60 КБ суммарно против 81 КБ у последовательного «собери всё руками»
+и против одного 69 КБ `search --json`, если не сузить контекст.
+
+Если ответ нужен по одному продукту, шаги 2 и 3 заменяются на `issue`/`page`; если нужен
+только код — хватит шага 1 и затем `file`/`grep` на закреплённом коммите.
 
 ## Реальные вызовы
 

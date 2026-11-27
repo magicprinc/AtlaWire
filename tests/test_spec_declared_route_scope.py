@@ -32,6 +32,12 @@ def server():
         protocol_version = "HTTP/1.0"
 
         def _reply(self):
+            # Read the POST body before answering: a response on a connection
+            # with an unread body is reset on some platforms, which looked like
+            # an intermittent transport failure in the product under test.
+            length = int(self.headers.get("Content-Length") or 0)
+            if length:
+                self.rfile.read(length)
             self.server.calls.append(self.path)
             body = b'{"ok": true}'
             self.send_response(200)
@@ -47,6 +53,7 @@ def server():
             pass
 
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    httpd.daemon_threads = True
     httpd.calls = []
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
