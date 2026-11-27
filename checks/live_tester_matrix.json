@@ -1,0 +1,3278 @@
+[
+  {
+    "id": "bitbucket.admin.cluster",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.groups",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.groups.more-members",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.groups.more-non-members",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.license",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.mail-server",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.mail-server.sender-address",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.permissions.groups",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.permissions.groups.none",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.permissions.users",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.permissions.users.none",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.pull-requests.scmid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.admin.users",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.users.more-members",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.admin.users.more-non-members",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.application-properties",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.dashboard.pull-request-suggestions",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.dashboard.pull-requests",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.groups",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.hooks.avatar",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.inbox.pull-requests",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.inbox.pull-requests.count",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.logs.logger.loggername",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.logs.rootlogger",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.profile.recent-repositories",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "repos"
+    ],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.project.avatar",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.project.get",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "projects"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "projects"
+    ],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.projects.projectkey.permissions.groups",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects.projectkey.permissions.groups.none",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects.projectkey.permissions.permission.all",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.permissions.users",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects.projectkey.permissions.users.none",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "repos"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.branches",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "branches"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.browse",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.browse.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.changes",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "commits"
+    ],
+    "wadl_documented": true,
+    "query_fields": 7,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "commits"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.changes",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.comments.commentid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 4
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 4
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.compare.diff-path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.files",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "files"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.files.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "files"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "last-modified"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "last-modified"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.groups",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.groups.none",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.users",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.users.none",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.changes",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments.commentid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 4
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.commits",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "commits"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 7,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 7,
+    "path_arguments": 4
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.merge",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.participants",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks.count",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.raw.path",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks.hookkey",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks.hookkey.settings",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.pull-requests",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.tags",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "tags"
+    ],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.tags.name",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "tags"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.latest",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.statistics",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.statistics.summary",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.projects.projectkey.settings.hooks",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.projects.projectkey.settings.hooks.hookkey",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.settings.hooks.hookkey.settings",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.projects.projectkey.settings.pull-requests.scmid",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repos",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "repos"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.repository.archive",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.commit-comments",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.repository.compare-changes",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.compare-commits",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "commits"
+    ],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.default-branch",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.forks",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.get",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "repos"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.participants",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.pull-request-activity",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 3
+  },
+  {
+    "id": "bitbucket.repository.raw",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.repository.related",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 2
+  },
+  {
+    "id": "bitbucket.task.get",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.user.get",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "bitbucket.users.list",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "bitbucket.users.userslug.settings",
+    "product": "bitbucket",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.accessmode",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.audit",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.audit.retention",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.audit.since",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.content.attachments",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.by-title",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 8,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.content.children",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.convert",
+    "product": "confluence",
+    "method": "POST",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id.child.comment",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id.child.type",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 2
+  },
+  {
+    "id": "confluence.content.id.descendant",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id.descendant.type",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 2
+  },
+  {
+    "id": "confluence.content.id.history",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id.history.version.macro.hash.hash",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "confluence.content.id.history.version.macro.id.macroid",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "confluence.content.id.label",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id.property.key",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "confluence.content.id.restriction.byoperation",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.id.restriction.byoperation.operationkey",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 2
+  },
+  {
+    "id": "confluence.content.properties",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.content.search",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.group",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.group.groupname",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.group.groupname.member",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.longtask",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.longtask.id",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.search",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 7,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.space",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "space"
+    ],
+    "wadl_documented": true,
+    "query_fields": 8,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.space.content",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "space-content"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.space.get",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "space"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.space.spacekey.content.type",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "space-content"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 2
+  },
+  {
+    "id": "confluence.space.spacekey.property",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.space.spacekey.property.key",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "confluence.user.anonymous",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.user.current",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.user.get",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.user.memberof",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.user.watch.content.contentid",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.user.watch.space.spacekey",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "space"
+    ],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.webhooks",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "confluence.webhooks.webhookid",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.webhooks.webhookid.latest",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.webhooks.webhookid.statistics",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "confluence.webhooks.webhookid.statistics.summary",
+    "product": "confluence",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.application-properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.application-properties.advanced-settings",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.applicationrole",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.applicationrole.key",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.attachment.content",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": false,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.attachment.expand.raw",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.attachment.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.attachment.id.expand.human",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.attachment.meta",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.auditing.record",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 7,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.avatar.system",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.cluster.nodes",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.cluster.zdu.state",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.comment.commentid.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.comment.commentid.properties.propertykey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.component.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.component.id.relatedissuecounts",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.configuration",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.customfieldoption.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.customfields",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 9,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.dashboard.dashboardid.items.itemid.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.dashboard.dashboardid.items.itemid.properties.propertykey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 3
+  },
+  {
+    "id": "jira.dashboard.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.dashboard.list",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.email-templates.types",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.field.list",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.filter.defaultsharescope",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.filter.favourites",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.filter.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.filter.id.columns",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.filter.id.permission",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.filter.id.permission.permissionid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.group",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.group.member",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.groups.picker",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.groupuserpicker",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.index.summary",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issue-link.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.comment.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-comment"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.issue.createmeta",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issue.createmeta.projectidorkey.issuetypes",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.createmeta.projectidorkey.issuetypes.issuetypeid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.issue.issueidorkey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue"
+    ],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.comment",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-comment"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.editmeta",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-properties"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.properties.propertykey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-properties"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.issue.issueidorkey.remotelink",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.remotelink.linkid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.issue.issueidorkey.subtask",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.transitions",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "transitions"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.issueidorkey.worklog",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-worklog"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.picker",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issue.votes",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-votes"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.watchers",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-watchers"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issue.worklog.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "issue-worklog"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.issuelinktype",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issuelinktype.issuelinktypeid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issuesecurityschemes",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issuesecurityschemes.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issuetype",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issuetype.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issuetype.id.alternatives",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issuetype.issuetypeid.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issuetype.issuetypeid.properties.propertykey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.issuetypescheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.issuetypescheme.schemeid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.issuetypescheme.schemeid.associations",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.jql.autocomplete",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.jql.autocompletedata.suggestions",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.monitoring.jmx.aremetricsexposed",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.monitoring.jmx.getavailablemetrics",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.mypermissions.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.mypreferences",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.myself",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.notificationscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.notificationscheme.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.password.policy",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.permissions",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.permissionscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.permissionscheme.permissionschemeid.attribute.attributekey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.permissionscheme.schemeid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.permissionscheme.schemeid.permission",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.permissionscheme.schemeid.permission.permissionid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.priority",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.priority.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.priorityschemes",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.priorityschemes.schemeid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "project"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.project.components",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "project"
+    ],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectidorkey.avatars",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectidorkey.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectidorkey.properties.propertykey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.project.projectidorkey.role.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.project.projectidorkey.version",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectkeyorid.issuesecuritylevelscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectkeyorid.notificationscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectkeyorid.permissionscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectkeyorid.priorityscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectkeyorid.securitylevel",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.projectkeyorid.workflowscheme",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.roles",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.statuses",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "statuses"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.type",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.project.type.projecttypekey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.type.projecttypekey.accessible",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.project.versions",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.projectcategory",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.projectcategory.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.projects.picker",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.projectvalidate.key",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.reindex",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.reindex.progress",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.reindex.request.bulk",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.reindex.request.requestid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.resolution",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.resolution.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.rest.auth.1.session",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": false,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.role",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.role.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.role.id.actors",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.screens",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.screens.screenid.availablefields",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.screens.screenid.tabs",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.screens.screenid.tabs.tabid.fields",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.search",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.search.post",
+    "product": "jira",
+    "method": "POST",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.securitylevel.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.serverinfo",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.settings.columns",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.status",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.status.idorname",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.statuscategory",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.statuscategory.idorkey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.terminology.entries",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.terminology.entries.originalname",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.universal-avatar.type.type.owner.owningobjectid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.upgrade",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.a11y.personal-settings",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.anonymization",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.anonymization.progress",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.anonymization.rerun",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.assignable-search",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.assignable.multiprojectsearch",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.avatars",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.columns",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.duplicated.count",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.duplicated.list",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.get",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 3,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.permission.search",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 6,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.picker",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.properties.propertykey",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.user.search",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 5,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.user.viewissue.search",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [
+      "search"
+    ],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.version.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.version.id.relatedissuecounts",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.version.id.unresolvedissuecount",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.version.remotelink",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.version.versionid.remotelink",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.version.versionid.remotelink.globalid",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.workflow",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.workflow.transitions.id.properties",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 4,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.workflowscheme.id",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.workflowscheme.id.default",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.workflowscheme.id.draft",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.workflowscheme.id.draft.default",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.workflowscheme.id.draft.issuetype.issuetype",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.workflowscheme.id.draft.workflow",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.workflowscheme.id.issuetype.issuetype",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 2
+  },
+  {
+    "id": "jira.workflowscheme.id.workflow",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 2,
+    "path_arguments": 1
+  },
+  {
+    "id": "jira.worklog.deleted",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.worklog.list",
+    "product": "jira",
+    "method": "POST",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 0,
+    "path_arguments": 0
+  },
+  {
+    "id": "jira.worklog.updated",
+    "product": "jira",
+    "method": "GET",
+    "python_api": true,
+    "cli_commands": [],
+    "wadl_documented": true,
+    "query_fields": 1,
+    "path_arguments": 0
+  }
+]

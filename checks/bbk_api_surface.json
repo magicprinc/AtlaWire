@@ -1,0 +1,1403 @@
+[
+  {
+    "file": "__init__.py",
+    "lines": 100,
+    "functions": [
+      [
+        "whoami",
+        76,
+        0,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "__main__.py",
+    "lines": 9,
+    "functions": [],
+    "classes": []
+  },
+  {
+    "file": "agent_hub.py",
+    "lines": 544,
+    "functions": [
+      [
+        "validated_text",
+        50,
+        2,
+        false,
+        false
+      ],
+      [
+        "validated_page_size",
+        142,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "HubConflict",
+      "LeaseLost",
+      "Lease",
+      "Workplace",
+      "SlotsPage",
+      "Hub"
+    ]
+  },
+  {
+    "file": "atlawire_transport.py",
+    "lines": 90,
+    "functions": [
+      [
+        "request_once",
+        54,
+        4,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "attachments.py",
+    "lines": 17,
+    "functions": [
+      [
+        "attachment_download",
+        11,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "audit.py",
+    "lines": 606,
+    "functions": [
+      [
+        "audit_write",
+        142,
+        3,
+        false,
+        false
+      ],
+      [
+        "tech_event",
+        156,
+        2,
+        false,
+        false
+      ],
+      [
+        "tech_query",
+        172,
+        2,
+        false,
+        false
+      ],
+      [
+        "people_event",
+        186,
+        2,
+        false,
+        false
+      ],
+      [
+        "people_day",
+        204,
+        1,
+        false,
+        false
+      ],
+      [
+        "titles_cached",
+        212,
+        1,
+        false,
+        false
+      ],
+      [
+        "titles_store",
+        222,
+        1,
+        false,
+        false
+      ],
+      [
+        "chat_claim",
+        240,
+        6,
+        false,
+        false
+      ],
+      [
+        "chat_replied",
+        267,
+        1,
+        false,
+        false
+      ],
+      [
+        "chat_history",
+        282,
+        1,
+        false,
+        false
+      ],
+      [
+        "chat_purge",
+        293,
+        1,
+        false,
+        false
+      ],
+      [
+        "set_agent_name",
+        532,
+        1,
+        false,
+        false
+      ],
+      [
+        "agent_identity",
+        547,
+        0,
+        false,
+        false
+      ],
+      [
+        "audit_tail",
+        603,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "bitbucket.py",
+    "lines": 317,
+    "functions": [
+      [
+        "search_code",
+        39,
+        1,
+        false,
+        false
+      ],
+      [
+        "projects",
+        102,
+        0,
+        false,
+        false
+      ],
+      [
+        "repos",
+        109,
+        1,
+        false,
+        false
+      ],
+      [
+        "list_files",
+        116,
+        1,
+        false,
+        false
+      ],
+      [
+        "file_at",
+        124,
+        2,
+        false,
+        false
+      ],
+      [
+        "repos_with_extension",
+        133,
+        1,
+        false,
+        false
+      ],
+      [
+        "pr",
+        170,
+        2,
+        false,
+        false
+      ],
+      [
+        "pr_files",
+        176,
+        2,
+        false,
+        false
+      ],
+      [
+        "pr_diff",
+        183,
+        2,
+        false,
+        false
+      ],
+      [
+        "pr_file",
+        212,
+        3,
+        false,
+        false
+      ],
+      [
+        "pr_comments",
+        235,
+        2,
+        false,
+        false
+      ],
+      [
+        "pr_compact",
+        253,
+        2,
+        false,
+        false
+      ],
+      [
+        "my_prs",
+        258,
+        1,
+        false,
+        false
+      ],
+      [
+        "prs",
+        294,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "calendar.py",
+    "lines": 169,
+    "functions": [
+      [
+        "fetch_ics",
+        47,
+        0,
+        false,
+        false
+      ],
+      [
+        "parse_ics",
+        101,
+        1,
+        false,
+        false
+      ],
+      [
+        "events",
+        138,
+        0,
+        false,
+        false
+      ],
+      [
+        "meetings",
+        160,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "calendar_store.py",
+    "lines": 107,
+    "functions": [
+      [
+        "store_ics_url",
+        42,
+        1,
+        false,
+        false
+      ],
+      [
+        "load_ics_url",
+        76,
+        0,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "calendar_ticket.py",
+    "lines": 95,
+    "functions": [
+      [
+        "keywords",
+        33,
+        1,
+        false,
+        false
+      ],
+      [
+        "strong_terms",
+        50,
+        1,
+        false,
+        false
+      ],
+      [
+        "meetings_for_ticket",
+        62,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "chat_guard.py",
+    "lines": 89,
+    "functions": [
+      [
+        "config",
+        37,
+        0,
+        false,
+        false
+      ],
+      [
+        "allowed_space",
+        45,
+        0,
+        false,
+        false
+      ],
+      [
+        "is_allowed",
+        50,
+        1,
+        false,
+        false
+      ],
+      [
+        "require_allowed",
+        60,
+        1,
+        false,
+        false
+      ],
+      [
+        "save",
+        70,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "checkpoint_decision.py",
+    "lines": 75,
+    "functions": [
+      [
+        "decide",
+        50,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "Checkpoint",
+      "Observation",
+      "Decision"
+    ]
+  },
+  {
+    "file": "cli.py",
+    "lines": 579,
+    "functions": [
+      [
+        "build",
+        44,
+        0,
+        false,
+        false
+      ],
+      [
+        "main",
+        238,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "config.py",
+    "lines": 78,
+    "functions": [
+      [
+        "credentials",
+        39,
+        0,
+        false,
+        false
+      ],
+      [
+        "service",
+        52,
+        1,
+        false,
+        false
+      ],
+      [
+        "require_token",
+        64,
+        1,
+        false,
+        false
+      ],
+      [
+        "redact",
+        72,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "BbkError"
+    ]
+  },
+  {
+    "file": "confluence.py",
+    "lines": 155,
+    "functions": [
+      [
+        "page_id",
+        24,
+        1,
+        false,
+        false
+      ],
+      [
+        "page",
+        36,
+        1,
+        false,
+        false
+      ],
+      [
+        "page_storage",
+        47,
+        1,
+        false,
+        false
+      ],
+      [
+        "page_md",
+        52,
+        1,
+        false,
+        false
+      ],
+      [
+        "title",
+        57,
+        1,
+        false,
+        false
+      ],
+      [
+        "children",
+        100,
+        1,
+        false,
+        false
+      ],
+      [
+        "spaces",
+        109,
+        0,
+        false,
+        false
+      ],
+      [
+        "search_cql",
+        116,
+        1,
+        false,
+        false
+      ],
+      [
+        "url_for",
+        142,
+        1,
+        false,
+        false
+      ],
+      [
+        "client_base",
+        150,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "envs.py",
+    "lines": 88,
+    "functions": [
+      [
+        "load",
+        21,
+        0,
+        false,
+        false
+      ],
+      [
+        "services",
+        27,
+        1,
+        false,
+        false
+      ],
+      [
+        "where",
+        34,
+        1,
+        false,
+        false
+      ],
+      [
+        "used_by",
+        56,
+        1,
+        false,
+        false
+      ],
+      [
+        "summary",
+        76,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "find.py",
+    "lines": 61,
+    "functions": [
+      [
+        "find",
+        17,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "gcal.py",
+    "lines": 119,
+    "functions": [
+      [
+        "calendars",
+        24,
+        0,
+        false,
+        false
+      ],
+      [
+        "events",
+        39,
+        0,
+        false,
+        false
+      ],
+      [
+        "freebusy",
+        71,
+        1,
+        false,
+        false
+      ],
+      [
+        "busy_now",
+        95,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "gchat.py",
+    "lines": 267,
+    "functions": [
+      [
+        "spaces",
+        130,
+        0,
+        false,
+        false
+      ],
+      [
+        "find_space",
+        148,
+        1,
+        false,
+        false
+      ],
+      [
+        "messages",
+        155,
+        1,
+        false,
+        false
+      ],
+      [
+        "messages_since",
+        169,
+        1,
+        false,
+        false
+      ],
+      [
+        "verify_task_receipt",
+        207,
+        4,
+        false,
+        false
+      ],
+      [
+        "send",
+        228,
+        1,
+        false,
+        false
+      ],
+      [
+        "send_planned",
+        248,
+        0,
+        false,
+        false
+      ],
+      [
+        "owner_messages",
+        263,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "gmail.py",
+    "lines": 94,
+    "functions": [
+      [
+        "search",
+        47,
+        1,
+        false,
+        false
+      ],
+      [
+        "read",
+        62,
+        1,
+        false,
+        false
+      ],
+      [
+        "unread_count",
+        91,
+        0,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "google_auth.py",
+    "lines": 145,
+    "functions": [
+      [
+        "has_token",
+        62,
+        0,
+        false,
+        false
+      ],
+      [
+        "creds",
+        87,
+        0,
+        false,
+        false
+      ],
+      [
+        "service",
+        133,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "http.py",
+    "lines": 125,
+    "functions": [
+      [
+        "client",
+        120,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "Client"
+    ]
+  },
+  {
+    "file": "hub_archive.py",
+    "lines": 544,
+    "functions": [],
+    "classes": [
+      "ArchiveIntegrityError",
+      "ArchivePage",
+      "_CaptureSpec",
+      "Evidence"
+    ]
+  },
+  {
+    "file": "hub_cli.py",
+    "lines": 725,
+    "functions": [
+      [
+        "main",
+        695,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "CliError",
+      "_Parser"
+    ]
+  },
+  {
+    "file": "hub_messages.py",
+    "lines": 320,
+    "functions": [],
+    "classes": [
+      "MessagePage",
+      "Messages"
+    ]
+  },
+  {
+    "file": "hub_resources.py",
+    "lines": 529,
+    "functions": [],
+    "classes": [
+      "OwnerLease",
+      "ReservationToken",
+      "ReservationRecord",
+      "ResourcePage",
+      "ReservationHistoryPage",
+      "Reservations"
+    ]
+  },
+  {
+    "file": "hub_tasks.py",
+    "lines": 948,
+    "functions": [],
+    "classes": [
+      "ExecutionOwner",
+      "PlanRecord",
+      "TaskRecord",
+      "PlanPage",
+      "TaskPage",
+      "TaskHistoryPage",
+      "Tasks"
+    ]
+  },
+  {
+    "file": "idx.py",
+    "lines": 56,
+    "functions": [
+      [
+        "load",
+        18,
+        1,
+        false,
+        false
+      ],
+      [
+        "search",
+        26,
+        1,
+        false,
+        false
+      ],
+      [
+        "databases",
+        44,
+        1,
+        false,
+        false
+      ],
+      [
+        "projects",
+        50,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "jira.py",
+    "lines": 341,
+    "functions": [
+      [
+        "jql",
+        24,
+        1,
+        false,
+        false
+      ],
+      [
+        "rows",
+        43,
+        1,
+        false,
+        false
+      ],
+      [
+        "mine",
+        61,
+        1,
+        false,
+        false
+      ],
+      [
+        "issue",
+        69,
+        1,
+        false,
+        false
+      ],
+      [
+        "issue_md",
+        79,
+        1,
+        false,
+        false
+      ],
+      [
+        "statuses",
+        84,
+        0,
+        false,
+        false
+      ],
+      [
+        "me",
+        90,
+        0,
+        false,
+        false
+      ],
+      [
+        "transitions",
+        97,
+        1,
+        false,
+        false
+      ],
+      [
+        "resolve_user",
+        135,
+        1,
+        false,
+        false
+      ],
+      [
+        "recent_comments",
+        206,
+        1,
+        false,
+        false
+      ],
+      [
+        "titles",
+        309,
+        1,
+        false,
+        false
+      ],
+      [
+        "url",
+        339,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "kafka.py",
+    "lines": 113,
+    "functions": [
+      [
+        "topics",
+        31,
+        0,
+        false,
+        false
+      ],
+      [
+        "describe",
+        43,
+        1,
+        false,
+        false
+      ],
+      [
+        "consume",
+        65,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "local.py",
+    "lines": 53,
+    "functions": [
+      [
+        "load",
+        18,
+        0,
+        false,
+        false
+      ],
+      [
+        "local_path",
+        24,
+        1,
+        false,
+        false
+      ],
+      [
+        "find",
+        33,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "log.py",
+    "lines": 97,
+    "functions": [
+      [
+        "log_change",
+        44,
+        0,
+        false,
+        false
+      ],
+      [
+        "log_note",
+        76,
+        2,
+        false,
+        false
+      ],
+      [
+        "tail",
+        83,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "maven.py",
+    "lines": 53,
+    "functions": [
+      [
+        "versions",
+        36,
+        2,
+        false,
+        false
+      ],
+      [
+        "latest",
+        41,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "md.py",
+    "lines": 212,
+    "functions": [
+      [
+        "confluence_to_md",
+        82,
+        1,
+        false,
+        false
+      ],
+      [
+        "wiki_to_md",
+        105,
+        1,
+        false,
+        false
+      ],
+      [
+        "html_to_md",
+        113,
+        1,
+        false,
+        false
+      ],
+      [
+        "jira_issue_to_md",
+        118,
+        1,
+        false,
+        false
+      ],
+      [
+        "render_diff",
+        156,
+        1,
+        false,
+        false
+      ],
+      [
+        "change_rows",
+        176,
+        1,
+        false,
+        false
+      ],
+      [
+        "compact",
+        194,
+        1,
+        false,
+        false
+      ],
+      [
+        "compact_json",
+        210,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "ConfluenceConverter"
+    ]
+  },
+  {
+    "file": "nats_client.py",
+    "lines": 96,
+    "functions": [
+      [
+        "streams",
+        35,
+        0,
+        false,
+        false
+      ],
+      [
+        "stream_info",
+        51,
+        1,
+        false,
+        false
+      ],
+      [
+        "subjects",
+        67,
+        0,
+        false,
+        false
+      ],
+      [
+        "collect",
+        73,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "owner_digest.py",
+    "lines": 60,
+    "functions": [
+      [
+        "compose",
+        49,
+        1,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "Item",
+      "Digest"
+    ]
+  },
+  {
+    "file": "repo.py",
+    "lines": 145,
+    "functions": [
+      [
+        "ls",
+        27,
+        2,
+        false,
+        false
+      ],
+      [
+        "blame",
+        44,
+        2,
+        false,
+        false
+      ],
+      [
+        "branches",
+        69,
+        1,
+        false,
+        false
+      ],
+      [
+        "commits",
+        81,
+        1,
+        false,
+        false
+      ],
+      [
+        "commit",
+        94,
+        2,
+        false,
+        false
+      ],
+      [
+        "pr_commits",
+        100,
+        2,
+        false,
+        false
+      ],
+      [
+        "find_repos",
+        121,
+        1,
+        false,
+        false
+      ],
+      [
+        "branch",
+        140,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "repo_grep.py",
+    "lines": 239,
+    "functions": [
+      [
+        "grep",
+        48,
+        2,
+        false,
+        false
+      ],
+      [
+        "grep_ex",
+        68,
+        2,
+        false,
+        false
+      ],
+      [
+        "commit_changes",
+        210,
+        2,
+        false,
+        false
+      ],
+      [
+        "commit_diff",
+        224,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  },
+  {
+    "file": "review.py",
+    "lines": 652,
+    "functions": [
+      [
+        "parse_pr_link",
+        79,
+        1,
+        false,
+        false
+      ],
+      [
+        "file_links",
+        87,
+        2,
+        false,
+        false
+      ],
+      [
+        "java_members",
+        160,
+        1,
+        false,
+        false
+      ],
+      [
+        "red_flags",
+        216,
+        1,
+        false,
+        false
+      ],
+      [
+        "is_test_path",
+        226,
+        1,
+        false,
+        false
+      ],
+      [
+        "collect",
+        232,
+        2,
+        false,
+        false
+      ],
+      [
+        "find_ticket",
+        420,
+        1,
+        false,
+        false
+      ],
+      [
+        "fetch_ticket",
+        442,
+        1,
+        false,
+        false
+      ],
+      [
+        "changed_symbols",
+        498,
+        2,
+        false,
+        false
+      ],
+      [
+        "render_markdown",
+        567,
+        1,
+        false,
+        false
+      ],
+      [
+        "review",
+        649,
+        2,
+        false,
+        false
+      ]
+    ],
+    "classes": [
+      "Packet"
+    ]
+  },
+  {
+    "file": "selftest.py",
+    "lines": 125,
+    "functions": [
+      [
+        "run",
+        109,
+        0,
+        false,
+        false
+      ]
+    ],
+    "classes": []
+  }
+]

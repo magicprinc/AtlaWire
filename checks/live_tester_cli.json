@@ -1,0 +1,724 @@
+{
+  "generated": "2026-11-27T03:43:28.953179+03:00",
+  "commands": 90,
+  "help_failures": [],
+  "summary": {
+    "not-attempted": 59,
+    "exit-0": 28,
+    "exit-2": 1,
+    "exit-1": 2
+  },
+  "results": [
+    {
+      "command": "api-get",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "api-request",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "attachment-get",
+      "has_json": false,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "blame",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "branch",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "branches",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "branches",
+        "AB/address-book-api",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "children",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "commit",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "commit-changes",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "commit-comment",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "commit-comments",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "commit-diff",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "commits",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "commits",
+        "AB/address-book-api",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "convert-body",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "cql",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "default-branch",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "default-branch",
+        "AB/address-book-api"
+      ],
+      "live_exit": 2,
+      "live_stdout_kind": "empty",
+      "live_stderr": "Usage: python -m atlawire default-branch [OPTIONS] PROJECT_KEY SLUG\nTry 'python -m atlawire default-branch --help' for help.\n\nError: Missing argument 'SLUG'."
+    },
+    {
+      "command": "file",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "files",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "files",
+        "AB/address-book-api"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "find",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "find-repos",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "grep",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "grep-repo",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "issue",
+        "INC-1753"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "issue-changelog",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "issue-changelog",
+        "INC-1753"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "issue-comment",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-comments",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "issue-comments",
+        "INC-1753"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "issue-link",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-properties",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-property",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-remote-links",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-subtasks",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-votes",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-watchers",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "issue-watchers",
+        "INC-1753"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "issue-worklog",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "issue-worklogs",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "issue-worklogs",
+        "INC-1753"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "jira-author-comments",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-create-meta",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-edit-meta",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-issue-types",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-me",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "jira-me"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "jira-priorities",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "jira-priorities"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "jira-projects",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "jira-projects"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "jira-resolutions",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-status-categories",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-transition-fields",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jira-users",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "jql",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "jql",
+        "order by created DESC",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "last-modified",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "login",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "ls",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "mine",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "my-prs",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "my-prs",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "operations",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "operations"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "page",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "page",
+        "347249"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "page-attachments",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "page-attachments",
+        "347249"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "page-comments",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "page-comments",
+        "347249"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "page-history",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "page-labels",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "page-labels",
+        "347249"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "page-url",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "page-version",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "pr",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "pr",
+        "AB/address-book-api",
+        "192"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "pr-comments",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "pr-comments",
+        "AB/address-book-api",
+        "192"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "pr-diff-complete",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "pr-files",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "pr-files",
+        "AB/address-book-api",
+        "192"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "pr-merge-status",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "pr-merge-status",
+        "AB/address-book-api",
+        "192"
+      ],
+      "live_exit": 1,
+      "live_stdout_kind": "empty",
+      "live_stderr": "Error: HTTP 409: request failed."
+    },
+    {
+      "command": "pr-review",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "pr-review",
+        "AB/address-book-api",
+        "192"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "project",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "projects",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "projects",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "prs",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "prs",
+        "AB/address-book-api",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "read",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "read-operation",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "related-repos",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "repo-changes",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "repo-forks",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "repo-participants",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "repo-search",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "repos",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "repos",
+        "AB/address-book-api"
+      ],
+      "live_exit": 1,
+      "live_stdout_kind": "empty",
+      "live_stderr": "Error: Expected a Bitbucket project key or ~user project."
+    },
+    {
+      "command": "repository",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "scan",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "scan-extension",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "search",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "selftest",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "space",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "space",
+        "AB"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "space-content",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "spaces",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "spaces",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "text"
+    },
+    {
+      "command": "statuses",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "tag",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "tags",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "tags",
+        "AB/address-book-api",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    },
+    {
+      "command": "transitions",
+      "has_json": true,
+      "help_ok": true,
+      "live": "not-attempted"
+    },
+    {
+      "command": "whoami",
+      "has_json": true,
+      "help_ok": true,
+      "live_argv": [
+        "whoami"
+      ],
+      "live_exit": 0,
+      "live_stdout_kind": "json"
+    }
+  ]
+}

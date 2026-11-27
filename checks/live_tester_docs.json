@@ -1,0 +1,142 @@
+{
+  "operations": 319,
+  "summary": {
+    "parameter-not-in-wadl": 19,
+    "route-not-in-wadl": 2,
+    "parameter-missing-from-registry": 1
+  },
+  "problems": [
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.profile.recent-repositories",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.profile.recent-repositories",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.commit-comments",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.commit-comments",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.compare-changes",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.compare-changes",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.compare-commits",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.compare-commits",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.forks",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.forks",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.participants",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.participants",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.pull-request-activity",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.pull-request-activity",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.related",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.repository.related",
+      "detail": "start"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.users.list",
+      "detail": "limit"
+    },
+    {
+      "product": "bitbucket",
+      "kind": "parameter-not-in-wadl",
+      "id": "bitbucket.users.list",
+      "detail": "start"
+    },
+    {
+      "product": "jira",
+      "kind": "route-not-in-wadl",
+      "id": "jira.attachment.content",
+      "detail": "/rest/api/2/attachment/{id}/content"
+    },
+    {
+      "product": "jira",
+      "kind": "parameter-missing-from-registry",
+      "id": "jira.issue.issueidorkey",
+      "detail": "updateHistory"
+    },
+    {
+      "product": "jira",
+      "kind": "route-not-in-wadl",
+      "id": "jira.rest.auth.1.session",
+      "detail": "/rest/auth/1/session"
+    },
+    {
+      "product": "jira",
+      "kind": "parameter-not-in-wadl",
+      "id": "jira.user.assignable-search",
+      "detail": "startAt"
+    }
+  ]
+}

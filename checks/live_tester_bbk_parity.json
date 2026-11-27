@@ -1,0 +1,808 @@
+{
+  "generated": "2026-11-27T04:26:12.797250+03:00",
+  "bbk_functions_in_scope": 73,
+  "summary": {
+    "better": 10,
+    "same": 55,
+    "different": 2,
+    "worse": 2,
+    "excluded": 4
+  },
+  "results": [
+    {
+      "bbk": "jira.py:jql",
+      "bbk_line": 24,
+      "atlawire": "atlawire.jira.search_all_issues",
+      "note": "Adds completeness reporting and a bounded page budget",
+      "live_argv": [
+        "jql",
+        "order by created DESC",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "jira.py:rows",
+      "bbk_line": 43,
+      "atlawire": "atlawire.jira.search_all_issues",
+      "note": "",
+      "live_argv": [
+        "jql",
+        "order by created DESC",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:mine",
+      "bbk_line": 61,
+      "atlawire": "atlawire.jira.search_issues",
+      "note": "A JQL preset over the same search",
+      "live_argv": [
+        "mine",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:issue",
+      "bbk_line": 69,
+      "atlawire": "atlawire.jira.get_issue",
+      "note": "",
+      "live_argv": [
+        "issue",
+        "INC-1753",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:issue_md",
+      "bbk_line": 79,
+      "atlawire": "atlawire.issue_markdown.render_issue_markdown",
+      "note": "",
+      "live_argv": [
+        "issue",
+        "INC-1753",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:statuses",
+      "bbk_line": 84,
+      "atlawire": "atlawire.jira.list_statuses",
+      "note": "",
+      "live_argv": [
+        "statuses",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:me",
+      "bbk_line": 90,
+      "atlawire": "atlawire.jira.get_current_user",
+      "note": "",
+      "live_argv": [
+        "jira-me",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:transitions",
+      "bbk_line": 97,
+      "atlawire": "atlawire.jira.list_transitions",
+      "note": "",
+      "live_argv": [
+        "transitions",
+        "INC-1753",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:resolve_user",
+      "bbk_line": 135,
+      "atlawire": "atlawire.jira.search_users",
+      "note": "Resolves a name through the documented user search",
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:recent_comments",
+      "bbk_line": 206,
+      "atlawire": "atlawire.jira_comments_search.find_author_comments",
+      "note": "Author comment search over JQL",
+      "live_argv": [
+        "jira-author-comments",
+        "a.fink",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:titles",
+      "bbk_line": 309,
+      "atlawire": "atlawire.jira.titles",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "jira.py:url",
+      "bbk_line": 339,
+      "atlawire": "atlawire.jira.issue_url",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:page_id",
+      "bbk_line": 24,
+      "atlawire": "atlawire.confluence.page_id",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:page",
+      "bbk_line": 36,
+      "atlawire": "atlawire.confluence.get_page",
+      "note": "",
+      "live_argv": [
+        "page",
+        "347249",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:page_storage",
+      "bbk_line": 47,
+      "atlawire": "atlawire.confluence.get_page_storage",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:page_md",
+      "bbk_line": 52,
+      "atlawire": "atlawire.confluence.get_page_markdown",
+      "note": "One call renders Markdown",
+      "live_argv": [
+        "page",
+        "347249",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "confluence.py:title",
+      "bbk_line": 57,
+      "atlawire": "atlawire.confluence.get_page_title",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:children",
+      "bbk_line": 100,
+      "atlawire": "atlawire.confluence.list_children",
+      "note": "Reports completeness instead of a bare list",
+      "live_argv": [
+        "children",
+        "347249",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "confluence.py:spaces",
+      "bbk_line": 109,
+      "atlawire": "atlawire.confluence.list_spaces",
+      "note": "",
+      "live_argv": [
+        "spaces",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:search_cql",
+      "bbk_line": 116,
+      "atlawire": "atlawire.confluence.search_cql",
+      "note": "",
+      "live_argv": [
+        "cql",
+        "type = page",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "confluence.py:url_for",
+      "bbk_line": 142,
+      "atlawire": "atlawire.confluence.get_page_web_url",
+      "note": "A JSON envelope carries the URL",
+      "live_argv": [
+        "page-url",
+        "347249",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "confluence.py:client_base",
+      "bbk_line": 150,
+      "atlawire": "atlawire.sdk.client_for",
+      "note": "Never returns saved credentials implicitly",
+      "verdict": "different"
+    },
+    {
+      "bbk": "bitbucket.py:search_code",
+      "bbk_line": 39,
+      "atlawire": "atlawire.repo_search.search_repositories",
+      "note": "Three engines and bounded per-repo work",
+      "live_argv": [
+        "repo-search",
+        "README",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "bitbucket.py:projects",
+      "bbk_line": 102,
+      "atlawire": "atlawire.bitbucket.list_projects",
+      "note": "",
+      "live_argv": [
+        "projects",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:repos",
+      "bbk_line": 109,
+      "atlawire": "atlawire.bitbucket.list_repositories",
+      "note": "",
+      "live_argv": [
+        "repos",
+        "AB",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:list_files",
+      "bbk_line": 116,
+      "atlawire": "atlawire.bitbucket.list_repository_files",
+      "note": "",
+      "live_argv": [
+        "files",
+        "AB/address-book-api",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:file_at",
+      "bbk_line": 124,
+      "atlawire": "atlawire.bitbucket.get_repository_file",
+      "note": "Reads the real default branch when no ref is given",
+      "live_argv": [
+        "file",
+        "AB/address-book-api",
+        ".gitignore"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "bitbucket.py:repos_with_extension",
+      "bbk_line": 133,
+      "atlawire": "atlawire.repo_scan.scan_repository_extensions_report",
+      "note": "Reports completeness",
+      "live_argv": [
+        "scan-extension",
+        "--ext",
+        ".md",
+        "--max-pages",
+        "1",
+        "--project",
+        "AB"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "bitbucket.py:pr",
+      "bbk_line": 170,
+      "atlawire": "atlawire.bitbucket.get_pull_request",
+      "note": "",
+      "live_argv": [
+        "pr",
+        "AB/address-book-api",
+        "192",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:pr_files",
+      "bbk_line": 176,
+      "atlawire": "atlawire.bitbucket.list_pull_request_files",
+      "note": "",
+      "live_argv": [
+        "pr-files",
+        "AB/address-book-api",
+        "192",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:pr_diff",
+      "bbk_line": 183,
+      "atlawire": "atlawire.bitbucket.get_pull_request_diffs",
+      "note": "Batch paths, validated whitespace mode",
+      "verdict": "better"
+    },
+    {
+      "bbk": "bitbucket.py:pr_file",
+      "bbk_line": 212,
+      "atlawire": "atlawire.bitbucket.get_pull_request_file",
+      "note": "live call failed with exit 2",
+      "live_argv": [
+        "pr-file",
+        "AB/address-book-api",
+        "192",
+        ".gitignore"
+      ],
+      "live_exit": 2,
+      "verdict": "worse"
+    },
+    {
+      "bbk": "bitbucket.py:pr_comments",
+      "bbk_line": 235,
+      "atlawire": "atlawire.bitbucket.list_pull_request_comments",
+      "note": "",
+      "live_argv": [
+        "pr-comments",
+        "AB/address-book-api",
+        "192",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:pr_compact",
+      "bbk_line": 253,
+      "atlawire": "atlawire.bitbucket.pr_compact",
+      "note": "",
+      "live_argv": [
+        "pr",
+        "AB/address-book-api",
+        "192",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:my_prs",
+      "bbk_line": 258,
+      "atlawire": "atlawire.bitbucket.list_my_pull_requests",
+      "note": "",
+      "live_argv": [
+        "my-prs",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "bitbucket.py:prs",
+      "bbk_line": 294,
+      "atlawire": "atlawire.bitbucket.list_pull_requests",
+      "note": "Adds direction, author, role and participant filters",
+      "live_argv": [
+        "prs",
+        "AB/address-book-api",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "repo.py:ls",
+      "bbk_line": 27,
+      "atlawire": "atlawire.bitbucket.list_directory",
+      "note": "",
+      "live_argv": [
+        "ls",
+        "AB/address-book-api",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo.py:blame",
+      "bbk_line": 44,
+      "atlawire": "atlawire.bitbucket.get_file_blame",
+      "note": "",
+      "live_argv": [
+        "blame",
+        "AB/address-book-api",
+        ".gitignore"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo.py:branches",
+      "bbk_line": 69,
+      "atlawire": "atlawire.bitbucket.list_branches",
+      "note": "",
+      "live_argv": [
+        "branches",
+        "AB/address-book-api",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo.py:commits",
+      "bbk_line": 81,
+      "atlawire": "atlawire.bitbucket.list_commits",
+      "note": "",
+      "live_argv": [
+        "commits",
+        "AB/address-book-api",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo.py:commit",
+      "bbk_line": 94,
+      "atlawire": "atlawire.bitbucket.get_commit",
+      "note": "",
+      "live_argv": [
+        "commit",
+        "AB/address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo.py:pr_commits",
+      "bbk_line": 100,
+      "atlawire": "atlawire.bitbucket.list_pull_request_commits",
+      "note": "live call failed with exit 2",
+      "live_argv": [
+        "pr-commits",
+        "AB/address-book-api",
+        "192",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 2,
+      "verdict": "worse"
+    },
+    {
+      "bbk": "repo.py:find_repos",
+      "bbk_line": 121,
+      "atlawire": "atlawire.bitbucket.find_repositories",
+      "note": "",
+      "live_argv": [
+        "find-repos",
+        "address",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo.py:branch",
+      "bbk_line": 140,
+      "atlawire": "atlawire.bitbucket.get_branch",
+      "note": "",
+      "live_argv": [
+        "branch",
+        "AB/address-book-api",
+        "refs/heads/develop"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo_grep.py:grep",
+      "bbk_line": 48,
+      "atlawire": "atlawire.repo_grep.grep_repository",
+      "note": "",
+      "live_argv": [
+        "grep-repo",
+        "AB/address-book-api",
+        "--limit",
+        "1"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo_grep.py:grep_ex",
+      "bbk_line": 68,
+      "atlawire": "atlawire.repo_grep.grep_repository",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo_grep.py:commit_changes",
+      "bbk_line": 210,
+      "atlawire": "atlawire.bitbucket.list_commit_changes",
+      "note": "",
+      "live_argv": [
+        "commit-changes",
+        "AB/address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "repo_grep.py:commit_diff",
+      "bbk_line": 224,
+      "atlawire": "atlawire.bitbucket.get_commit_diff",
+      "note": "",
+      "live_argv": [
+        "commit-diff",
+        "AB/address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:parse_pr_link",
+      "bbk_line": 79,
+      "atlawire": "atlawire.pr_review.parse_pr_link",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:file_links",
+      "bbk_line": 87,
+      "atlawire": "atlawire.pr_review.file_links",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:java_members",
+      "bbk_line": 160,
+      "atlawire": "atlawire.pr_review.java_members",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:red_flags",
+      "bbk_line": 216,
+      "atlawire": "atlawire.pr_review.red_flags",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:is_test_path",
+      "bbk_line": 226,
+      "atlawire": "atlawire.pr_review.is_test_path",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:collect",
+      "bbk_line": 232,
+      "atlawire": "atlawire.pr_review.collect_pr_review",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:find_ticket",
+      "bbk_line": 420,
+      "atlawire": "atlawire.pr_review.find_ticket",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:fetch_ticket",
+      "bbk_line": 442,
+      "atlawire": "atlawire.pr_review.fetch_ticket",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:changed_symbols",
+      "bbk_line": 498,
+      "atlawire": "atlawire.pr_review.changed_symbols",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:render_markdown",
+      "bbk_line": 567,
+      "atlawire": "atlawire.pr_review.render_markdown",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "review.py:review",
+      "bbk_line": 649,
+      "atlawire": "atlawire.pr_review.review",
+      "note": "",
+      "live_argv": [
+        "pr-review",
+        "AB/address-book-api",
+        "192"
+      ],
+      "live_exit": 0,
+      "verdict": "same"
+    },
+    {
+      "bbk": "find.py:find",
+      "bbk_line": 17,
+      "atlawire": "atlawire.federated.federated_search",
+      "note": "Labels every partial answer with complete=false",
+      "live_argv": [
+        "find",
+        "README",
+        "--limit",
+        "1",
+        "--json"
+      ],
+      "live_exit": 0,
+      "verdict": "better"
+    },
+    {
+      "bbk": "attachments.py:attachment_download",
+      "bbk_line": 11,
+      "atlawire": "atlawire.bitbucket_attachment",
+      "note": "Read through attachment-get",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:confluence_to_md",
+      "bbk_line": 82,
+      "atlawire": "atlawire.markdown.confluence_to_md",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:wiki_to_md",
+      "bbk_line": 105,
+      "atlawire": "atlawire.markdown.wiki_to_md",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:html_to_md",
+      "bbk_line": 113,
+      "atlawire": "atlawire.markdown.html_to_md",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:jira_issue_to_md",
+      "bbk_line": 118,
+      "atlawire": "atlawire.markdown.jira_issue_to_md",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:render_diff",
+      "bbk_line": 156,
+      "atlawire": "atlawire.markdown.render_diff",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:change_rows",
+      "bbk_line": 176,
+      "atlawire": "atlawire.markdown.render_diff",
+      "note": "Diff rendering covers the same output; there is no row model",
+      "verdict": "different"
+    },
+    {
+      "bbk": "md.py:compact",
+      "bbk_line": 194,
+      "atlawire": "atlawire.markdown.compact",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "md.py:compact_json",
+      "bbk_line": 210,
+      "atlawire": "atlawire.markdown.compact_json",
+      "note": "",
+      "verdict": "same"
+    },
+    {
+      "bbk": "idx.py:load",
+      "bbk_line": 18,
+      "atlawire": null,
+      "note": "BBK local index; AtlaWire reads the server",
+      "verdict": "excluded"
+    },
+    {
+      "bbk": "idx.py:search",
+      "bbk_line": 26,
+      "atlawire": null,
+      "note": "BBK local index; use repo-search instead",
+      "verdict": "excluded"
+    },
+    {
+      "bbk": "idx.py:databases",
+      "bbk_line": 44,
+      "atlawire": null,
+      "note": "BBK local index bookkeeping",
+      "verdict": "excluded"
+    },
+    {
+      "bbk": "idx.py:projects",
+      "bbk_line": 50,
+      "atlawire": null,
+      "note": "BBK local index bookkeeping",
+      "verdict": "excluded"
+    }
+  ]
+}

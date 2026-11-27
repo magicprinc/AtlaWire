@@ -1,0 +1,248 @@
+[
+  {
+    "product": "jira",
+    "function": "get_current_user",
+    "outcome": "ok",
+    "size": 3
+  },
+  {
+    "product": "jira",
+    "function": "get_issue",
+    "outcome": "ok",
+    "size": 6
+  },
+  {
+    "product": "jira",
+    "function": "list_issue_comments",
+    "outcome": "ok",
+    "size": 0
+  },
+  {
+    "product": "jira",
+    "function": "get_issue_watchers",
+    "outcome": "ok",
+    "size": 3
+  },
+  {
+    "product": "jira",
+    "function": "list_issue_worklogs",
+    "outcome": "ok",
+    "size": 0
+  },
+  {
+    "product": "jira",
+    "function": "get_issue_changelog",
+    "outcome": "ok",
+    "size": 4
+  },
+  {
+    "product": "jira",
+    "function": "list_jira_projects",
+    "outcome": "ok",
+    "size": 15
+  },
+  {
+    "product": "jira",
+    "function": "list_priorities",
+    "outcome": "ok",
+    "size": 5
+  },
+  {
+    "product": "jira",
+    "function": "list_statuses",
+    "outcome": "ok",
+    "size": 55
+  },
+  {
+    "product": "jira",
+    "function": "list_issue_types",
+    "outcome": "ok",
+    "size": 49
+  },
+  {
+    "product": "jira",
+    "function": "search_users",
+    "outcome": "ok",
+    "size": 31
+  },
+  {
+    "product": "jira",
+    "function": "list_transitions",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "jira",
+    "function": "titles",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "jira",
+    "function": "issue_url",
+    "outcome": "ok",
+    "size": 43
+  },
+  {
+    "product": "jira",
+    "function": "search_all_issues",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "jira",
+    "function": "search_issues",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "confluence",
+    "function": "list_spaces",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "confluence",
+    "function": "get_page",
+    "outcome": "ok",
+    "size": 11
+  },
+  {
+    "product": "confluence",
+    "function": "get_page_markdown",
+    "outcome": "ok",
+    "size": 1181
+  },
+  {
+    "product": "confluence",
+    "function": "get_page_storage",
+    "outcome": "ok",
+    "size": 4700
+  },
+  {
+    "product": "confluence",
+    "function": "get_page_title",
+    "outcome": "ok",
+    "size": 12
+  },
+  {
+    "product": "confluence",
+    "function": "get_page_web_url",
+    "outcome": "ok",
+    "size": 49
+  },
+  {
+    "product": "confluence",
+    "function": "list_children",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "confluence",
+    "function": "page_id",
+    "outcome": "signature-mismatch",
+    "detail": "page_id() got an unexpected keyword argument 'token'"
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_projects",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_repositories",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "bitbucket",
+    "function": "get_repository",
+    "outcome": "signature-mismatch",
+    "detail": "get_repository() missing 1 required positional argument: 'slug'"
+  },
+  {
+    "product": "bitbucket",
+    "function": "get_pull_request",
+    "outcome": "ok",
+    "size": 16
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_pull_request_files",
+    "outcome": "ok",
+    "size": 6
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_pull_request_comments",
+    "outcome": "ok",
+    "size": 4
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_pull_request_commits",
+    "outcome": "ok",
+    "size": 3
+  },
+  {
+    "product": "bitbucket",
+    "function": "get_pull_request_merge_status",
+    "outcome": "ok",
+    "size": 4
+  },
+  {
+    "product": "bitbucket",
+    "function": "get_repository_file",
+    "outcome": "ok",
+    "size": 461
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_repository_files",
+    "outcome": "ok",
+    "size": 89
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_branches",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_commits",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "bitbucket",
+    "function": "get_commit",
+    "outcome": "ok",
+    "size": 9
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_tags",
+    "outcome": "ok",
+    "size": 1
+  },
+  {
+    "product": "bitbucket",
+    "function": "get_default_branch",
+    "outcome": "ok",
+    "size": 4
+  },
+  {
+    "product": "bitbucket",
+    "function": "list_directory",
+    "outcome": "ok",
+    "size": 9
+  },
+  {
+    "product": "bitbucket",
+    "function": "find_repositories",
+    "outcome": "ok",
+    "size": 10
+  }
+]

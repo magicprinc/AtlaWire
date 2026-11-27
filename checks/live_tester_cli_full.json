@@ -1,0 +1,939 @@
+{
+  "generated": "2026-11-27T04:27:53.784423+03:00",
+  "commands": 90,
+  "summary": {
+    "failed": 16,
+    "ok": 70,
+    "skipped": 2,
+    "blocked": 2
+  },
+  "results": [
+    {
+      "command": "api-get",
+      "argv": [
+        "api-get",
+        "bitbucket",
+        ".gitignore"
+      ],
+      "exit": 1,
+      "stdout_kind": "json",
+      "outcome": "failed",
+      "error": "{\"ok\": false, \"product\": \"bitbucket\", \"error\": {\"status\": null, \"code\": \"validation_error\", \"classification\": \"client_error\", \"message\": \"Expected a safe standard REST path.\", \"path\": \".gitignore\", \"c",
+      "error_all": "{\"ok\": false, \"product\": \"bitbucket\", \"error\": {\"status\": null, \"code\": \"validation_error\", \"classification\": \"client_error\", \"message\": \"Expected a safe standa"
+    },
+    {
+      "command": "api-request",
+      "argv": [
+        "api-request",
+        "bitbucket",
+        "GET",
+        ".gitignore"
+      ],
+      "exit": 1,
+      "stdout_kind": "json",
+      "outcome": "failed",
+      "error": "{\"ok\": false, \"product\": \"bitbucket\", \"error\": {\"status\": null, \"code\": \"validation_error\", \"classification\": \"client_error\", \"message\": \"Expected a safe standard REST path.\", \"path\": \".gitignore\", \"c",
+      "error_all": "{\"ok\": false, \"product\": \"bitbucket\", \"error\": {\"status\": null, \"code\": \"validation_error\", \"classification\": \"client_error\", \"message\": \"Expected a safe standa"
+    },
+    {
+      "command": "attachment-get",
+      "argv": [
+        "attachment-get",
+        "AB/address-book-api",
+        "1"
+      ],
+      "exit": 2,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Usage: python -m atlawire attachment-get [OPTIONS] REPO ATTACHMENT_ID",
+      "error_all": "Usage: python -m atlawire attachment-get [OPTIONS] REPO ATTACHMENT_ID / Try 'python -m atlawire attachment-get --help' for help. / "
+    },
+    {
+      "command": "blame",
+      "argv": [
+        "blame",
+        "AB/address-book-api",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "branch",
+      "argv": [
+        "branch",
+        "AB/address-book-api",
+        "refs/heads/develop"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "branches",
+      "argv": [
+        "branches",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "children",
+      "argv": [
+        "children",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "commit",
+      "argv": [
+        "commit",
+        "AB/address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "commit-changes",
+      "argv": [
+        "commit-changes",
+        "AB/address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "commit-comment",
+      "argv": [
+        "commit-comment",
+        "AB",
+        "address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce",
+        "98598"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 404: request failed.",
+      "error_all": "Error: HTTP 404: request failed."
+    },
+    {
+      "command": "commit-comments",
+      "argv": [
+        "commit-comments",
+        "AB",
+        "address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 400: request failed.",
+      "error_all": "Error: HTTP 400: request failed. / The path query parameter is required when retrieving comments."
+    },
+    {
+      "command": "commit-diff",
+      "argv": [
+        "commit-diff",
+        "AB/address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "commits",
+      "argv": [
+        "commits",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "convert-body",
+      "argv": [
+        "convert-body"
+      ],
+      "exit": 2,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Usage: python -m atlawire convert-body [OPTIONS]",
+      "error_all": "Usage: python -m atlawire convert-body [OPTIONS] / Try 'python -m atlawire convert-body --help' for help. / "
+    },
+    {
+      "command": "cql",
+      "argv": [
+        "cql",
+        "order by created DESC"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 400: request failed.",
+      "error_all": "Error: HTTP 400: request failed. / Could not parse cql : order by created DESC Bad Request"
+    },
+    {
+      "command": "default-branch",
+      "argv": [
+        "default-branch",
+        "AB",
+        "address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "file",
+      "argv": [
+        "file",
+        "AB/address-book-api",
+        ".gitignore"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "files",
+      "argv": [
+        "files",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "find",
+      "argv": [
+        "find",
+        "README"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "find-repos",
+      "argv": [
+        "find-repos",
+        "refs/heads/develop"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "grep",
+      "argv": [
+        "grep",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "grep-repo",
+      "argv": [
+        "grep-repo",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue",
+      "argv": [
+        "issue",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-changelog",
+      "argv": [
+        "issue-changelog",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-comment",
+      "argv": [
+        "issue-comment",
+        "INC-1753",
+        "98598"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 404: request failed.",
+      "error_all": "Error: HTTP 404: request failed."
+    },
+    {
+      "command": "issue-comments",
+      "argv": [
+        "issue-comments",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-link",
+      "argv": [
+        "issue-link",
+        "1"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 404: request failed.",
+      "error_all": "Error: HTTP 404: request failed."
+    },
+    {
+      "command": "issue-properties",
+      "argv": [
+        "issue-properties",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-property",
+      "argv": [
+        "issue-property",
+        "INC-1753",
+        "atlawire.probe"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 404: request failed.",
+      "error_all": "Error: HTTP 404: request failed."
+    },
+    {
+      "command": "issue-remote-links",
+      "argv": [
+        "issue-remote-links",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-subtasks",
+      "argv": [
+        "issue-subtasks",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-votes",
+      "argv": [
+        "issue-votes",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-watchers",
+      "argv": [
+        "issue-watchers",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-worklog",
+      "argv": [
+        "issue-worklog",
+        "INC-1753",
+        "1"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 404: request failed.",
+      "error_all": "Error: HTTP 404: request failed."
+    },
+    {
+      "command": "issue-worklogs",
+      "argv": [
+        "issue-worklogs",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-author-comments",
+      "argv": [
+        "jira-author-comments"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-create-meta",
+      "argv": [
+        "jira-create-meta"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-edit-meta",
+      "argv": [
+        "jira-edit-meta",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-issue-types",
+      "argv": [
+        "jira-issue-types"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-me",
+      "argv": [
+        "jira-me"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-priorities",
+      "argv": [
+        "jira-priorities"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-projects",
+      "argv": [
+        "jira-projects"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-resolutions",
+      "argv": [
+        "jira-resolutions"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-status-categories",
+      "argv": [
+        "jira-status-categories"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-transition-fields",
+      "argv": [
+        "jira-transition-fields",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jira-users",
+      "argv": [
+        "jira-users",
+        "order by created DESC"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "jql",
+      "argv": [
+        "jql",
+        "order by created DESC"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "last-modified",
+      "argv": [
+        "last-modified",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "login",
+      "outcome": "skipped",
+      "reason": "interactive or self-check"
+    },
+    {
+      "command": "ls",
+      "argv": [
+        "ls",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "mine",
+      "argv": [
+        "mine"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "my-prs",
+      "argv": [
+        "my-prs"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "operations",
+      "argv": [
+        "operations"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "page",
+      "argv": [
+        "page",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "page-attachments",
+      "argv": [
+        "page-attachments",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "page-comments",
+      "argv": [
+        "page-comments",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "page-history",
+      "argv": [
+        "page-history",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "page-labels",
+      "argv": [
+        "page-labels",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "page-url",
+      "argv": [
+        "page-url",
+        "347249"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "page-version",
+      "argv": [
+        "page-version",
+        "347249",
+        "1"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "pr",
+      "argv": [
+        "pr",
+        "AB/address-book-api",
+        "192",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "pr-comments",
+      "argv": [
+        "pr-comments",
+        "AB/address-book-api",
+        "192"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "pr-diff-complete",
+      "argv": [
+        "pr-diff-complete",
+        "AB/address-book-api",
+        "192"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "pr-files",
+      "argv": [
+        "pr-files",
+        "AB/address-book-api",
+        "192"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "pr-merge-status",
+      "argv": [
+        "pr-merge-status",
+        "AB/address-book-api",
+        "192"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 409: request failed.",
+      "error_all": "Error: HTTP 409: request failed."
+    },
+    {
+      "command": "pr-review",
+      "argv": [
+        "pr-review",
+        "AB/address-book-api"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: Expected /projects/KEY/repos/slug/pull-requests/N.",
+      "error_all": "Error: Expected /projects/KEY/repos/slug/pull-requests/N."
+    },
+    {
+      "command": "project",
+      "argv": [
+        "project",
+        "AB"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "projects",
+      "argv": [
+        "projects"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "prs",
+      "argv": [
+        "prs",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "read",
+      "outcome": "blocked",
+      "reason": "no identifier for operation_id"
+    },
+    {
+      "command": "read-operation",
+      "outcome": "blocked",
+      "reason": "no identifier for operation_id"
+    },
+    {
+      "command": "related-repos",
+      "argv": [
+        "related-repos",
+        "AB",
+        "address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "repo-changes",
+      "argv": [
+        "repo-changes",
+        "AB",
+        "address-book-api",
+        "be65631714af82d0a610a656f8103b04d4d50fce"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "repo-forks",
+      "argv": [
+        "repo-forks",
+        "AB",
+        "address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "repo-participants",
+      "argv": [
+        "repo-participants",
+        "AB",
+        "address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "repo-search",
+      "argv": [
+        "repo-search",
+        "order by created DESC"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "repos",
+      "argv": [
+        "repos",
+        "AB"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "repository",
+      "argv": [
+        "repository",
+        "AB",
+        "address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "scan",
+      "argv": [
+        "scan"
+      ],
+      "exit": 2,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Usage: python -m atlawire scan [OPTIONS]",
+      "error_all": "Usage: python -m atlawire scan [OPTIONS] / Try 'python -m atlawire scan --help' for help. / "
+    },
+    {
+      "command": "scan-extension",
+      "argv": [
+        "scan-extension"
+      ],
+      "exit": 2,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Usage: python -m atlawire scan-extension [OPTIONS]",
+      "error_all": "Usage: python -m atlawire scan-extension [OPTIONS] / Try 'python -m atlawire scan-extension --help' for help. / "
+    },
+    {
+      "command": "search",
+      "argv": [
+        "search",
+        "order by created DESC"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "selftest",
+      "outcome": "skipped",
+      "reason": "interactive or self-check"
+    },
+    {
+      "command": "space",
+      "argv": [
+        "space",
+        "AB"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "space-content",
+      "argv": [
+        "space-content",
+        "AB"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "spaces",
+      "argv": [
+        "spaces"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "statuses",
+      "argv": [
+        "statuses"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "tag",
+      "argv": [
+        "tag",
+        "AB/address-book-api",
+        "refs/heads/develop"
+      ],
+      "exit": 1,
+      "stdout_kind": "empty",
+      "outcome": "failed",
+      "error": "Error: HTTP 404: request failed.",
+      "error_all": "Error: HTTP 404: request failed."
+    },
+    {
+      "command": "tags",
+      "argv": [
+        "tags",
+        "AB/address-book-api"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "transitions",
+      "argv": [
+        "transitions",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
+      "outcome": "ok"
+    },
+    {
+      "command": "whoami",
+      "argv": [
+        "whoami"
+      ],
+      "exit": 0,
+      "stdout_kind": "json",
+      "outcome": "ok"
+    }
+  ]
+}

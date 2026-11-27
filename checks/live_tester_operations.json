@@ -1,0 +1,6012 @@
+{
+  "generated": "2026-11-27T04:25:25.193493+03:00",
+  "operations": 319,
+  "summary": {
+    "failed": 132,
+    "ok": 125,
+    "blocked": 62
+  },
+  "identifiers": {
+    "jira_user": "a.fink",
+    "jira_project_key": "BCHAT",
+    "jira_version_id": "13097",
+    "jira_component_id": "13032",
+    "jira_issue_key": "INC-1753",
+    "jira_issue_with_comments": "PLAT-4328",
+    "jira_comment_id": "98598",
+    "jira_field_id": "priority",
+    "jira_issue_type_id": "10002",
+    "jira_status_id": "1",
+    "confluence_space_key": "AB",
+    "confluence_page_id": "347249",
+    "confluence_content_type": "page",
+    "bitbucket_project_key": "AB",
+    "bitbucket_user_slug": "a.abakarov",
+    "bitbucket_repository_slug": "address-book-api",
+    "bitbucket_pull_request_id": 192,
+    "bitbucket_pull_request_from": "refs/heads/feature/PLAT-2500",
+    "bitbucket_pull_request_to": "refs/heads/develop",
+    "bitbucket_commit_id": "be65631714af82d0a610a656f8103b04d4d50fce",
+    "bitbucket_branch": "refs/heads/develop",
+    "bitbucket_tag": "refs/tags/v1.38.0-rc.14",
+    "bitbucket_file_path": ".gitignore"
+  },
+  "results": [
+    {
+      "id": "bitbucket.admin.cluster",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/cluster",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.groups",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/groups",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.admin.groups.more-members",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/groups/more-members",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The context parameter is required.",
+      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+    },
+    {
+      "id": "bitbucket.admin.groups.more-non-members",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/groups/more-non-members",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The context parameter is required.",
+      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+    },
+    {
+      "id": "bitbucket.admin.license",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/license",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.mail-server",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/mail-server",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.mail-server.sender-address",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/mail-server/sender-address",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "upstream",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.permissions.groups",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/permissions/groups",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.permissions.groups.none",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/permissions/groups/none",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.permissions.users",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/permissions/users",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.permissions.users.none",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/permissions/users/none",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.admin.pull-requests.scmid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/pull-requests/{scmId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "scmId: unmapped argument name 'scmId'"
+    },
+    {
+      "id": "bitbucket.admin.users",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/users",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.admin.users.more-members",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/users/more-members",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The context parameter is required.",
+      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+    },
+    {
+      "id": "bitbucket.admin.users.more-non-members",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/admin/users/more-non-members",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The context parameter is required.",
+      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+    },
+    {
+      "id": "bitbucket.application-properties",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/application-properties",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "buildDate",
+          "buildNumber",
+          "displayName",
+          "version"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.dashboard.pull-request-suggestions",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/dashboard/pull-request-suggestions",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.dashboard.pull-requests",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/dashboard/pull-requests",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.groups",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/groups",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.hooks.avatar",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/hooks/{hookKey}/avatar",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "hookKey: unmapped argument name 'hookKey'"
+    },
+    {
+      "id": "bitbucket.inbox.pull-requests",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/inbox/pull-requests",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.inbox.pull-requests.count",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/inbox/pull-requests/count",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "count"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.logs.logger.loggername",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/logs/logger/{loggerName}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "loggerName: unmapped argument name 'loggerName'"
+    },
+    {
+      "id": "bitbucket.logs.rootlogger",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/logs/rootLogger",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.profile.recent-repositories",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/profile/recent/repos",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.project.avatar",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/avatar.png",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 406,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.project.get",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 7,
+        "top": [
+          "description",
+          "id",
+          "key",
+          "links",
+          "name",
+          "public",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.permissions.groups",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/groups",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.permissions.groups.none",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/groups/none",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.permissions.permission.all",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/{permission}/all",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "permission: unmapped argument name 'permission'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.permissions.users",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/users",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.permissions.users.none",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/permissions/users/none",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.branches",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.browse",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/browse",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 3,
+        "top": [
+          "children",
+          "path",
+          "revision"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.browse.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/browse/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "isLastPage",
+          "lines",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.changes",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/changes",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The until query parameter is required",
+      "registry_gap": "server requires query parameter 'until'; declared: ['since', 'until']"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 7,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "commitId": "be65631714af82d0a610a656f8103b04d4d50fce"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "commitId": "discovered commit"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 9,
+        "top": [
+          "author",
+          "authorTimestamp",
+          "committer",
+          "committerTimestamp",
+          "displayId",
+          "id",
+          "message",
+          "parents",
+          "properties"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.changes",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/changes",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "commitId": "be65631714af82d0a610a656f8103b04d4d50fce"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "commitId": "discovered commit"
+      },
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 9,
+        "top": [
+          "fromHash",
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "properties",
+          "size",
+          "start",
+          "toHash",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.comments.commentid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments/{commentId}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "commitId": "be65631714af82d0a610a656f8103b04d4d50fce"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "commitId": "discovered commit"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "commentId: discovered comment"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/diff",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "commitId": "be65631714af82d0a610a656f8103b04d4d50fce"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "commitId": "discovered commit"
+      },
+      "query_declared": 6,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "contextLines",
+          "diffs",
+          "fromHash",
+          "toHash",
+          "truncated",
+          "whitespace"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits.commitid.diff.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/diff/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "commitId": "be65631714af82d0a610a656f8103b04d4d50fce",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "commitId": "discovered commit",
+        "path": "discovered file path"
+      },
+      "query_declared": 6,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "contextLines",
+          "diffs",
+          "fromHash",
+          "toHash",
+          "truncated",
+          "whitespace"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.compare.diff-path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/diff{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
+      },
+      "query_declared": 6,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "contextLines",
+          "diffs",
+          "fromHash",
+          "toHash",
+          "truncated",
+          "whitespace"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "A file path is required."
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
+      },
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The \"until\" query parameter is required.",
+      "registry_gap": "server requires query parameter 'until'; declared: ['contextLines', 'since', 'srcPath', 'until', 'whitespace']"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.files",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/files",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.files.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/files/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": ".gitignore is not a directory at revision refs/heads/develop"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/last-modified",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Streaming modifications requires a starting commit."
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.last-modified.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/last-modified/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Streaming modifications requires a starting commit."
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.groups",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/groups",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.groups.none",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/groups/none",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.users",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/users",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.permissions.users.none",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/permissions/users/none",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 6,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 16,
+        "top": [
+          "author",
+          "closed",
+          "closedDate",
+          "createdDate",
+          "fromRef",
+          "id",
+          "links",
+          "locked",
+          "open",
+          "participants",
+          "reviewers",
+          "state"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.changes",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/changes",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 9,
+        "top": [
+          "fromHash",
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "properties",
+          "size",
+          "start",
+          "toHash",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/comments",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The path query parameter is required when retrieving comments.",
+      "registry_gap": "server requires query parameter 'path'; declared: ['anchorState', 'diffType', 'fromHash', 'path', 'toHash']"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments.commentid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/comments/{commentId}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "commentId: discovered comment"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.commits",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/commits",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/diff",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 7,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "contextLines",
+          "diffs",
+          "fromHash",
+          "toHash",
+          "truncated",
+          "whitespace"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.diff.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/diff/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request",
+        "path": "discovered file path"
+      },
+      "query_declared": 7,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "contextLines",
+          "diffs",
+          "fromHash",
+          "toHash",
+          "truncated",
+          "whitespace"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.merge",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/merge",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 409,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.participants",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/participants",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/tasks",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.tasks.count",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/tasks/count",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "open",
+          "resolved"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.raw.path",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
+      },
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 500,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks.hookkey",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "hookKey: unmapped argument name 'hookKey'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks.hookkey.settings",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/hooks/{hookKey}/settings",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "hookKey: unmapped argument name 'hookKey'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.pull-requests",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/settings/pull-requests",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 8,
+        "top": [
+          "com.atlassian.bitbucket.server.bitbucket-build:requiredBuilds",
+          "com.atlassian.bitbucket.server.bitbucket-bundled-hooks:requiredApprovers",
+          "mergeConfig",
+          "requiredAllApprovers",
+          "requiredAllTasksComplete",
+          "requiredApprovers",
+          "requiredSuccessfulBuilds",
+          "unapproveOnUpdate"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.tags",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/tags",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.tags.name",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/tags/{name:.*}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "name: unmapped argument name 'name'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.latest",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/latest",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 2,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.statistics",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/statistics",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.repos.repositoryslug.webhooks.webhookid.statistics.summary",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/webhooks/{webhookId}/statistics/summary",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.settings.hooks",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.projects.projectkey.settings.hooks.hookkey",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "hookKey: unmapped argument name 'hookKey'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.settings.hooks.hookkey.settings",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/hooks/{hookKey}/settings",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "hookKey: unmapped argument name 'hookKey'"
+    },
+    {
+      "id": "bitbucket.projects.projectkey.settings.pull-requests.scmid",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/settings/pull-requests/{scmId}",
+      "scope": "admin",
+      "arguments": {
+        "projectKey": "AB"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "scmId: unmapped argument name 'scmId'"
+    },
+    {
+      "id": "bitbucket.repos",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/repos",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.archive",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/archive",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 406,
+      "detail": null
+    },
+    {
+      "id": "bitbucket.repository.commit-comments",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/commits/{commitId}/comments",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "commitId": "be65631714af82d0a610a656f8103b04d4d50fce"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "commitId": "discovered commit"
+      },
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The path query parameter is required when retrieving comments.",
+      "registry_gap": "server requires query parameter 'path'; declared: ['path', 'since', 'start', 'limit']"
+    },
+    {
+      "id": "bitbucket.repository.compare-changes",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/changes",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 5,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 9,
+        "top": [
+          "fromHash",
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "properties",
+          "size",
+          "start",
+          "toHash",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.compare-commits",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/compare/commits",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 5,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.default-branch",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/branches/default",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "displayId",
+          "id",
+          "isDefault",
+          "latestChangeset",
+          "latestCommit",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.forks",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/forks",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.get",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 10,
+        "top": [
+          "forkable",
+          "id",
+          "links",
+          "name",
+          "project",
+          "public",
+          "scmId",
+          "slug",
+          "state",
+          "statusMessage"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.participants",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/participants",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 5,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.pull-request-activity",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/pull-requests/{pullRequestId}/activities",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api",
+        "pullRequestId": "192"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository",
+        "pullRequestId": "discovered pull request"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.repository.raw",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The parameter 'path' is required",
+      "registry_gap": "server requires query parameter 'path'; declared: ['at', 'hardwrap', 'htmlEscape', 'markup']"
+    },
+    {
+      "id": "bitbucket.repository.related",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/related",
+      "scope": "read",
+      "arguments": {
+        "projectKey": "AB",
+        "repositorySlug": "address-book-api"
+      },
+      "argument_sources": {
+        "projectKey": "discovered project",
+        "repositorySlug": "discovered repository"
+      },
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLastPage",
+          "limit",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.task.get",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/tasks/{taskId}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "taskId: unmapped argument name 'taskId'"
+    },
+    {
+      "id": "bitbucket.user.get",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/users/{userSlug}",
+      "scope": "read",
+      "arguments": {
+        "userSlug": "a.abakarov"
+      },
+      "argument_sources": {
+        "userSlug": "discovered user"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 8,
+        "top": [
+          "active",
+          "displayName",
+          "emailAddress",
+          "id",
+          "links",
+          "name",
+          "slug",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.users.list",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/users",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "isLastPage",
+          "limit",
+          "nextPageStart",
+          "size",
+          "start",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "bitbucket.users.userslug.settings",
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/users/{userSlug}/settings",
+      "scope": "admin",
+      "arguments": {
+        "userSlug": "a.abakarov"
+      },
+      "argument_sources": {
+        "userSlug": "discovered user"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "plugin.bitbucket-notification:batchFeatureDiscoveryCount",
+          "user.created.version"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.accessmode",
+      "product": "confluence",
+      "path": "/rest/api/accessmode",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "str",
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.audit",
+      "product": "confluence",
+      "path": "/rest/api/audit",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "confluence.audit.retention",
+      "product": "confluence",
+      "path": "/rest/api/audit/retention",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "confluence.audit.since",
+      "product": "confluence",
+      "path": "/rest/api/audit/since",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "confluence.content.attachments",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/child/attachment",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "blocked",
+      "reason": "id: route: attachment"
+    },
+    {
+      "id": "confluence.content.by-title",
+      "product": "confluence",
+      "path": "/rest/api/content",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 8,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "confluence.content.children",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/child",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "_expandable",
+          "_links"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.convert",
+      "product": "confluence",
+      "path": "/rest/api/contentbody/convert/{to}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "to: unmapped argument name 'to'"
+    },
+    {
+      "id": "confluence.content.id",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 10,
+        "top": [
+          "_expandable",
+          "_links",
+          "extensions",
+          "history",
+          "id",
+          "space",
+          "status",
+          "title",
+          "type",
+          "version"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.id.child.comment",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/child/comment",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 6,
+      "outcome": "blocked",
+      "reason": "id: route: confluence comment"
+    },
+    {
+      "id": "confluence.content.id.child.type",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/child/{type}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249",
+        "type": "page"
+      },
+      "argument_sources": {
+        "id": "route: confluence content",
+        "type": "discovered content type"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.id.descendant",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/descendant",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "_expandable",
+          "_links"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.id.descendant.type",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/descendant/{type}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249",
+        "type": "page"
+      },
+      "argument_sources": {
+        "id": "route: confluence content",
+        "type": "discovered content type"
+      },
+      "query_declared": 3,
+      "outcome": "failed",
+      "category": "http",
+      "status": 501,
+      "detail": null
+    },
+    {
+      "id": "confluence.content.id.history",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/history",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 7,
+        "top": [
+          "_expandable",
+          "_links",
+          "createdBy",
+          "createdDate",
+          "lastUpdated",
+          "latest",
+          "previousVersion"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.id.history.version.macro.hash.hash",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/history/{version}/macro/hash/{hash}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249",
+        "version": "1"
+      },
+      "argument_sources": {
+        "id": "route: confluence content",
+        "version": "arbitrary version probe"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "hash: unmapped argument name 'hash'"
+    },
+    {
+      "id": "confluence.content.id.history.version.macro.id.macroid",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/history/{version}/macro/id/{macroId}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249",
+        "version": "1"
+      },
+      "argument_sources": {
+        "id": "route: confluence content",
+        "version": "arbitrary version probe"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "macroId: unmapped argument name 'macroId'"
+    },
+    {
+      "id": "confluence.content.id.label",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/label",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.id.property.key",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/property/{key}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249",
+        "key": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "id": "route: confluence content",
+        "key": "arbitrary probe key"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "confluence.content.id.restriction.byoperation",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/restriction/byOperation",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 3,
+        "top": [
+          "_links",
+          "read",
+          "update"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.id.restriction.byoperation.operationkey",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/restriction/byOperation/{operationKey}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 3,
+      "outcome": "blocked",
+      "reason": "operationKey: unmapped argument name 'operationKey'"
+    },
+    {
+      "id": "confluence.content.properties",
+      "product": "confluence",
+      "path": "/rest/api/content/{id}/property",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.content.search",
+      "product": "confluence",
+      "path": "/rest/api/content/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "confluence.group",
+      "product": "confluence",
+      "path": "/rest/api/group",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.group.groupname",
+      "product": "confluence",
+      "path": "/rest/api/group/{groupName}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "groupName: no group is known on this deployment"
+    },
+    {
+      "id": "confluence.group.groupname.member",
+      "product": "confluence",
+      "path": "/rest/api/group/{groupName}/member",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "blocked",
+      "reason": "groupName: no group is known on this deployment"
+    },
+    {
+      "id": "confluence.longtask",
+      "product": "confluence",
+      "path": "/rest/api/longtask",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.longtask.id",
+      "product": "confluence",
+      "path": "/rest/api/longtask/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "347249"
+      },
+      "argument_sources": {
+        "id": "route: confluence content"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 500,
+      "detail": null
+    },
+    {
+      "id": "confluence.search",
+      "product": "confluence",
+      "path": "/rest/api/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 7,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "cql query parameter is required Bad Request",
+      "registry_gap": "server requires query parameter 'cql'; declared: ['cql', 'cqlcontext', 'excerpt', 'expand', 'includeArchivedSpaces', 'limit', 'start']"
+    },
+    {
+      "id": "confluence.space",
+      "product": "confluence",
+      "path": "/rest/api/space",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 8,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.space.content",
+      "product": "confluence",
+      "path": "/rest/api/space/{spaceKey}/content",
+      "scope": "read",
+      "arguments": {
+        "spaceKey": "AB"
+      },
+      "argument_sources": {
+        "spaceKey": "discovered space"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 3,
+        "top": [
+          "_links",
+          "blogpost",
+          "page"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.space.get",
+      "product": "confluence",
+      "path": "/rest/api/space/{spaceKey}",
+      "scope": "read",
+      "arguments": {
+        "spaceKey": "AB"
+      },
+      "argument_sources": {
+        "spaceKey": "discovered space"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "_expandable",
+          "_links",
+          "id",
+          "key",
+          "name",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.space.spacekey.content.type",
+      "product": "confluence",
+      "path": "/rest/api/space/{spaceKey}/content/{type}",
+      "scope": "read",
+      "arguments": {
+        "spaceKey": "AB",
+        "type": "page"
+      },
+      "argument_sources": {
+        "spaceKey": "discovered space",
+        "type": "discovered content type"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.space.spacekey.property",
+      "product": "confluence",
+      "path": "/rest/api/space/{spaceKey}/property",
+      "scope": "read",
+      "arguments": {
+        "spaceKey": "AB"
+      },
+      "argument_sources": {
+        "spaceKey": "discovered space"
+      },
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "_links",
+          "limit",
+          "results",
+          "size",
+          "start"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.space.spacekey.property.key",
+      "product": "confluence",
+      "path": "/rest/api/space/{spaceKey}/property/{key}",
+      "scope": "read",
+      "arguments": {
+        "spaceKey": "AB",
+        "key": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "spaceKey": "discovered space",
+        "key": "arbitrary probe key"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "confluence.user.anonymous",
+      "product": "confluence",
+      "path": "/rest/api/user/anonymous",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "_links",
+          "displayName",
+          "profilePicture",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.user.current",
+      "product": "confluence",
+      "path": "/rest/api/user/current",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 7,
+        "top": [
+          "_expandable",
+          "_links",
+          "displayName",
+          "profilePicture",
+          "type",
+          "userKey",
+          "username"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.user.get",
+      "product": "confluence",
+      "path": "/rest/api/user",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "confluence.user.memberof",
+      "product": "confluence",
+      "path": "/rest/api/user/memberof",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Only one query param of key or username is required Bad Request"
+    },
+    {
+      "id": "confluence.user.watch.content.contentid",
+      "product": "confluence",
+      "path": "/rest/api/user/watch/content/{contentId}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "blocked",
+      "reason": "contentId: unmapped argument name 'contentId'"
+    },
+    {
+      "id": "confluence.user.watch.space.spacekey",
+      "product": "confluence",
+      "path": "/rest/api/user/watch/space/{spaceKey}",
+      "scope": "read",
+      "arguments": {
+        "spaceKey": "AB"
+      },
+      "argument_sources": {
+        "spaceKey": "discovered space"
+      },
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "watching"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "confluence.webhooks",
+      "product": "confluence",
+      "path": "/rest/api/webhooks",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "confluence.webhooks.webhookid",
+      "product": "confluence",
+      "path": "/rest/api/webhooks/{webhookId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "confluence.webhooks.webhookid.latest",
+      "product": "confluence",
+      "path": "/rest/api/webhooks/{webhookId}/latest",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "confluence.webhooks.webhookid.statistics",
+      "product": "confluence",
+      "path": "/rest/api/webhooks/{webhookId}/statistics",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "confluence.webhooks.webhookid.statistics.summary",
+      "product": "confluence",
+      "path": "/rest/api/webhooks/{webhookId}/statistics/summary",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "webhookId: unmapped argument name 'webhookId'"
+    },
+    {
+      "id": "jira.application-properties",
+      "product": "jira",
+      "path": "/rest/api/2/application-properties",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.application-properties.advanced-settings",
+      "product": "jira",
+      "path": "/rest/api/2/application-properties/advanced-settings",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.applicationrole",
+      "product": "jira",
+      "path": "/rest/api/2/applicationrole",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.applicationrole.key",
+      "product": "jira",
+      "path": "/rest/api/2/applicationrole/{key}",
+      "scope": "admin",
+      "arguments": {
+        "key": "INC-1753"
+      },
+      "argument_sources": {
+        "key": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.attachment.content",
+      "product": "jira",
+      "path": "/rest/api/2/attachment/{id}/content",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "id: route: Jira attachment"
+    },
+    {
+      "id": "jira.attachment.expand.raw",
+      "product": "jira",
+      "path": "/rest/api/2/attachment/{id}/expand/raw",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "id: route: Jira attachment"
+    },
+    {
+      "id": "jira.attachment.get",
+      "product": "jira",
+      "path": "/rest/api/2/attachment/{id}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "id: route: Jira attachment"
+    },
+    {
+      "id": "jira.attachment.id.expand.human",
+      "product": "jira",
+      "path": "/rest/api/2/attachment/{id}/expand/human",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "id: route: Jira attachment"
+    },
+    {
+      "id": "jira.attachment.meta",
+      "product": "jira",
+      "path": "/rest/api/2/attachment/meta",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "enabled",
+          "uploadLimit"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.auditing.record",
+      "product": "jira",
+      "path": "/rest/api/2/auditing/record",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 7,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.avatar.system",
+      "product": "jira",
+      "path": "/rest/api/2/avatar/{type}/system",
+      "scope": "read",
+      "arguments": {
+        "type": "10002"
+      },
+      "argument_sources": {
+        "type": "discovered issue type"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "jira.cluster.nodes",
+      "product": "jira",
+      "path": "/rest/api/2/cluster/nodes",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.cluster.zdu.state",
+      "product": "jira",
+      "path": "/rest/api/2/cluster/zdu/state",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.comment.commentid.properties",
+      "product": "jira",
+      "path": "/rest/api/2/comment/{commentId}/properties",
+      "scope": "read",
+      "arguments": {
+        "commentId": "98598"
+      },
+      "argument_sources": {
+        "commentId": "discovered comment"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "keys"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.comment.commentid.properties.propertykey",
+      "product": "jira",
+      "path": "/rest/api/2/comment/{commentId}/properties/{propertyKey}",
+      "scope": "read",
+      "arguments": {
+        "commentId": "98598",
+        "propertyKey": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "commentId": "discovered comment",
+        "propertyKey": "arbitrary probe key"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.component.id",
+      "product": "jira",
+      "path": "/rest/api/2/component/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.component.id.relatedissuecounts",
+      "product": "jira",
+      "path": "/rest/api/2/component/{id}/relatedIssueCounts",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.configuration",
+      "product": "jira",
+      "path": "/rest/api/2/configuration",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 8,
+        "top": [
+          "attachmentsEnabled",
+          "issueLinkingEnabled",
+          "subTasksEnabled",
+          "timeTrackingConfiguration",
+          "timeTrackingEnabled",
+          "unassignedIssuesAllowed",
+          "votingEnabled",
+          "watchingEnabled"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.customfieldoption.id",
+      "product": "jira",
+      "path": "/rest/api/2/customFieldOption/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.customfields",
+      "product": "jira",
+      "path": "/rest/api/2/customFields",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 9,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.dashboard.dashboardid.items.itemid.properties",
+      "product": "jira",
+      "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "dashboardId: unmapped argument name 'dashboardId'"
+    },
+    {
+      "id": "jira.dashboard.dashboardid.items.itemid.properties.propertykey",
+      "product": "jira",
+      "path": "/rest/api/2/dashboard/{dashboardId}/items/{itemId}/properties/{propertyKey}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "dashboardId: unmapped argument name 'dashboardId'"
+    },
+    {
+      "id": "jira.dashboard.id",
+      "product": "jira",
+      "path": "/rest/api/2/dashboard/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.dashboard.list",
+      "product": "jira",
+      "path": "/rest/api/2/dashboard",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "dashboards",
+          "maxResults",
+          "startAt",
+          "total"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.email-templates.types",
+      "product": "jira",
+      "path": "/rest/api/2/email-templates/types",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.field.list",
+      "product": "jira",
+      "path": "/rest/api/2/field",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 135,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "clauseNames",
+          "custom",
+          "id",
+          "name",
+          "navigable",
+          "orderable",
+          "schema",
+          "searchable"
+        ]
+      }
+    },
+    {
+      "id": "jira.filter.defaultsharescope",
+      "product": "jira",
+      "path": "/rest/api/2/filter/defaultShareScope",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "scope"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.filter.favourites",
+      "product": "jira",
+      "path": "/rest/api/2/filter/favourite",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 0,
+        "empty": true,
+        "item_type": null,
+        "item_keys": null
+      }
+    },
+    {
+      "id": "jira.filter.id",
+      "product": "jira",
+      "path": "/rest/api/2/filter/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.filter.id.columns",
+      "product": "jira",
+      "path": "/rest/api/2/filter/{id}/columns",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.filter.id.permission",
+      "product": "jira",
+      "path": "/rest/api/2/filter/{id}/permission",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.filter.id.permission.permissionid",
+      "product": "jira",
+      "path": "/rest/api/2/filter/{id}/permission/{permissionId}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "permissionId: unmapped argument name 'permissionId'"
+    },
+    {
+      "id": "jira.group",
+      "product": "jira",
+      "path": "/rest/api/2/group",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.group.member",
+      "product": "jira",
+      "path": "/rest/api/2/group/member",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.groups.picker",
+      "product": "jira",
+      "path": "/rest/api/2/groups/picker",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 3,
+        "top": [
+          "groups",
+          "header",
+          "total"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.groupuserpicker",
+      "product": "jira",
+      "path": "/rest/api/2/groupuserpicker",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 6,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The username query parameter was not provided"
+    },
+    {
+      "id": "jira.index.summary",
+      "product": "jira",
+      "path": "/rest/api/2/index/summary",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.issue-link.get",
+      "product": "jira",
+      "path": "/rest/api/2/issueLink/{linkId}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "linkId: unmapped argument name 'linkId'"
+    },
+    {
+      "id": "jira.issue.comment.get",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/comment/{id}",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753",
+        "id": "98598"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue",
+        "id": "route: comment"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.issue.createmeta",
+      "product": "jira",
+      "path": "/rest/api/2/issue/createmeta",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "expand",
+          "projects"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.createmeta.projectidorkey.issuetypes",
+      "product": "jira",
+      "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLast",
+          "maxResults",
+          "startAt",
+          "total",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.createmeta.projectidorkey.issuetypes.issuetypeid",
+      "product": "jira",
+      "path": "/rest/api/2/issue/createmeta/{projectIdOrKey}/issuetypes/{issueTypeId}",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT",
+        "issueTypeId": "10002"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project",
+        "issueTypeId": "discovered issue type"
+      },
+      "query_declared": 2,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLast",
+          "maxResults",
+          "startAt",
+          "total",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "expand",
+          "fields",
+          "id",
+          "key",
+          "self"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.comment",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/comment",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "comments",
+          "maxResults",
+          "startAt",
+          "total"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.editmeta",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/editmeta",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "fields"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.properties",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/properties",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "keys"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.properties.propertykey",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/properties/{propertyKey}",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753",
+        "propertyKey": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue",
+        "propertyKey": "arbitrary probe key"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.issue.issueidorkey.remotelink",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 0,
+        "empty": true,
+        "item_type": null,
+        "item_keys": null
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.remotelink.linkid",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/remotelink/{linkId}",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "linkId: unmapped argument name 'linkId'"
+    },
+    {
+      "id": "jira.issue.issueidorkey.subtask",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/subtask",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 0,
+        "empty": true,
+        "item_type": null,
+        "item_keys": null
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.transitions",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/transitions",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "expand",
+          "transitions"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.issueidorkey.worklog",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/worklog",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "maxResults",
+          "startAt",
+          "total",
+          "worklogs"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.picker",
+      "product": "jira",
+      "path": "/rest/api/2/issue/picker",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 6,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "sections"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.votes",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/votes",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "hasVoted",
+          "self",
+          "voters",
+          "votes"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.watchers",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/watchers",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 4,
+        "top": [
+          "isWatching",
+          "self",
+          "watchCount",
+          "watchers"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issue.worklog.get",
+      "product": "jira",
+      "path": "/rest/api/2/issue/{issueIdOrKey}/worklog/{id}",
+      "scope": "read",
+      "arguments": {
+        "issueIdOrKey": "INC-1753"
+      },
+      "argument_sources": {
+        "issueIdOrKey": "discovered issue"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "id: route: worklog"
+    },
+    {
+      "id": "jira.issuelinktype",
+      "product": "jira",
+      "path": "/rest/api/2/issueLinkType",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "issueLinkTypes"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issuelinktype.issuelinktypeid",
+      "product": "jira",
+      "path": "/rest/api/2/issueLinkType/{issueLinkTypeId}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "issueLinkTypeId: unmapped argument name 'issueLinkTypeId'"
+    },
+    {
+      "id": "jira.issuesecurityschemes",
+      "product": "jira",
+      "path": "/rest/api/2/issuesecurityschemes",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.issuesecurityschemes.id",
+      "product": "jira",
+      "path": "/rest/api/2/issuesecurityschemes/{id}",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.issuetype",
+      "product": "jira",
+      "path": "/rest/api/2/issuetype",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 49,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "avatarId",
+          "description",
+          "iconUrl",
+          "id",
+          "name",
+          "self",
+          "subtask"
+        ]
+      }
+    },
+    {
+      "id": "jira.issuetype.id",
+      "product": "jira",
+      "path": "/rest/api/2/issuetype/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.issuetype.id.alternatives",
+      "product": "jira",
+      "path": "/rest/api/2/issuetype/{id}/alternatives",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.issuetype.issuetypeid.properties",
+      "product": "jira",
+      "path": "/rest/api/2/issuetype/{issueTypeId}/properties",
+      "scope": "read",
+      "arguments": {
+        "issueTypeId": "10002"
+      },
+      "argument_sources": {
+        "issueTypeId": "discovered issue type"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "keys"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.issuetype.issuetypeid.properties.propertykey",
+      "product": "jira",
+      "path": "/rest/api/2/issuetype/{issueTypeId}/properties/{propertyKey}",
+      "scope": "read",
+      "arguments": {
+        "issueTypeId": "10002",
+        "propertyKey": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "issueTypeId": "discovered issue type",
+        "propertyKey": "arbitrary probe key"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.issuetypescheme",
+      "product": "jira",
+      "path": "/rest/api/2/issuetypescheme",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.issuetypescheme.schemeid",
+      "product": "jira",
+      "path": "/rest/api/2/issuetypescheme/{schemeId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "schemeId: unmapped argument name 'schemeId'"
+    },
+    {
+      "id": "jira.issuetypescheme.schemeid.associations",
+      "product": "jira",
+      "path": "/rest/api/2/issuetypescheme/{schemeId}/associations",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "schemeId: unmapped argument name 'schemeId'"
+    },
+    {
+      "id": "jira.jql.autocomplete",
+      "product": "jira",
+      "path": "/rest/api/2/jql/autocompletedata",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 3,
+        "top": [
+          "jqlReservedWords",
+          "visibleFieldNames",
+          "visibleFunctionNames"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.jql.autocompletedata.suggestions",
+      "product": "jira",
+      "path": "/rest/api/2/jql/autocompletedata/suggestions",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "results"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.monitoring.jmx.aremetricsexposed",
+      "product": "jira",
+      "path": "/rest/api/2/monitoring/jmx/areMetricsExposed",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.monitoring.jmx.getavailablemetrics",
+      "product": "jira",
+      "path": "/rest/api/2/monitoring/jmx/getAvailableMetrics",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.mypermissions.get",
+      "product": "jira",
+      "path": "/rest/api/2/mypermissions",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "permissions"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.mypreferences",
+      "product": "jira",
+      "path": "/rest/api/2/mypreferences",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.myself",
+      "product": "jira",
+      "path": "/rest/api/2/myself",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 13,
+        "top": [
+          "active",
+          "applicationRoles",
+          "avatarUrls",
+          "deleted",
+          "displayName",
+          "emailAddress",
+          "expand",
+          "groups",
+          "key",
+          "locale",
+          "name",
+          "self"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.notificationscheme",
+      "product": "jira",
+      "path": "/rest/api/2/notificationscheme",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "isLast",
+          "maxResults",
+          "startAt",
+          "total",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.notificationscheme.id",
+      "product": "jira",
+      "path": "/rest/api/2/notificationscheme/{id}",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.password.policy",
+      "product": "jira",
+      "path": "/rest/api/2/password/policy",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 0,
+        "empty": true,
+        "item_type": null,
+        "item_keys": null
+      }
+    },
+    {
+      "id": "jira.permissions",
+      "product": "jira",
+      "path": "/rest/api/2/permissions",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.permissionscheme",
+      "product": "jira",
+      "path": "/rest/api/2/permissionscheme",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.permissionscheme.permissionschemeid.attribute.attributekey",
+      "product": "jira",
+      "path": "/rest/api/2/permissionscheme/{permissionSchemeId}/attribute/{attributeKey}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "permissionSchemeId: unmapped argument name 'permissionSchemeId'"
+    },
+    {
+      "id": "jira.permissionscheme.schemeid",
+      "product": "jira",
+      "path": "/rest/api/2/permissionscheme/{schemeId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "schemeId: unmapped argument name 'schemeId'"
+    },
+    {
+      "id": "jira.permissionscheme.schemeid.permission",
+      "product": "jira",
+      "path": "/rest/api/2/permissionscheme/{schemeId}/permission",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "schemeId: unmapped argument name 'schemeId'"
+    },
+    {
+      "id": "jira.permissionscheme.schemeid.permission.permissionid",
+      "product": "jira",
+      "path": "/rest/api/2/permissionscheme/{schemeId}/permission/{permissionId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "schemeId: unmapped argument name 'schemeId'"
+    },
+    {
+      "id": "jira.priority",
+      "product": "jira",
+      "path": "/rest/api/2/priority",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 5,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "description",
+          "iconUrl",
+          "id",
+          "name",
+          "self",
+          "statusColor"
+        ]
+      }
+    },
+    {
+      "id": "jira.priority.id",
+      "product": "jira",
+      "path": "/rest/api/2/priority/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.priorityschemes",
+      "product": "jira",
+      "path": "/rest/api/2/priorityschemes",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.priorityschemes.schemeid",
+      "product": "jira",
+      "path": "/rest/api/2/priorityschemes/{schemeId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "schemeId: unmapped argument name 'schemeId'"
+    },
+    {
+      "id": "jira.project",
+      "product": "jira",
+      "path": "/rest/api/2/project",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 15,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "archived",
+          "avatarUrls",
+          "expand",
+          "id",
+          "key",
+          "name",
+          "projectTypeKey",
+          "self"
+        ]
+      }
+    },
+    {
+      "id": "jira.project.components",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/components",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 24,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "archived",
+          "assignee",
+          "assigneeType",
+          "id",
+          "isAssigneeTypeValid",
+          "lead",
+          "name",
+          "project",
+          "projectId",
+          "realAssignee",
+          "realAssigneeType",
+          "self"
+        ]
+      }
+    },
+    {
+      "id": "jira.project.get",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 15,
+        "top": [
+          "archived",
+          "assigneeType",
+          "avatarUrls",
+          "components",
+          "description",
+          "expand",
+          "id",
+          "issueTypes",
+          "key",
+          "lead",
+          "name",
+          "projectTypeKey"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.project.projectidorkey.avatars",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/avatars",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "custom",
+          "system"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.project.projectidorkey.properties",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/properties",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "keys"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.project.projectidorkey.properties.propertykey",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/properties/{propertyKey}",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT",
+        "propertyKey": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project",
+        "propertyKey": "arbitrary probe key"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.project.projectidorkey.role.id",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/role/{id}",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT",
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project",
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.project.projectidorkey.version",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/version",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 4,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 7,
+        "top": [
+          "isLast",
+          "maxResults",
+          "nextPage",
+          "self",
+          "startAt",
+          "total",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.project.projectkeyorid.issuesecuritylevelscheme",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectKeyOrId}/issuesecuritylevelscheme",
+      "scope": "admin",
+      "arguments": {
+        "projectKeyOrId": "BCHAT"
+      },
+      "argument_sources": {
+        "projectKeyOrId": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.project.projectkeyorid.notificationscheme",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectKeyOrId}/notificationscheme",
+      "scope": "admin",
+      "arguments": {
+        "projectKeyOrId": "BCHAT"
+      },
+      "argument_sources": {
+        "projectKeyOrId": "discovered Jira project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Selected project does not exist."
+    },
+    {
+      "id": "jira.project.projectkeyorid.permissionscheme",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectKeyOrId}/permissionscheme",
+      "scope": "admin",
+      "arguments": {
+        "projectKeyOrId": "BCHAT"
+      },
+      "argument_sources": {
+        "projectKeyOrId": "discovered Jira project"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.project.projectkeyorid.priorityscheme",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectKeyOrId}/priorityscheme",
+      "scope": "admin",
+      "arguments": {
+        "projectKeyOrId": "BCHAT"
+      },
+      "argument_sources": {
+        "projectKeyOrId": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.project.projectkeyorid.securitylevel",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectKeyOrId}/securitylevel",
+      "scope": "read",
+      "arguments": {
+        "projectKeyOrId": "BCHAT"
+      },
+      "argument_sources": {
+        "projectKeyOrId": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "levels"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.project.projectkeyorid.workflowscheme",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectKeyOrId}/workflowscheme",
+      "scope": "admin",
+      "arguments": {
+        "projectKeyOrId": "BCHAT"
+      },
+      "argument_sources": {
+        "projectKeyOrId": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.project.roles",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/role",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.project.statuses",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/statuses",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 7,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "id",
+          "name",
+          "self",
+          "statuses",
+          "subtask"
+        ]
+      }
+    },
+    {
+      "id": "jira.project.type",
+      "product": "jira",
+      "path": "/rest/api/2/project/type",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 2,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "color",
+          "descriptionI18nKey",
+          "formattedKey",
+          "icon",
+          "key"
+        ]
+      }
+    },
+    {
+      "id": "jira.project.type.projecttypekey",
+      "product": "jira",
+      "path": "/rest/api/2/project/type/{projectTypeKey}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "projectTypeKey: unmapped argument name 'projectTypeKey'"
+    },
+    {
+      "id": "jira.project.type.projecttypekey.accessible",
+      "product": "jira",
+      "path": "/rest/api/2/project/type/{projectTypeKey}/accessible",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "projectTypeKey: unmapped argument name 'projectTypeKey'"
+    },
+    {
+      "id": "jira.project.versions",
+      "product": "jira",
+      "path": "/rest/api/2/project/{projectIdOrKey}/versions",
+      "scope": "read",
+      "arguments": {
+        "projectIdOrKey": "BCHAT"
+      },
+      "argument_sources": {
+        "projectIdOrKey": "discovered Jira project"
+      },
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 138,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "archived",
+          "id",
+          "name",
+          "projectId",
+          "releaseDate",
+          "released",
+          "self",
+          "startDate",
+          "userReleaseDate",
+          "userStartDate"
+        ]
+      }
+    },
+    {
+      "id": "jira.projectcategory",
+      "product": "jira",
+      "path": "/rest/api/2/projectCategory",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 0,
+        "empty": true,
+        "item_type": null,
+        "item_keys": null
+      }
+    },
+    {
+      "id": "jira.projectcategory.id",
+      "product": "jira",
+      "path": "/rest/api/2/projectCategory/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.projects.picker",
+      "product": "jira",
+      "path": "/rest/api/2/projects/picker",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 1,
+        "top": [
+          "projects"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.projectvalidate.key",
+      "product": "jira",
+      "path": "/rest/api/2/projectvalidate/key",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 2,
+        "top": [
+          "errorMessages",
+          "errors"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.reindex",
+      "product": "jira",
+      "path": "/rest/api/2/reindex",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 7,
+        "top": [
+          "currentProgress",
+          "finishTime",
+          "progressUrl",
+          "startTime",
+          "submittedTime",
+          "success",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.reindex.progress",
+      "product": "jira",
+      "path": "/rest/api/2/reindex/progress",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 7,
+        "top": [
+          "currentProgress",
+          "finishTime",
+          "progressUrl",
+          "startTime",
+          "submittedTime",
+          "success",
+          "type"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.reindex.request.bulk",
+      "product": "jira",
+      "path": "/rest/api/2/reindex/request/bulk",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 0,
+        "empty": true,
+        "item_type": null,
+        "item_keys": null
+      }
+    },
+    {
+      "id": "jira.reindex.request.requestid",
+      "product": "jira",
+      "path": "/rest/api/2/reindex/request/{requestId}",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "requestId: unmapped argument name 'requestId'"
+    },
+    {
+      "id": "jira.resolution",
+      "product": "jira",
+      "path": "/rest/api/2/resolution",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 14,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "description",
+          "id",
+          "name",
+          "self"
+        ]
+      }
+    },
+    {
+      "id": "jira.resolution.id",
+      "product": "jira",
+      "path": "/rest/api/2/resolution/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.rest.auth.1.session",
+      "product": "jira",
+      "path": "/rest/auth/1/session",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 3,
+        "top": [
+          "loginInfo",
+          "name",
+          "self"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.role",
+      "product": "jira",
+      "path": "/rest/api/2/role",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.role.id",
+      "product": "jira",
+      "path": "/rest/api/2/role/{id}",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.role.id.actors",
+      "product": "jira",
+      "path": "/rest/api/2/role/{id}/actors",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.screens",
+      "product": "jira",
+      "path": "/rest/api/2/screens",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.screens.screenid.availablefields",
+      "product": "jira",
+      "path": "/rest/api/2/screens/{screenId}/availableFields",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "screenId: unmapped argument name 'screenId'"
+    },
+    {
+      "id": "jira.screens.screenid.tabs",
+      "product": "jira",
+      "path": "/rest/api/2/screens/{screenId}/tabs",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "screenId: unmapped argument name 'screenId'"
+    },
+    {
+      "id": "jira.screens.screenid.tabs.tabid.fields",
+      "product": "jira",
+      "path": "/rest/api/2/screens/{screenId}/tabs/{tabId}/fields",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "screenId: unmapped argument name 'screenId'"
+    },
+    {
+      "id": "jira.search",
+      "product": "jira",
+      "path": "/rest/api/2/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 6,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "expand",
+          "issues",
+          "maxResults",
+          "startAt",
+          "total"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.search.post",
+      "product": "jira",
+      "path": "/rest/api/2/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "jira.securitylevel.id",
+      "product": "jira",
+      "path": "/rest/api/2/securitylevel/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.serverinfo",
+      "product": "jira",
+      "path": "/rest/api/2/serverInfo",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 10,
+        "top": [
+          "baseUrl",
+          "buildDate",
+          "buildNumber",
+          "databaseBuildNumber",
+          "deploymentType",
+          "scmInfo",
+          "serverTime",
+          "serverTitle",
+          "version",
+          "versionNumbers"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.settings.columns",
+      "product": "jira",
+      "path": "/rest/api/2/settings/columns",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.status",
+      "product": "jira",
+      "path": "/rest/api/2/status",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 55,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "description",
+          "iconUrl",
+          "id",
+          "name",
+          "self",
+          "statusCategory"
+        ]
+      }
+    },
+    {
+      "id": "jira.status.idorname",
+      "product": "jira",
+      "path": "/rest/api/2/status/{idOrName}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "idOrName: unmapped argument name 'idOrName'"
+    },
+    {
+      "id": "jira.statuscategory",
+      "product": "jira",
+      "path": "/rest/api/2/statuscategory",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 4,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "colorName",
+          "id",
+          "key",
+          "name",
+          "self"
+        ]
+      }
+    },
+    {
+      "id": "jira.statuscategory.idorkey",
+      "product": "jira",
+      "path": "/rest/api/2/statuscategory/{idOrKey}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "idOrKey: unmapped argument name 'idOrKey'"
+    },
+    {
+      "id": "jira.terminology.entries",
+      "product": "jira",
+      "path": "/rest/api/2/terminology/entries",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 2,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "isDefault",
+          "newName",
+          "newNamePlural",
+          "originalName",
+          "originalNamePlural"
+        ]
+      }
+    },
+    {
+      "id": "jira.terminology.entries.originalname",
+      "product": "jira",
+      "path": "/rest/api/2/terminology/entries/{originalName}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "originalName: unmapped argument name 'originalName'"
+    },
+    {
+      "id": "jira.universal-avatar.type.type.owner.owningobjectid",
+      "product": "jira",
+      "path": "/rest/api/2/universal_avatar/type/{type}/owner/{owningObjectId}",
+      "scope": "admin",
+      "arguments": {
+        "type": "10002"
+      },
+      "argument_sources": {
+        "type": "discovered issue type"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "owningObjectId: unmapped argument name 'owningObjectId'"
+    },
+    {
+      "id": "jira.upgrade",
+      "product": "jira",
+      "path": "/rest/api/2/upgrade",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.user.a11y.personal-settings",
+      "product": "jira",
+      "path": "/rest/api/2/user/a11y/personal-settings",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 4,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "description",
+          "enabled",
+          "image",
+          "key",
+          "label"
+        ]
+      }
+    },
+    {
+      "id": "jira.user.anonymization",
+      "product": "jira",
+      "path": "/rest/api/2/user/anonymization",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.user.anonymization.progress",
+      "product": "jira",
+      "path": "/rest/api/2/user/anonymization/progress",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.user.anonymization.rerun",
+      "product": "jira",
+      "path": "/rest/api/2/user/anonymization/rerun",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.user.assignable-search",
+      "product": "jira",
+      "path": "/rest/api/2/user/assignable/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 6,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "jira.user.assignable.multiprojectsearch",
+      "product": "jira",
+      "path": "/rest/api/2/user/assignable/multiProjectSearch",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Required field 'projectKeys' was not provided",
+      "registry_gap": "server requires query parameter 'projectKeys'; declared: ['maxResults', 'projectKeys', 'username']"
+    },
+    {
+      "id": "jira.user.avatars",
+      "product": "jira",
+      "path": "/rest/api/2/user/avatars",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The username query parameter was not provided"
+    },
+    {
+      "id": "jira.user.columns",
+      "product": "jira",
+      "path": "/rest/api/2/user/columns",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "array",
+        "items": 12,
+        "empty": false,
+        "item_type": "dict",
+        "item_keys": [
+          "label",
+          "value"
+        ]
+      }
+    },
+    {
+      "id": "jira.user.duplicated.count",
+      "product": "jira",
+      "path": "/rest/api/2/user/duplicated/count",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.user.duplicated.list",
+      "product": "jira",
+      "path": "/rest/api/2/user/duplicated/list",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 403,
+      "detail": null
+    },
+    {
+      "id": "jira.user.get",
+      "product": "jira",
+      "path": "/rest/api/2/user",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 3,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "jira.user.permission.search",
+      "product": "jira",
+      "path": "/rest/api/2/user/permission/search",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 6,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "At least one permission name must be specified"
+    },
+    {
+      "id": "jira.user.picker",
+      "product": "jira",
+      "path": "/rest/api/2/user/picker",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The username query parameter was not provided"
+    },
+    {
+      "id": "jira.user.properties",
+      "product": "jira",
+      "path": "/rest/api/2/user/properties",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Either 'username' or 'userKey' query parameter needs to be provided"
+    },
+    {
+      "id": "jira.user.properties.propertykey",
+      "product": "jira",
+      "path": "/rest/api/2/user/properties/{propertyKey}",
+      "scope": "read",
+      "arguments": {
+        "propertyKey": "atlawire.live.test"
+      },
+      "argument_sources": {
+        "propertyKey": "arbitrary probe key"
+      },
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "Either 'username' or 'userKey' query parameter needs to be provided"
+    },
+    {
+      "id": "jira.user.search",
+      "product": "jira",
+      "path": "/rest/api/2/user/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 5,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "The username query parameter was not provided"
+    },
+    {
+      "id": "jira.user.viewissue.search",
+      "product": "jira",
+      "path": "/rest/api/2/user/viewissue/search",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "No project or issue key was provided"
+    },
+    {
+      "id": "jira.version.id",
+      "product": "jira",
+      "path": "/rest/api/2/version/{id}",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.version.id.relatedissuecounts",
+      "product": "jira",
+      "path": "/rest/api/2/version/{id}/relatedIssueCounts",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.version.id.unresolvedissuecount",
+      "product": "jira",
+      "path": "/rest/api/2/version/{id}/unresolvedIssueCount",
+      "scope": "read",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 404,
+      "detail": null
+    },
+    {
+      "id": "jira.version.remotelink",
+      "product": "jira",
+      "path": "/rest/api/2/version/remotelink",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 400,
+      "detail": "globalId: 'globalId' is required.",
+      "registry_gap": "server requires query parameter 'globalId'; declared: ['globalId']"
+    },
+    {
+      "id": "jira.version.versionid.remotelink",
+      "product": "jira",
+      "path": "/rest/api/2/version/{versionId}/remotelink",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "versionId: unmapped argument name 'versionId'"
+    },
+    {
+      "id": "jira.version.versionid.remotelink.globalid",
+      "product": "jira",
+      "path": "/rest/api/2/version/{versionId}/remotelink/{globalId}",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "versionId: unmapped argument name 'versionId'"
+    },
+    {
+      "id": "jira.workflow",
+      "product": "jira",
+      "path": "/rest/api/2/workflow",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflow.transitions.id.properties",
+      "product": "jira",
+      "path": "/rest/api/2/workflow/transitions/{id}/properties",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 4,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflowscheme.id",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflowscheme.id.default",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/default",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflowscheme.id.draft",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/draft",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflowscheme.id.draft.default",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/draft/default",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflowscheme.id.draft.issuetype.issuetype",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/draft/issuetype/{issueType}",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 0,
+      "outcome": "blocked",
+      "reason": "issueType: unmapped argument name 'issueType'"
+    },
+    {
+      "id": "jira.workflowscheme.id.draft.workflow",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/draft/workflow",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.workflowscheme.id.issuetype.issuetype",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/issuetype/{issueType}",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 1,
+      "outcome": "blocked",
+      "reason": "issueType: unmapped argument name 'issueType'"
+    },
+    {
+      "id": "jira.workflowscheme.id.workflow",
+      "product": "jira",
+      "path": "/rest/api/2/workflowscheme/{id}/workflow",
+      "scope": "admin",
+      "arguments": {
+        "id": "INC-1753"
+      },
+      "argument_sources": {
+        "id": "route: issue"
+      },
+      "query_declared": 2,
+      "outcome": "failed",
+      "category": "http",
+      "status": 401,
+      "detail": null
+    },
+    {
+      "id": "jira.worklog.deleted",
+      "product": "jira",
+      "path": "/rest/api/2/worklog/deleted",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 5,
+        "top": [
+          "lastPage",
+          "self",
+          "since",
+          "until",
+          "values"
+        ],
+        "empty": false
+      }
+    },
+    {
+      "id": "jira.worklog.list",
+      "product": "jira",
+      "path": "/rest/api/2/worklog/list",
+      "scope": "read",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 0,
+      "outcome": "failed",
+      "category": "validation",
+      "status": null,
+      "detail": null
+    },
+    {
+      "id": "jira.worklog.updated",
+      "product": "jira",
+      "path": "/rest/api/2/worklog/updated",
+      "scope": "admin",
+      "arguments": {},
+      "argument_sources": {},
+      "query_declared": 1,
+      "outcome": "ok",
+      "shape": {
+        "type": "object",
+        "keys": 6,
+        "top": [
+          "lastPage",
+          "nextPage",
+          "self",
+          "since",
+          "until",
+          "values"
+        ],
+        "empty": false
+      }
+    }
+  ]
+}
