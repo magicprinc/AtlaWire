@@ -2199,8 +2199,15 @@ def read_binary(
     destination: str,
     max_bytes: int = BINARY_MAX_BYTES,
     allow_http_loopback: bool = False,
+    query: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Stream one registered binary read into ``destination``.
+
+    ``query`` carries the operation's declared query fields. They are validated
+    against the registry and forwarded to the request: an archive's ``format``,
+    a raw file's ``at`` revision, or an avatar's ``s`` size changes the bytes the
+    server returns, so dropping them would publish a different file than the
+    caller asked for while still reporting success.
 
     The destination must not exist. Nothing is published on failure, and the
     returned receipt describes the complete file that was written.
@@ -2211,6 +2218,7 @@ def read_binary(
     if not isinstance(destination, str) or not destination:
         raise _invalid(_BINARY_TARGET, operation)
     path = _render_path(operation, arguments)
+    params = _validated_query(operation, query)
     base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     if not isinstance(token, str):
         raise AtlaWireError(
@@ -2225,6 +2233,7 @@ def read_binary(
         path,
         token=token,
         destination=destination,
+        params=params or None,
         max_bytes=max_bytes,
         allow_http_loopback=allow_http_loopback,
     )

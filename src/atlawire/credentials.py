@@ -12,6 +12,7 @@ without appearing in an argument list, a shell history, or a terminal echo.
 
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,6 +37,10 @@ _SAVE_EXISTING_INVALID = (
 _SAVE_WRITE_FAILED = "Could not write the saved credentials file."
 _FILE_MODE = 0o600
 _DIRECTORY_MODE = 0o700
+
+# One writer at a time in this process: read-modify-write must not interleave, or
+# the second save would publish a document that lacks the first one's entry.
+_SAVE_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +177,11 @@ def save_credentials(
     destination and renamed over it, so a concurrent reader sees either the old
     file or the new one, and the file is created with owner-only permissions.
 
+    A directory this call creates is private; a directory that already existed
+    is never modified, because an override path may point at a shared location
+    this tool does not own. Two saves in one process are serialised, so the
+    second reads the first one's result instead of overwriting it.
+
     Neither the token nor the document contents are ever included in an error.
     """
     if product not in PRODUCTS:
@@ -184,10 +194,11 @@ def save_credentials(
         raise AtlaWireError(
             _SAVE_INVALID, category="credentials", product=product
         ) from None
-    document = _existing_document()
-    document[f"{product}_url"] = base
-    document[f"{product}_token"] = token
-    _write_document(document, product=product)
+    with _SAVE_LOCK:
+        document = _existing_document()
+        document[f"{product}_url"] = base
+        document[f"{product}_token"] = token
+        _write_document(document, product=product)
     return credentials_path()
 
 
@@ -196,8 +207,9 @@ def _write_document(document: dict[str, object], *, product: str) -> None:
     path = credentials_path()
     temporary: Path | None = None
     try:
+        created = not path.parent.exists()
         path.parent.mkdir(parents=True, exist_ok=True)
-        if os.name != "nt":
+        if created and os.name != "nt":
             _restrict_directory(path.parent)
         temporary = create_temporary_file(path)
         with temporary.open("w", encoding="utf-8") as stream:

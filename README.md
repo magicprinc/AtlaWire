@@ -14,27 +14,32 @@ not replace opening the underlying issue, page, or file as evidence.
 
 ## Status and verified scope
 
-- 89 visible read-only commands (`atlawire --catalog`) and 202 registered read
+- 92 visible read-only commands (`atlawire --catalog`) and 317 registered read
   operations (`atlawire operations`) are advertised. Only `jira.project.get`,
   `confluence.space.get` and `bitbucket.repository.get` are in the canonical
   `--catalog` operations list; the rest are reachable through `read <id>` and the
-  existing commands. There are no writes, transition execution, arbitrary or
-  mutating REST calls beyond the read-only `api-get`/`api-request` layer described
-  below (non-administrative GETs and four documented read-only POSTs), profile/keyring,
-  response caches, or MCP features.
+  existing commands. The tool makes no server-side writes, transition execution,
+  arbitrary or mutating REST calls beyond the read-only `api-get`/`api-request`
+  layer described below (non-administrative GETs and four documented read-only
+  POSTs), profile/keyring, response caches, or MCP features. Two explicit local
+  writes exist: `login` saves one token to the credentials file, and
+  `--out` on `read`/`attachment-get` writes one new file and prints a receipt.
 - The package is unpublished and installed editably from this checkout. CPython
   3.15 is the only tested runtime. A wheel builds offline with the pinned
-  Hatchling backend; a clean install from that wheel is not yet verified here.
+  Hatchling backend; a wheel build and install into a target directory is
+  exercised, while a clean install on a fresh machine is still unverified.
 - The offline suite in `tests/` is specification-first and runs with the installed
   CPython 3.15 (`python -B -m pytest -p no:cacheprovider -q tests`). It covers unit,
   adapter-boundary, and in-process Click-runner loopback behaviour and never contacts
-  a real instance. The installed console entry point is exercised by the release
-  gate, not by this suite. A green suite is not release approval and does not prove
-  live behaviour or a clean-wheel install.
-- Local gates are green: `ruff check src tests checks`, `ruff check --select S src`,
-  `ruff format --check src tests checks`, and `pyright src` all pass. The `tests/`
-  and `checks/` trees still carry known typing noise outside the release gate. No CI
-  workflow is configured yet (the repository has no CI configuration files).
+  a real instance. The installed console entry point is verified manually against a
+  built wheel, not by this suite. A green suite is not release approval and does not
+  prove live behaviour.
+- Local gates are green: `ruff check src tests checks tools`,
+  `ruff check --select S src`, `ruff format --check src tests checks tools`, and
+  `pyright src` all pass. The `tests/` and `checks/` trees still carry known typing
+  noise outside the release gate. `.github/workflows/ci.yml` runs the same gates,
+  the registry `--check` tools and the offline suite on every push; a wheel build
+  and clean install are not part of it.
 - Live read-only checks passed on one self-hosted setup on 2026-11-23
   (`checks/e2e_param_matrix_report.md`: CLI check 32/32 observations, Jira/Confluence
   CLI 22/22 steps, parameter matrix PASS=70 CAP=8 GAP=3 DEFECT=0, REST matrix 86 rows
@@ -42,14 +47,14 @@ not replace opening the underlying issue, page, or file as evidence.
   bearer authentication, permissions, TLS, and the relevant reads elsewhere. No
   supported-version matrix is published.
 - The required REST inventory is frozen in `.development/rest-inventory.json`:
-  252 documented rows, **201 required**, 51 excluded with a stated reason, 0
+  252 documented rows, **199 required**, 53 excluded with a stated reason, 0
   unresolved. `tools/build_rest_inventory.py --check` verifies both directions,
   so a required row without a registered operation, or a registered operation
   with no disposition, fails. The registry is an inventory, not proof of
   complete REST coverage, and the inventory and the registry share one input.
-- Query surfaces are mostly unreconciled: 22 of the 202 registered operations
-  declare query fields and 180 declare none. `--describe` reports that as
-  `query_documented: true | null`; `null` means "not reconciled with the
+- Query surfaces are partly unreconciled: 178 of the 317 registered operations
+  declare query fields (472 fields) and 139 declare none. `--describe` reports that
+  as `query_documented: true | null`; `null` means "not reconciled with the
   versioned reference", not "the route takes no parameters", and `read` rejects
   query values for such an operation. 152 operations also use the generic JSON
   response shape, so their response contracts remain unverified.
@@ -675,8 +680,8 @@ atlawire attachment-get DEMO/widgets 42 --base64 --max-bytes 1048576 --token-fro
 `/rest/api/1.0/projects/KEY/repos/slug/attachments/ID` and prints a JSON object
 with a `base64` string field. `REPO` is `PROJECT/slug`; `ID` must be one safe
 path segment. `--base64` selects the encoded output, and `--max-bytes` defaults
-to 8 MiB. A larger body fails instead of being truncated. Nothing is written to
-local storage, and no response link or redirect is followed.
+to 8 MiB. A larger body fails instead of being truncated. The bytes go to the
+`--out` destination only; no response link or redirect is followed.
 
 The route is BBK-observed: the local Bitbucket 5.10 core documentation does not
 describe it, and real-system compatibility is unverified. This documentation is
@@ -1024,7 +1029,7 @@ execution or full plugin safety.
 ## Not implemented
 
 Writes and transition execution, arbitrary or mutating REST calls, product-grouped
-subcommands, profiles/keyring, `.env` loading, response caches, an MCP server, CI, and
+subcommands, profiles/keyring, `.env` loading, response caches, an MCP server, and
 published packages are not part of the current read-only tool; the only REST surface
 is the fixed `api-get`/`api-request` allowlist described above. Full `bbk` parity, a
 doctor/health command, and automatic fallback inside `pr … diff` remain deferred;

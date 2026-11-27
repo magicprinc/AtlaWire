@@ -4,8 +4,9 @@ Each test pins one finding so it cannot come back silently. They are offline: th
 assertion is on the registry the tools read, not on a live answer.
 """
 
-import inspect
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,64 @@ from atlawire import operations
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = {entry["id"]: entry for entry in operations.list_operations()}
+SYNTHETIC_TOKEN = "synthetic-findings-token"
+IMAGE_BYTES = b"\x89PNG\r\n\x1a\n fake avatar"
+
+
+@pytest.fixture
+def loopback():
+    """One loopback product that records each request and answers like the server."""
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.0"
+
+        def _reply(self, body: bytes, content_type: str) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            self.server.calls.append(
+                {"method": "GET", "path": self.path, "headers": dict(self.headers)}
+            )
+            # An image route refuses the JSON Accept the shared session sends.
+            if self.headers.get("Accept") == "application/json":
+                self.send_response(406)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self._reply(IMAGE_BYTES, "image/png")
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(length)
+            self.server.calls.append(
+                {
+                    "method": "POST",
+                    "path": self.path,
+                    "headers": dict(self.headers),
+                    "body": body,
+                }
+            )
+            self._reply(b'{"issues": []}', "application/json")
+
+        def log_message(self, *args):
+            pass
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    httpd.calls = []
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{httpd.server_port}"
+    try:
+        yield httpd, base
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+        assert not thread.is_alive()
 
 
 def _field(operation_id: str, name: str) -> dict[str, object]:
@@ -71,19 +130,40 @@ def test_memberof_declares_the_exactly_one_rule():
     assert rules["exactly_one"] == ["key", "username"]
 
 
-def test_a_post_read_is_reachable_from_the_library_entry_point():
+def test_a_post_read_is_reachable_from_the_library_entry_point(loopback):
     """D8: a POST used to raise 'requires the library transport' for a library caller."""
-    source = inspect.getsource(operations.read_operation)
-    assert 'use_library or operation.method != "GET"' in source
-    assert "requires the library transport" not in source
+    httpd, base = loopback
+
+    result = operations.read_operation(
+        "jira.search.post",
+        base,
+        token=SYNTHETIC_TOKEN,
+        arguments={},
+        body={"jql": "project = DEMO"},
+        allow_http_loopback=True,
+    )
+
+    assert result == {"issues": []}
+    assert httpd.calls[0]["method"] == "POST"
+    assert json.loads(httpd.calls[0]["body"]) == {"jql": "project = DEMO"}
 
 
-def test_the_binary_reader_states_what_it_accepts():
+def test_the_binary_reader_states_what_it_accepts(loopback, tmp_path):
     """D5: an image route answers 406 to the JSON Accept the session sends."""
-    from atlawire import sdk
+    httpd, base = loopback
+    destination = tmp_path / "avatar.png"
 
-    source = inspect.getsource(sdk._send_binary)
-    assert 'accept="*/*"' in source
+    operations.read_binary(
+        "bitbucket.project.avatar",
+        base,
+        token=SYNTHETIC_TOKEN,
+        arguments={"projectKey": "AB"},
+        destination=str(destination),
+        allow_http_loopback=True,
+    )
+
+    assert httpd.calls[0]["headers"].get("Accept") == "*/*"
+    assert destination.read_bytes() == IMAGE_BYTES
 
 
 def test_a_wildcard_file_route_is_never_declared_as_json():

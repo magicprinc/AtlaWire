@@ -27,7 +27,7 @@ Every command below was run in the repository root and its exit code recorded.
 | --- | --- | --- | --- |
 | Syntax, every module | `python -m compileall -q src tests checks tools` | 0 | clean |
 | Import, every module | import all 27 `atlawire.*` modules | 0 | 0 failures |
-| Full test suite | `python -B -m pytest -p no:cacheprovider -q` | 0 | **1171 passed, 1 skipped** |
+| Full test suite | `python -B -m pytest -p no:cacheprovider -q` | 0 | **1192 passed, 2 skipped** |
 | Lint | `python -m ruff check src tests checks tools` | 0 | All checks passed |
 | Security lint | `python -m ruff check --select S src` | 0 | All checks passed |
 | Format | `python -m ruff format --check src tests checks tools` | 0 | 142 files |
@@ -39,15 +39,17 @@ Every command below was run in the repository root and its exit code recorded.
 | Admin surface | `python -B tools/build_admin_surface.py --check` | 0 | 117 operations, 5 deferred |
 | API surface | `python -B tools/check_api_surface.py --check` | 0 | matches the baseline |
 | Read-only audit | `python -B tools/check_read_only.py` | 0 | every declared operation only reads |
-| Wheel build | `python -m pip wheel . --no-deps -w dist` | 0 | `atlawire-0.9.10-py3-none-any.whl` |
+| Wheel build | `python -m pip wheel . --no-deps -w dist` | 0 | `atlawire-0.9.10-py3-none-any.whl`, sha256 `313fad05…` |
+| Installed wheel | install into `target/0.9.10`, run `atlawire.exe` | 0 | 317 operations; `read`/`api-get` failures exit 2 with a JSON envelope |
 
-### The one skip
+### The two skips
 
-`tests/test_spec_login_command.py::test_the_saved_file_is_owner_only` is skipped on
-Windows: it asserts POSIX mode bits (`0o600`), which Windows does not express. The
-same contract is enforced by the code (`os.chmod` is best-effort and the profile
-ACL is the real boundary), and the skip is declared in the test itself rather than
-silently disabled.
+`tests/test_spec_login_command.py::test_the_saved_file_is_owner_only` and
+`tests/test_spec_review_fixes.py::test_a_new_credentials_directory_is_created_private`
+skip on Windows: both assert POSIX mode bits (`0o600`/`0o700`), which Windows does
+not express. The same contract is enforced by the code (`os.chmod` is best-effort
+and the profile ACL is the real boundary), and each skip is declared in the test
+itself rather than silently disabled.
 
 ### pip-audit's two skipped names
 
@@ -74,7 +76,7 @@ token. They prove deployed behaviour, not unit behaviour.
 | Avatar binary read | 3 098 bytes, `image/png` |
 
 The full tester sweep (`checks/live_tester_*.py`) is the broader evidence: 317
-registered operations, 481 declared query fields, 90 CLI commands, the public
+registered operations, 472 declared query fields, 92 CLI commands, the public
 Python API, and 73 BBK functions. Its output lives in `checks/live_tester_*.json`
 and its findings in `checks/TEST-FINDINGS.md`.
 

@@ -9,7 +9,7 @@ import sys
 from io import TextIOWrapper
 from pathlib import Path
 from typing import cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import click
 import requests
@@ -144,6 +144,7 @@ from atlawire.http import (
     bearer_session,
     get_json_array,
     get_json_object,
+    new_session,
     normalize_base_url,
     reject_credential_echo,
 )
@@ -519,7 +520,10 @@ def _product_base_url_and_token(
             )
         token = os.environ.get(token_name, "")
         if not BEARER_TOKEN_GRAMMAR.fullmatch(token):
-            raise click.ClickException(
+            # Configuration is checked before any request, so this is a usage
+            # failure with the same exit code as a missing URL. A read failure
+            # (exit 1) would send a caller to look at the server instead.
+            raise click.UsageError(
                 f"Missing or invalid bearer token in {token_name} "
                 "when using --token-from-env."
             )
@@ -531,6 +535,10 @@ def _product_base_url_and_token(
             allow_http_loopback=allow_http_loopback,
         )
     except AtlaWireError as exc:
+        # Saved-file problems are configuration too: the file is missing or
+        # unreadable before any request exists.
+        if exc.category == "credentials":
+            raise click.UsageError(str(exc)) from None
         raise _click_error(exc) from None
     return saved.base_url, saved.token
 
@@ -854,6 +862,45 @@ def find_command(
     click.echo(json.dumps(result))
 
 
+class _MachineReadCommand(click.Command):
+    """A read command that answers framework parse failures with JSON.
+
+    Click parses options and required parameters in
+    [parse_args][click.Command.parse_args] before the callback exists, so a
+    missing required option, an unknown option, a missing option value, or an
+    extra positional would otherwise leave stdout empty and print text on
+    stderr. Every command that promises one JSON ``validation_error`` document
+    and exit 2 with no credential, file, or network activity converts those
+    failures here.
+
+    ``product`` comes only from the already-parsed argument, never from scanning
+    raw tokens: an option-looking value stays a value, and an unparsed argument
+    leaves ``product`` null. The message is fixed and never repeats the
+    exception text.
+    """
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        try:
+            return super().parse_args(ctx, args)
+        except click.UsageError:
+            operation_id = ctx.params.get("operation_id")
+            product = (
+                _product_of_operation(operation_id)
+                if isinstance(operation_id, str)
+                else None
+            )
+            click.echo(
+                json.dumps(
+                    _error_envelope(
+                        product,
+                        code="validation_error",
+                        message="The read command line is invalid.",
+                    )
+                )
+            )
+            raise click.exceptions.Exit(2) from None
+
+
 @cli.command("operations")
 def operations_command() -> None:
     """Print every registered fixed read operation as JSON.
@@ -863,7 +910,7 @@ def operations_command() -> None:
     click.echo(json.dumps(list_operations()))
 
 
-@cli.command("read-operation")
+@cli.command("read-operation", cls=_MachineReadCommand)
 @click.argument("operation_id")
 @click.option(
     "--params",
@@ -917,10 +964,13 @@ def read_operation_command(
         query = _operation_json_object(raw_query) if raw_query is not None else None
         product = _operation_product(operation_id)
     except click.ClickException as exc:
+        # `_product_of_operation` never raises: `_operation_product` is the
+        # raising form, and calling it again inside this handler would re-raise
+        # the very error being reported.
         click.echo(
             json.dumps(
                 _error_envelope(
-                    None,
+                    _product_of_operation(operation_id),
                     code="validation_error",
                     message=exc.format_message(),
                 )
@@ -969,46 +1019,7 @@ def read_operation_command(
     click.echo(json.dumps(result))
 
 
-class _CanonicalReadCommand(click.Command):
-    """The canonical `read` command answers framework parse failures with JSON.
-
-    Click parses options and required parameters in
-    [parse_args][click.Command.parse_args] before the callback exists, so a
-    missing required option, an unknown option, a missing option value, or an
-    extra positional would otherwise leave stdout empty and print text on
-    stderr. The canonical contract requires exactly one
-    JSON ``validation_error`` document and exit 2 with no credential, file, or
-    network activity, so those failures are converted here.
-
-    ``product`` comes only from the already-parsed argument, never from scanning
-    raw tokens: an option-looking value stays a value, and an unparsed argument
-    leaves ``product`` null. The message is fixed and never repeats the
-    exception text.
-    """
-
-    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
-        try:
-            return super().parse_args(ctx, args)
-        except click.UsageError:
-            operation_id = ctx.params.get("operation_id")
-            product = (
-                _product_of_operation(operation_id)
-                if isinstance(operation_id, str)
-                else None
-            )
-            click.echo(
-                json.dumps(
-                    _error_envelope(
-                        product,
-                        code="validation_error",
-                        message="The read command line is invalid.",
-                    )
-                )
-            )
-            raise click.exceptions.Exit(2) from None
-
-
-@cli.command("read", cls=_CanonicalReadCommand)
+@cli.command("read", cls=_MachineReadCommand)
 @click.argument("operation_id")
 @click.option(
     "--params",
@@ -1208,6 +1219,7 @@ def read_command(
                 resolved_url,
                 token=token,
                 arguments=arguments,
+                query=query,
                 destination=destination,
                 max_bytes=max_bytes,
                 allow_http_loopback=allow_http_loopback,
@@ -1277,7 +1289,7 @@ def read_command(
     click.echo(json.dumps({"ok": True, "product": product, "data": result}))
 
 
-@cli.command("api-get")
+@cli.command("api-get", cls=_MachineReadCommand)
 @click.argument("product", type=click.Choice(sorted(_PRODUCT_ENVIRONMENT)))
 @click.argument("path")
 @click.option(
@@ -1304,10 +1316,23 @@ def api_get_command(
     allow_http_loopback: bool,
 ) -> None:
     """Read one standard non-admin JSON GET through the read-only client."""
-    params = _operation_json_object(raw_params) if raw_params is not None else None
-    resolved_url, token = _product_base_url_and_token(
-        product, base_url, token_from_env, allow_http_loopback
-    )
+    try:
+        params = _operation_json_object(raw_params) if raw_params is not None else None
+        resolved_url, token = _product_base_url_and_token(
+            product, base_url, token_from_env, allow_http_loopback
+        )
+    except (click.ClickException, click.UsageError) as exc:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message=exc.format_message(),
+                    path=path,
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
     try:
         result = get_json(
             product,
@@ -1341,7 +1366,7 @@ def api_get_command(
     click.echo(json.dumps(result))
 
 
-@cli.command("api-request")
+@cli.command("api-request", cls=_MachineReadCommand)
 @click.argument("product", type=click.Choice(sorted(_PRODUCT_ENVIRONMENT)))
 @click.argument("method", type=click.Choice(["GET", "POST"], case_sensitive=False))
 @click.argument("path")
@@ -1367,11 +1392,24 @@ def api_request_command(
     allow_http_loopback: bool,
 ) -> None:
     """Run one read-only GET or POST through the read-only client."""
-    params = _operation_json_object(raw_params) if raw_params is not None else None
-    body = _operation_json_object(raw_body) if raw_body is not None else None
-    resolved_url, token = _product_base_url_and_token(
-        product, base_url, token_from_env, allow_http_loopback
-    )
+    try:
+        params = _operation_json_object(raw_params) if raw_params is not None else None
+        body = _operation_json_object(raw_body) if raw_body is not None else None
+        resolved_url, token = _product_base_url_and_token(
+            product, base_url, token_from_env, allow_http_loopback
+        )
+    except (click.ClickException, click.UsageError) as exc:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message=exc.format_message(),
+                    path=path,
+                )
+            )
+        )
+        raise click.exceptions.Exit(2) from None
     try:
         result = request_json(
             product,
@@ -1515,13 +1553,18 @@ def login_command(
     be read as a JSON object is refused rather than overwritten, because it may
     hold another product's token.
     """
-    resolved_url = _login_base_url(product, base_url, allow_http_loopback)
+    try:
+        resolved_url = _login_base_url(product, base_url, allow_http_loopback)
+    except AtlaWireError as exc:
+        raise click.UsageError(str(exc)) from None
     token_url = token_page_url(resolved_url, product)
-    click.echo(f"Create a read-only token here:\n  {token_url}", err=True)
-    click.echo(f"  {describe_token_page(token_url)}", err=True)
     if print_url:
+        # A pure URL answer: no probe, no prompt, no credential read, so it is
+        # safe for an agent to run without a terminal or a reachable deployment.
         click.echo(json.dumps({"product": product, "url": token_url}))
         return
+    click.echo(f"Create a read-only token here:\n  {token_url}", err=True)
+    click.echo(f"  {describe_token_page(token_url)}", err=True)
     if not _stdin_is_interactive():
         raise click.ClickException(
             "A hidden token prompt needs an interactive terminal. "
@@ -1614,18 +1657,37 @@ def describe_token_page(url: str) -> str:
     """Return one line describing whether the token page answers.
 
     A hidden prompt is useless if the URL is wrong, so the page is probed once.
-    The message never includes the response body or a redirect target.
+    The probe uses the shared transport policy: ambient proxy and ``.netrc``
+    credentials do not apply, a redirect is reported instead of followed, and
+    only the status line is read, so no body is downloaded. Only a loopback
+    HTTP address is accepted beside HTTPS, which is exactly the destinations
+    `login` itself accepts; the message never includes the response body or a
+    redirect target.
     """
+    session = _page_probe_session(url)
     try:
-        response = requests.get(
-            url,
-            timeout=(5, 15),
-            allow_redirects=False,
-            headers={"Accept": "text/html"},
-        )
+        response = session.get(url, timeout=(5, 15), allow_redirects=False, stream=True)
+        try:
+            status = response.status_code
+        finally:
+            response.close()
     except requests.RequestException:
         return "not reachable — check the base URL and connectivity."
-    return _classify_token_page(response.status_code)
+    finally:
+        session.close()
+    return _classify_token_page(status)
+
+
+def _page_probe_session(url: str) -> requests.Session:
+    """Return a guarded session for one token-page probe.
+
+    Only the origin is validated: a token-page URL legitimately carries its own
+    query (`?selectedTab=...`), which a base-URL rule would reject. The same two
+    destinations as `login` are accepted, HTTPS and loopback HTTP.
+    """
+    parts = urlsplit(url)
+    origin = f"{parts.scheme}://{parts.netloc}"
+    return new_session(origin, None, timeout=15, allow_http_loopback=True)
 
 
 def _classify_token_page(status: int) -> str:
@@ -1647,14 +1709,24 @@ def _classify_token_page(status: int) -> str:
 def _login_base_url(
     product: str, base_url: str | None, allow_http_loopback: bool
 ) -> str:
-    """Return the URL to save against: explicit, else saved, else prompted."""
+    """Return the checked URL to save against: explicit, saved, or prompted.
+
+    The value is validated with the same rules as every read before it can reach
+    the token-page probe, so a malformed or plain-HTTP destination is refused
+    instead of being requested.
+    """
     if base_url is not None:
-        return base_url
-    try:
-        saved = load_saved_credentials(product, allow_http_loopback=allow_http_loopback)
-    except AtlaWireError:
-        return click.prompt(f"Base URL for {product}", err=True)
-    return saved.base_url
+        candidate = base_url
+    else:
+        try:
+            saved = load_saved_credentials(
+                product, allow_http_loopback=allow_http_loopback
+            )
+        except AtlaWireError:
+            candidate = click.prompt(f"Base URL for {product}", err=True)
+        else:
+            candidate = saved.base_url
+    return normalize_base_url(candidate, allow_http_loopback=allow_http_loopback)
 
 
 def _verify_login(

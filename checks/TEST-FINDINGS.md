@@ -35,7 +35,7 @@ Raw evidence is in `checks/live_tester_*.json`.
 | Operations refused before the request (the tester supplied no value) | 15 |
 | Operations refused by the server | 116 |
 | Operations not callable (no identifier on this deployment) | 62 |
-| Declared query fields | 481 across 180 operations |
+| Declared query fields | 472 across 178 operations |
 | Query fields exercised | 137 (328 have no derivable safe value, 21 blocked) |
 | CLI commands invoked | 86 of 90 (70 succeeded, 16 rejected the tester's arguments; 2 need an operation id, 2 skipped) |
 | Public Python functions invoked | 41 representative calls |
@@ -270,10 +270,14 @@ argument mistakes:
 | same | 55 |
 | different (reason recorded) | 2 |
 | excluded (BBK local index) | 4 |
-| worse | 0 |
-| missing | 0 |
+| worse | 2 |
 
-No BBK capability is missing or worse. Details in
+Two in-scope functions failed their live invocation (`pr_file`, `pr_commits`).
+That is not proof the capability is worse: the comparison used the wrong
+arguments. It does mean parity was **not** established for those two, and they
+must be re-run with valid inputs before BBK is retired. BBK's local schema and
+environment indexes are out of scope here and have no AtlaWire equivalent
+(`docs/RESEARCH-COVERAGE.md`). Details in
 `checks/live_tester_bbk_parity.json`.
 
 ## Verified working (so it is not re-opened)

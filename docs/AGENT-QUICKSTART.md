@@ -24,7 +24,10 @@ See [research coverage and evidence limits](RESEARCH-COVERAGE.md).
 
 ## Output contract
 
-Every command makes one bounded read; none of them writes. Output and failure shape:
+Every command makes one bounded read and no server-side write. The two explicit
+local writes are `login`, which saves one token to the credentials file, and
+`--out` on `read`/`attachment-get`, which writes one new file and prints a
+receipt. Output and failure shape:
 
 - **`--json` vs `--raw`.** `--json` prints the command's stable projection (short
   issue rows, flat resource objects, `{rows, truncated, total}` metadata); `--raw`
@@ -623,7 +626,8 @@ compared with BBK's extension scan.
 `attachment-get REPO ID --base64 [--max-bytes N]` sends one fixed GET to the
 configured Bitbucket origin and prints a JSON object with a `base64` string
 field. The default bound is 8 MiB; larger bodies fail rather than truncating.
-No local file is written, and links or redirects are not followed. The route is
+`--out` writes the bytes to a new file and prints a receipt; without it the bytes
+are printed as base64. Links or redirects are not followed. The route is
 BBK-observed; Bitbucket 5.10 core documentation and real-system compatibility
 are unverified, and this is not an executed-verification or parity claim.
 
@@ -645,7 +649,8 @@ unverified. Do not replace it with an equivalent content-search claim. Use a
 working scoped `bbk` search or repository browse for the task, and say which one
 provided the lead.
 
-`projects` and `repos` support `--max-pages`, not `--limit`. `find-repos`
+`projects` and `repos` support `--max-pages` and `--limit`; a `--limit` reply is a
+capped bare list, so it is not proof that no further rows exist. `find-repos`
 reads the visible project list in full first, then pages each project's
 repositories in server order and stops repository paging once `--limit` actual
 matches are found. It does not reorder results, request another repository page,
