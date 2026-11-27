@@ -164,13 +164,27 @@ echo, so it never becomes an argument, a shell-history entry, or output:
 C:/Python315/python.exe -P -B -m atlawire login --product jira
 ```
 
-Run it in a terminal the human controls and let them type. Ask for the product
-and base URL, open the product in the browser, and guide the human to
-Profile picture → Profile → **Personal Access Tokens** (Jira), Profile picture →
-Settings → **Personal Access Tokens** (Confluence), or Profile picture →
-**Manage account** → **HTTP access tokens** (Bitbucket). The command checks the
-token before saving; confirm afterwards with `atlawire whoami`. Never ask a human
-to paste a token into chat, a file, or a command argument.
+It prints the full URL of the product's token page first, plus one status line,
+so nobody has to navigate menus:
+
+```text
+Create a read-only token here:
+  https://jira.example.com/secure/ViewProfile.jspa?selectedTab=com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens
+  HTTP 302 — a login redirect; open it in your browser.
+```
+
+`404` means the address is wrong for this deployment; `401`/`403` means the page
+exists and needs the browser session. Open the printed address for the human,
+then run the command in a terminal they control and let them type the token. The
+command checks the token before saving; confirm afterwards with
+`atlawire whoami`. With `--print-url` the command only prints the address and
+exits, which needs no terminal. Never ask a human to paste a token into chat, a
+file, or a command argument.
+
+Fallback menu paths, if a deployment does not serve the direct page: Jira
+Profile picture → Profile → **Personal Access Tokens**, Confluence Profile
+picture → Settings → **Personal Access Tokens**, Bitbucket Profile picture →
+**Manage account** → **HTTP access tokens**.
 
 **Environment (explicit).** Pass `--token-from-env` to use environment-only mode;
 AtlaWire then does not open the saved file. Set both variables in the invoking

@@ -12,6 +12,7 @@ from typing import cast
 from urllib.parse import quote
 
 import click
+import requests
 
 from atlawire import __version__
 from atlawire.bitbucket import (
@@ -1453,6 +1454,11 @@ def whoami_command(
     help="Save without checking the token against the server.",
 )
 @click.option(
+    "--print-url",
+    is_flag=True,
+    help="Print where to create the token, then exit without prompting.",
+)
+@click.option(
     "--json",
     "as_json",
     is_flag=True,
@@ -1465,10 +1471,17 @@ def login_command(
     product: str,
     base_url: str | None,
     skip_verify: bool,
+    print_url: bool,
     as_json: bool,
     allow_http_loopback: bool,
 ) -> None:
     """Read one personal access token from a hidden prompt and save it.
+
+    Before prompting, the command prints the full URL of the page that creates a
+    token for this product, so the page can be opened directly instead of
+    navigating menus. The page is probed and its HTTP status reported: a 404
+    means the page is missing on this server, while 401 or 403 means it exists
+    and needs a browser session.
 
     The token is typed at a prompt without echo. It therefore never appears in
     an argument list, in shell history, in this command's output, or in a log
@@ -1481,6 +1494,12 @@ def login_command(
     hold another product's token.
     """
     resolved_url = _login_base_url(product, base_url, allow_http_loopback)
+    token_url = token_page_url(resolved_url, product)
+    click.echo(f"Create a read-only token here:\n  {token_url}", err=True)
+    click.echo(f"  {describe_token_page(token_url)}", err=True)
+    if print_url:
+        click.echo(json.dumps({"product": product, "url": token_url}))
+        return
     if not _stdin_is_interactive():
         raise click.ClickException(
             "A hidden token prompt needs an interactive terminal. "
@@ -1546,6 +1565,61 @@ _LOGIN_HINTS = {
     "confluence": "Profile picture > Settings > Personal Access Tokens",
     "jira": "Profile picture > Profile > Personal Access Tokens",
 }
+
+# The page that creates a personal access token, per product. Verified against a
+# live deployment: Jira and Confluence answer 200, and the Bitbucket servlet
+# answers 401 because it renders with the browser session rather than a token.
+_LOGIN_PATHS = {
+    "jira": (
+        "/secure/ViewProfile.jspa?selectedTab="
+        "com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens"
+    ),
+    "confluence": "/plugins/personalaccesstokens/usertokens.action",
+    "bitbucket": "/plugins/servlet/access-tokens/manage",
+}
+
+
+def token_page_url(base_url: str, product: str) -> str:
+    """Return the full URL of the page that creates a token for ``product``.
+
+    ``base_url`` may carry a deployment context path; the product's page path is
+    appended to it unchanged, exactly as the other readers do.
+    """
+    return f"{base_url.rstrip('/')}{_LOGIN_PATHS[product]}"
+
+
+def describe_token_page(url: str) -> str:
+    """Return one line describing whether the token page answers.
+
+    A hidden prompt is useless if the URL is wrong, so the page is probed once.
+    The message never includes the response body or a redirect target.
+    """
+    try:
+        response = requests.get(
+            url,
+            timeout=(5, 15),
+            allow_redirects=False,
+            headers={"Accept": "text/html"},
+        )
+    except requests.RequestException:
+        return "not reachable — check the base URL and connectivity."
+    return _classify_token_page(response.status_code)
+
+
+def _classify_token_page(status: int) -> str:
+    """Map one status code to a fixed sentence; no server text is echoed."""
+    if status == 200:
+        return "HTTP 200 — open it in your browser."
+    if status in {401, 403}:
+        return f"HTTP {status} — the page exists and needs your browser session."
+    if 300 <= status < 400:
+        return f"HTTP {status} — a login redirect; open it in your browser."
+    if status == 404:
+        return (
+            "HTTP 404 — no token page at this address. Check the base URL, "
+            "including any context path, and the product version."
+        )
+    return f"HTTP {status} — unexpected status for a token page."
 
 
 def _login_base_url(

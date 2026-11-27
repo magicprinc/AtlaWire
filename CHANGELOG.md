@@ -10,6 +10,22 @@ installation is from this checkout or from a wheel built here. The entries below
 the read-only surface: the initial command batch, the agent-facing batch (commits
 `2960a43..a4efee1`), and everything added up to `v0.9.1`.
 
+## [0.9.10] - 2026-11-25
+
+### Added
+
+- `login` prints the full URL of the product's personal-access-token page before
+  prompting, with one status line from a single probe: `200` open it, `302` a
+  login redirect, `401`/`403` the page exists and needs a browser session, `404`
+  no token page at that address. A wrong address is therefore visible before any
+  typing, and nobody has to navigate product menus. The page paths were verified
+  against a live deployment, and a deployment context path in the product URL is
+  preserved.
+- `--print-url` prints the address and exits without prompting, which needs no
+  terminal and is the variant an agent can run on a human's behalf.
+- README and `docs/AGENT-QUICKSTART.md` document the printed URL, the status
+  meanings, the direct page path per product, and the fallback menu paths.
+
 ## [0.9.9] - 2026-11-25
 
 ### Added

@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from click.testing import CliRunner
 
+from atlawire import cli as cli_module
 from atlawire.cli import cli
 from atlawire.credentials import load_saved_credentials, save_credentials
 from atlawire.http import AtlaWireError
@@ -160,7 +161,11 @@ def test_login_verifies_the_token_before_saving(credentials_file, jira_server):
 
     assert result.exit_code == 0, result.output
     assert TOKEN not in result.output
-    assert httpd.calls == ["/rest/api/2/myself"]
+    # One probe of the token page, then exactly one identity read: the prompt
+    # must not send anything else to the product.
+    assert len(httpd.calls) == 2
+    assert httpd.calls[0].startswith("/secure/ViewProfile.jspa")
+    assert httpd.calls[1] == "/rest/api/2/myself"
     document = json.loads(credentials_file.read_text(encoding="utf-8"))
     assert document["jira_token"] == TOKEN
     assert json.loads(result.stdout)["verified"] is True
@@ -226,4 +231,90 @@ def test_a_piped_stdin_is_refused_instead_of_blocking(credentials_file):
     assert "interactive terminal" in completed.stderr
     assert TOKEN not in completed.stdout
     assert TOKEN not in completed.stderr
+    assert not credentials_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("product", "path"),
+    [
+        (
+            "jira",
+            (
+                "/secure/ViewProfile.jspa?selectedTab="
+                "com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens"
+            ),
+        ),
+        ("confluence", "/plugins/personalaccesstokens/usertokens.action"),
+        ("bitbucket", "/plugins/servlet/access-tokens/manage"),
+    ],
+)
+def test_the_token_page_url_keeps_the_deployment_context_path(product, path):
+    """A context path such as /jira must survive, exactly as other reads keep it."""
+    assert (
+        cli_module.token_page_url("https://host.example.com/jira", product)
+        == f"https://host.example.com/jira{path}"
+    )
+
+
+def test_a_trailing_slash_does_not_double_the_separator():
+    assert (
+        cli_module.token_page_url("https://host.example.com/", "confluence")
+        == "https://host.example.com/plugins/personalaccesstokens/usertokens.action"
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (200, "open it in your browser"),
+        (401, "needs your browser session"),
+        (403, "needs your browser session"),
+        (302, "login redirect"),
+        (404, "no token page at this address"),
+        (500, "unexpected status"),
+    ],
+)
+def test_the_page_status_is_reported_as_a_fixed_sentence(status, expected):
+    """A wrong URL is visible immediately; no server text is echoed."""
+    assert expected in cli_module._classify_token_page(status)
+
+
+def test_print_url_answers_without_a_prompt_or_a_terminal(
+    credentials_file, monkeypatch
+):
+    """The agent path: print the link and exit, even with a piped stdin."""
+    monkeypatch.setattr(cli_module, "describe_token_page", lambda url: "HTTP 302 — ok")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            "-m",
+            "atlawire",
+            "login",
+            "--product",
+            "bitbucket",
+            "--base-url",
+            JIRA_URL,
+            "--print-url",
+        ],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={
+            **os.environ,
+            "PYTHONPATH": str(SOURCE),
+            "BBK_CREDENTIALS": str(credentials_file),
+        },
+        timeout=120,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["product"] == "bitbucket"
+    assert payload["url"].endswith("/plugins/servlet/access-tokens/manage")
+    assert "https://jira.example.com" in payload["url"]
     assert not credentials_file.exists()

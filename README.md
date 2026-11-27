@@ -125,15 +125,29 @@ token; a BBK entry with a user and password but no token is not usable here.
 atlawire login --product jira
 ```
 
-The command asks for the base URL when neither `--base-url` nor a saved URL
-exists, then reads the token from a prompt without echo. The token therefore
-never appears in an argument list, in shell history, in the command's output, or
-in an error message. It is validated, checked against the product unless
-`--no-verify` is given, and written as the same `<product>_url` /
-`<product>_token` pair the read commands load. Entries for other products and
-unrelated keys are preserved, and a saved file that cannot be read as a JSON
-object is refused rather than overwritten. The file is staged beside the
-destination and renamed into place with owner-only permissions.
+The command first prints the full URL of the page that creates a token, so there
+is nothing to navigate to by hand:
+
+```text
+Create a read-only token here:
+  https://jira.example.com/secure/ViewProfile.jspa?selectedTab=com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens
+  HTTP 302 — a login redirect; open it in your browser.
+```
+
+The status line is a one-request check, so a wrong address is visible before any
+typing: `404` means no token page lives at that address, and `401`/`403` means the
+page exists and needs your browser session. `--print-url` prints the address and
+exits without prompting, which is the variant an agent can run.
+
+It then asks for the base URL when neither `--base-url` nor a saved URL exists,
+and reads the token from a prompt without echo. The token therefore never appears
+in an argument list, in shell history, in the command's output, or in an error
+message. It is validated, checked against the product unless `--no-verify` is
+given, and written as the same `<product>_url` / `<product>_token` pair the read
+commands load. Entries for other products and unrelated keys are preserved, and a
+saved file that cannot be read as a JSON object is refused rather than
+overwritten. The file is staged beside the destination and renamed into place
+with owner-only permissions.
 
 Run it in a real terminal window. A hidden prompt cannot read a pipe or a
 redirected file — on Windows it reads the console directly — so with a piped
@@ -143,17 +157,20 @@ Create the token with the smallest permissions that still let the agent read
 what it needs. A read-only token is what makes the read-only promise enforced by
 the server rather than only by this tool.
 
-| Product | Where to create a personal access token |
-| --- | --- |
-| Bitbucket | Profile picture → **Manage account** → **HTTP access tokens** → Create token |
-| Jira | Profile picture → **Profile** → **Personal Access Tokens** |
-| Confluence | Profile picture → **Settings** → **Personal Access Tokens** |
+| Product | Page path appended to the product base URL | Menu |
+| --- | --- | --- |
+| Jira | `/secure/ViewProfile.jspa?selectedTab=com.atlassian.pats.pats-plugin:jira-user-personal-access-tokens` | Profile picture → **Profile** → **Personal Access Tokens** |
+| Confluence | `/plugins/personalaccesstokens/usertokens.action` | Profile picture → **Settings** → **Personal Access Tokens** |
+| Bitbucket | `/plugins/servlet/access-tokens/manage` | Profile picture → **Manage account** → **HTTP access tokens** |
+
+A deployment context path in `<product>_url` (for example
+`https://host.example.com/jira`) is kept, and the page path is appended to it.
 
 Personal access tokens exist in Jira Core and Jira Software 8.14 and later, Jira
 Service Management 4.15 and later, and Confluence 7.9 and later; Bitbucket Data
 Center documents HTTP access tokens for user accounts. Menu labels differ
-slightly between versions, so navigate from the profile menu when a direct link
-is unknown. Official pages:
+slightly between versions, so the menu column is the fallback when a deployment
+does not serve the direct page. Official pages:
 [Bitbucket HTTP access tokens](https://confluence.atlassian.com/bitbucketserver/http-access-tokens-939515499.html)
 and
 [Using personal access tokens](https://confluence.atlassian.com/enterprise/using-personal-access-tokens-1026032365.html).
@@ -161,10 +178,10 @@ and
 For an agent helping a human set this up:
 
 1. Ask for the product and the base URL; do not ask for the token itself.
-2. Open the product's base URL in the browser and guide the human to the menu
-   path above.
-3. Run `atlawire login --product <name> --base-url <url>` in a terminal the
-   human controls, so the hidden prompt is theirs.
+2. Run `atlawire login --product <name> --base-url <url> --print-url` and open
+   the printed address in the browser.
+3. Run `atlawire login --product <name>` in a terminal the human controls, so the
+   hidden prompt is theirs. The address is printed again.
 4. Confirm the result with `atlawire whoami`.
 
 Never ask a human to paste a token into a chat, a file an agent writes, or a
