@@ -47,14 +47,16 @@ BASELINE = {
     # read from. Only the deliberately deferred routes remain: a binary body and
     # one state-changing GET.
     "bitbucket": {
-        "matched": 99,
+        "matched": 98,
         "undeclared_param_routes": 0,
-        # `GET /projects/{}/repos/{}/raw` is served but not declared: the bare
-        # form answers 400 "The parameter 'path' is required", and only the
-        # wildcard `/raw/{path:.*}` serves a file. Declaring the bare form would
-        # advertise a route that cannot be called.
-        "server_only": 1,
-        "server_only_sha": "173febccd03f5892",
+        # Two bare routes are served but not declared, both verified live:
+        # `/raw` answers 400 "The parameter 'path' is required" and `/diff`
+        # answers 400 "A file path is required", for every query shape. Only the
+        # wildcard `/raw/{path}` and `/diff/{path}` variants serve, and those are
+        # declared. Advertising the bare forms would promise a route that cannot
+        # be called.
+        "server_only": 2,
+        "server_only_sha": "363fb36afc6c4859",
         "registry_only": 0,
         "registry_only_sha": "e3b0c44298fc1c14",
         "wadl_sha256": "9942abd00c3aedaf",

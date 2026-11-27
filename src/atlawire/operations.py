@@ -2269,6 +2269,19 @@ def read_operation(
     must be deliberate.
     """
     operation = _operation(operation_id)
+    if operation.kind == "binary":
+        # The nature of the operation, not the caller's input, decides this, so the
+        # refusal comes before any argument or query validation: a caller who asks
+        # for a file through the JSON reader gets the same answer either way. A
+        # binary route serves bytes and answers 406 to the JSON Accept this reader
+        # sends, which turned a working route into a transport error.
+        raise AtlaWireError(
+            "This operation returns a binary body; use read_binary or "
+            "'read <id> --out <path>'.",
+            category="validation",
+            product=operation.product,
+            operation=operation.id,
+        )
     if operation.scope == "admin" and not allow_admin:
         raise AtlaWireError(
             _ADMIN_REFUSED,

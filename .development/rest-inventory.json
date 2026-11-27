@@ -4,10 +4,10 @@
   "totals": {
     "documented_rows": 252,
     "rows_with_disposition": 248,
-    "required": 200,
-    "excluded": 52,
+    "required": 199,
+    "excluded": 53,
     "unresolved": 0,
-    "runtime_operations": 318
+    "runtime_operations": 317
   },
   "products": {
     "jira": {
@@ -1933,11 +1933,13 @@
         {
           "method": "GET",
           "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff",
-          "disposition": "required",
+          "disposition": "excluded",
           "mapping_status": "gap",
-          "registered": true,
-          "runtime_operation_id": "bitbucket.projects.projectkey.repos.repositoryslug.diff",
-          "response_kind": "json"
+          "registered": false,
+          "runtime_operation_id": null,
+          "response_kind": null,
+          "reason": "deployment-rejects",
+          "reason_text": "Documented, but the deployment answers 400 on every form of the route; the wildcard form is the one that serves a file."
         },
         {
           "method": "GET",
@@ -2403,11 +2405,11 @@
       ],
       "counts": {
         "rows": 99,
-        "required": 56,
-        "excluded": 43,
+        "required": 55,
+        "excluded": 44,
         "excluded_by_reason": {
           "administrative": 41,
-          "deployment-rejects": 1,
+          "deployment-rejects": 2,
           "system-route": 1
         }
       },

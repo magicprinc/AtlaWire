@@ -172,6 +172,8 @@ def build() -> dict[str, object]:
             reason = DEFERRED.get((product, candidate.verb, candidate.route))
             if reason is None and wadl.is_non_json_route(candidate.route):
                 reason = "non-JSON body"
+            if reason is None and wadl.is_deployment_rejected_route(candidate.route):
+                reason = "the deployment rejects every form of this route"
             if reason is not None:
                 deferred.append(
                     {

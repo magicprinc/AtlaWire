@@ -32,6 +32,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MAPPINGS = ROOT / ".development"
 OUTPUT = MAPPINGS / "rest-inventory.json"
 
+sys.path.insert(0, str(ROOT / "tools"))
+import wadl_surface
+
 SCHEMA = "atlawire-rest-inventory/v1"
 _PLACEHOLDER = re.compile(r"\{[^{}]+\}")
 
@@ -79,22 +82,23 @@ _REGISTERED_ADDITIONS_SOURCE = {
 # routine regeneration, so the check fails until this table is updated.
 _EXPECTED = {
     "documented_rows": 252,
-    "required": 200,
-    "excluded": 52,
+    "required": 199,
+    "excluded": 53,
     "unresolved": 0,
-    # 318, not 319: the registry no longer declares the same Bitbucket file
-    # route twice. The duplicate was a JSON declaration of a binary route,
-    # which could never be read; the binary declaration now serves it.
-    "runtime_operations": 318,
+    # 317, not 319: the registry no longer declares the same Bitbucket file route
+    # twice, and it no longer advertises the bare repo `/diff`, which this
+    # deployment answers 400 for in every form.
+    "runtime_operations": 317,
 }
 # Per-product counts. Without them a global total could be satisfied by two
 # compensating mistakes, one product short and another long.
 _EXPECTED_PRODUCT = {
     "jira": {"required": 108, "excluded": 5},
     "confluence": {"required": 36, "excluded": 0},
-    # 56/43, not 57/42: the bare `/raw` row moved to excluded because the
-    # deployment rejects every form of it, and only `/raw/{path}` serves a file.
-    "bitbucket": {"required": 56, "excluded": 43},
+    # 55/44, not 57/42: the bare `/raw` and bare `/diff` rows moved to excluded
+    # because the deployment rejects every form of them, and only the wildcard
+    # variants serve.
+    "bitbucket": {"required": 55, "excluded": 44},
 }
 # Digest of the sorted normalized exclusions per product. Counting excluded rows
 # is not enough: swapping one for another keeps every total identical, so the
@@ -102,7 +106,7 @@ _EXPECTED_PRODUCT = {
 _EXPECTED_EXCLUDED_DIGEST: dict[str, str] = {
     "jira": "fe0a49d5fb2048de60981768d7a5bc9cab410630ff1788e67b1caf42d2abfa2c",
     "confluence": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "bitbucket": "04f9a4602bc880a4c9082ffd5f00ff1e2a5e0b7d57a351aa867e71d3fa3cf182",
+    "bitbucket": "51a9ccda4f65d5c52e12cd32c21f049cd3f160bec47ea609087f426b574183c2",
 }
 
 _REASON_TEXT = {
@@ -263,6 +267,8 @@ def _disposition(row: _Row) -> tuple[str, str]:
             # the bare route and for `/raw?path=...`; only `/raw/{path}` serves a
             # file. The bare row is documented but not served here, and claiming
             # it is covered by the wildcard operation would be a false receipt.
+            return "excluded", "deployment-rejects"
+        if wadl_surface.is_deployment_rejected_route(row.path):
             return "excluded", "deployment-rejects"
     return "required", ""
 

@@ -99,6 +99,32 @@ def test_a_wildcard_file_route_is_never_declared_as_json():
     assert offenders == []
 
 
+def test_a_binary_operation_is_refused_by_the_json_reader():
+    """D10: a binary route answers 406 to a JSON Accept; refuse before the request.
+
+    The JSON reader used to fall through to a JSON read for `kind: binary`, so a
+    working download reported a transport error. The refusal must name the entry
+    point that does work.
+    """
+    from atlawire.http import AtlaWireError
+
+    binary = [
+        entry for entry in REGISTRY.values() if entry["response"]["kind"] == "binary"
+    ]
+    assert binary, "no binary operation to test"
+
+    for entry in binary:
+        with pytest.raises(AtlaWireError) as raised:
+            operations.read_operation(
+                entry["id"],
+                "https://example.invalid",
+                token="synthetic-token",
+                arguments={},
+            )
+        assert raised.value.category == "validation"
+        assert "read_binary" in str(raised.value)
+
+
 def test_every_registered_route_is_declared_once():
     """A duplicate declaration is how a broken route hid behind a working one."""
     seen = {}

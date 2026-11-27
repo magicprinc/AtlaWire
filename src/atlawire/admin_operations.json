@@ -2,6 +2,12 @@
   "deferred": [
     {
       "method": "GET",
+      "path": "/projects/{projectKey}/repos/{repositorySlug}/diff",
+      "product": "bitbucket",
+      "reason": "the deployment rejects every form of this route"
+    },
+    {
+      "method": "GET",
       "path": "/projects/{projectKey}/repos/{repositorySlug}/raw",
       "product": "bitbucket",
       "reason": "non-JSON body"

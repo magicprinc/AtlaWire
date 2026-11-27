@@ -22,7 +22,7 @@ MAPPINGS = ROOT / ".development"
 OUTPUT = ROOT / "src" / "atlawire" / "manifest.json"
 
 sys.path.insert(0, str(ROOT / "tools"))
-import wadl_surface  # noqa: E402 - resolved through the path above
+import wadl_surface
 
 # Endpoints whose body is not JSON, or which the core reference does not
 # define. They stay in the release inventory with an explicit disposition.
@@ -95,6 +95,8 @@ def _deferred(path: str) -> str | None:
     lowered = path.lower()
     if wadl_surface.is_non_json_route(lowered):
         return "non-JSON body (archive, raw, download or avatar)"
+    if wadl_surface.is_deployment_rejected_route(lowered):
+        return "the deployment rejects every form of this route"
     segments = {part for part in lowered.split("/") if part}
     if segments & _ADMIN_SEGMENTS:
         return "administrative or system route"

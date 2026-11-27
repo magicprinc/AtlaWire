@@ -1,9 +1,10 @@
 {
-  "generated": "2026-11-27T06:48:49.813703+03:00",
+  "generated": "2026-11-27T07:12:53.611204+03:00",
   "operations": 318,
   "summary": {
-    "failed": 131,
+    "failed": 116,
     "ok": 125,
+    "refused": 15,
     "blocked": 62
   },
   "identifiers": {
@@ -76,10 +77,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 2,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The context query parameter is required."
     },
     {
       "id": "bitbucket.admin.groups.more-non-members",
@@ -89,10 +88,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 2,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The context query parameter is required."
     },
     {
       "id": "bitbucket.admin.license",
@@ -227,10 +224,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 2,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The context query parameter is required."
     },
     {
       "id": "bitbucket.admin.users.more-non-members",
@@ -240,10 +235,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 2,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The context query parameter is required."
     },
     {
       "id": "bitbucket.application-properties",
@@ -443,10 +436,8 @@
         "projectKey": "discovered project"
       },
       "query_declared": 1,
-      "outcome": "failed",
-      "category": "http",
-      "status": 406,
-      "detail": null
+      "outcome": "refused",
+      "reason": "binary operation; read through read_binary, not the JSON reader"
     },
     {
       "id": "bitbucket.project.get",
@@ -705,10 +696,8 @@
         "repositorySlug": "discovered repository"
       },
       "query_declared": 2,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The until query parameter is required."
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits",
@@ -956,10 +945,8 @@
         "path": "discovered file path"
       },
       "query_declared": 5,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The until query parameter is required."
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.files",
@@ -1242,10 +1229,8 @@
         "pullRequestId": "discovered pull request"
       },
       "query_declared": 5,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The path query parameter is required."
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments.commentid",
@@ -1803,10 +1788,8 @@
         "repositorySlug": "discovered repository"
       },
       "query_declared": 5,
-      "outcome": "failed",
-      "category": "http",
-      "status": 406,
-      "detail": null
+      "outcome": "refused",
+      "reason": "binary operation; read through read_binary, not the JSON reader"
     },
     {
       "id": "bitbucket.repository.commit-comments",
@@ -1824,10 +1807,8 @@
         "commitId": "discovered commit"
       },
       "query_declared": 4,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The path query parameter is required."
     },
     {
       "id": "bitbucket.repository.compare-changes",
@@ -2054,10 +2035,8 @@
         "path": "discovered file path"
       },
       "query_declared": 4,
-      "outcome": "failed",
-      "category": "http",
-      "status": 500,
-      "detail": null
+      "outcome": "refused",
+      "reason": "binary operation; read through read_binary, not the JSON reader"
     },
     {
       "id": "bitbucket.repository.related",
@@ -2245,10 +2224,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 8,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The title query parameter is required."
     },
     {
       "id": "confluence.content.children",
@@ -2576,10 +2553,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 5,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The cql query parameter is required."
     },
     {
       "id": "confluence.group",
@@ -2672,10 +2647,8 @@
       "arguments": {},
       "argument_sources": {},
       "query_declared": 7,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "the tester did not supply the required parameter: The cql query parameter is required."
     },
     {
       "id": "confluence.space",
@@ -3128,10 +3101,8 @@
         "type": "discovered issue type"
       },
       "query_declared": 0,
-      "outcome": "failed",
-      "category": "validation",
-      "status": null,
-      "detail": null
+      "outcome": "refused",
+      "reason": "binary operation; read through read_binary, not the JSON reader"
     },
     {
       "id": "jira.cluster.nodes",

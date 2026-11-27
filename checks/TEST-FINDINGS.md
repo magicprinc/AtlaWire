@@ -4,7 +4,7 @@ Generated: 2026-11-27, against one live self-hosted deployment
 (Jira Server, Confluence Server, Bitbucket Server) with a read-only personal
 access token.
 
-Scope: every registered operation (319), every declared query parameter, every
+Scope: every registered operation (317), every declared query parameter, every
 CLI command (90), the public Python API, and BBK's public API. The three
 surfaces were checked against each other and against the deployment's own WADL.
 
@@ -15,7 +15,7 @@ are findings.
 
 ```bash
 python checks/live_tester_discovery.py      # discover live identifiers
-python checks/live_tester_operations.py     # call all 319 registered operations
+python checks/live_tester_operations.py     # call all 317 registered operations
 python checks/live_tester_params.py         # probe every declared query field
 python checks/live_tester_docs.py           # registry vs the deployment's WADL
 python checks/live_tester_cli_full.py       # invoke all 90 CLI commands
@@ -30,9 +30,10 @@ Raw evidence is in `checks/live_tester_*.json`.
 
 | Surface | Measured |
 | --- | --- |
-| Registered operations | 319 (316 GET, 3 POST) |
+| Registered operations | 317 (314 GET, 3 POST) |
 | Operations answered | 125 |
-| Operations refused by the server | 132 |
+| Operations refused before the request (the tester supplied no value) | 15 |
+| Operations refused by the server | 116 |
 | Operations not callable (no identifier on this deployment) | 62 |
 | Declared query fields | 481 across 180 operations |
 | Query fields exercised | 137 (328 have no derivable safe value, 21 blocked) |
@@ -286,3 +287,77 @@ No BBK capability is missing or worse. Details in
   `checks/live_tester_cli_full.json` with their exact argv.
 - The three POST reads work through the CLI
   (`atlawire read jira.search.post ...`).
+
+---
+
+## Round 2 — retest after the fixes
+
+Everything above was re-run against commit `2ef49f8`'s successor. The nine
+original defects are closed, and the retest found two new ones.
+
+### Status of the original findings
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| D1 — a required parameter declared optional | fixed | each of the 9 operations now refuses before the request: `The <field> query parameter is required` |
+| D2 — a required parameter not declared | fixed | `path` is now a route argument on `repository.raw`; 461 bytes downloaded |
+| D3 — a POST body field misnamed | fixed | `jira.worklog.list` accepts `{"ids": []}` |
+| D4 — an undeclared query rule | fixed | `confluence.user.get` and `confluence.user.memberof` refuse a bad combination locally |
+| D5 — a binary route declared as a read | fixed | `read_binary` sends the wildcard `Accept`; avatar returns 3 098 bytes of `image/png` |
+| D6 — the CLI cannot send a required parameter | fixed | `commit-comments --path`, `pr-comments ... --path` |
+| D7 — public functions with no command | fixed | `titles`, `issue-url`, `page-title` commands added |
+| D8 — the library cannot perform the POST reads | fixed | the flag is gone; one transport serves all three |
+| D9 — registry and deployment disagree | recorded | the two `jira` route differences are intentional; see above |
+
+### New finding D10 — the JSON reader broke a binary route
+
+`read_operation` treated `kind: binary` as a JSON document. It sent
+`Accept: application/json`, so a route that serves bytes failed:
+
+```
+read bitbucket.repository.archive    -> HTTP 406   (read_binary: 102 278 bytes)
+read bitbucket.repository.raw        -> HTTP 500   (read_binary: 461 bytes)
+bitbucket.project.avatar             -> HTTP 406   (read_binary: 3 098 bytes)
+```
+
+The same operation must not behave differently through two public entry points.
+Fixed: the reader now refuses before any request and names the working entry
+point. `tests/test_spec_tester_findings.py::test_a_binary_operation_is_refused_by_the_json_reader`
+covers every binary operation, not just the three that were observed.
+
+### New finding D11 — a route the deployment rejects was advertised
+
+`bitbucket.projects.projectkey.repos.repositoryslug.diff` (the bare repo diff)
+answers `400 A file path is required` for every shape: no query, `path`,
+`srcPath`, `since`, `until`, and all combinations. The path must be in the route,
+which is what `/diff/{path}` already does:
+
+```
+GET /diff                                  -> 400
+GET /diff?path=.gitignore                  -> 400
+GET /diff?srcPath=.gitignore&until=<sha>   -> 400
+GET /diff/.gitignore?until=<sha>           -> 200, 2 195 bytes
+```
+
+The bare row promised a read that cannot happen. Fixed: the row is excluded by
+the same rule that already excludes the bare `/raw`, with the reason stated in
+the inventory, and the wildcard operation serves the route. The registry now
+declares 317 operations, and `server_only` for Bitbucket is 2 (`/raw`, `/diff`),
+both intentional and both pinned by digest.
+
+### What the retest shows about the remaining failures
+
+116 operations still end in an error, and none of them is a code defect:
+
+| Cause | Count | Note |
+| --- | --- | --- |
+| 401/403 | 63 | the token is read-only; the boundary working |
+| 404 | 28 | the identifier does not exist on this deployment |
+| 400 from a wrong-shaped tester value | 15 | e.g. `files.path` given a file where a directory is required |
+| 409 | 1 | the pull request is already merged; benign server state |
+| 500 / 501 | 3 | the deployment's own behaviour on a long-task id and a search variant |
+
+The 15 "refused before the request" rows are the fixes working: the tester did
+not supply a required value, so the tool declined to send a request the server
+would reject anyway. They are recorded separately so they cannot inflate either
+the defect list or the success count.

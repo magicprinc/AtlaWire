@@ -138,11 +138,31 @@ def is_non_json_route(path: str) -> bool:
     becomes `/browse` and is not.
     """
     shape = normalize(path).lower()
-    if shape.endswith("/{}"):
-        shape = shape[: -len("/{}")]
+    shape = shape.removesuffix("/{}")
     if shape.endswith(_NON_JSON_SUFFIXES):
         return True
     return any(marker in f"{shape}/" for marker in _NON_JSON_MARKERS)
+
+
+# Routes this deployment rejects in every form, verified live: the bare path answers
+# 400 however the request is shaped, and only the wildcard variant serves. They are
+# neither a read nor an administrative read, so both generators must skip them with
+# a stated reason rather than advertise a route that cannot be called. Written as a
+# tail because the registry spells the full `/rest/...` path while the WADL omits
+# the prefix; `/commits/{}/diff` and `/pull-requests/{}/diff` do not match it.
+_DEPLOYMENT_REJECTED = ("/projects/{}/repos/{}/diff",)
+
+
+def is_deployment_rejected_route(path: str) -> bool:
+    """True when the deployment refuses a route in every documented form.
+
+    Both sides go through `normalize`, so a placeholder name and the missing
+    `/rest/...` prefix cannot make the comparison miss.
+    """
+    lowered = normalize(path).lower()
+    return any(
+        lowered.endswith(normalize(route).lower()) for route in _DEPLOYMENT_REJECTED
+    )
 
 
 def prose(element: ElementTree.Element | None) -> str:

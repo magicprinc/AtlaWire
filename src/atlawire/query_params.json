@@ -285,29 +285,6 @@
         "type": "string"
       }
     ],
-    "bitbucket.projects.projectkey.repos.repositoryslug.diff": [
-      {
-        "default": "-1",
-        "name": "contextLines",
-        "type": "integer"
-      },
-      {
-        "name": "since",
-        "type": "string"
-      },
-      {
-        "name": "srcPath",
-        "type": "string"
-      },
-      {
-        "name": "until",
-        "type": "string"
-      },
-      {
-        "name": "whitespace",
-        "type": "string"
-      }
-    ],
     "bitbucket.projects.projectkey.repos.repositoryslug.diff.path": [
       {
         "default": "-1",

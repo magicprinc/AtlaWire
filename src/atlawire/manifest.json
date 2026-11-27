@@ -525,29 +525,6 @@
       ]
     },
     {
-      "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff",
-      "product": "bitbucket",
-      "method": "GET",
-      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff",
-      "description": "Bitbucket read: diff.",
-      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
-      "kind": "json",
-      "arguments": [
-        {
-          "name": "projectKey",
-          "pattern": "[A-Za-z0-9_.~\\-]+",
-          "allow_slash": false,
-          "description": "Path value for projectKey."
-        },
-        {
-          "name": "repositorySlug",
-          "pattern": "[A-Za-z0-9_.~\\-]+",
-          "allow_slash": false,
-          "description": "Path value for repositorySlug."
-        }
-      ]
-    },
-    {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.diff.path",
       "product": "bitbucket",
       "method": "GET",
@@ -3432,6 +3409,11 @@
       "product": "bitbucket",
       "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/archive",
       "reason": "non-JSON body (archive, raw, download or avatar)"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/diff",
+      "reason": "the deployment rejects every form of this route"
     },
     {
       "product": "bitbucket",

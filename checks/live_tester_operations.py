@@ -215,6 +215,33 @@ def run(limit: int | None, out: Path) -> int:
             )
         except AtlaWireError as exc:
             detail = (exc.detail or "")[:400] or None
+            message = str(exc)
+            # A local refusal that the deployment would also produce is not a
+            # defect: the tester simply did not supply the parameter. Recording it
+            # separately keeps the defect list honest.
+            if (
+                exc.category == "validation"
+                and "query parameter is required" in message
+            ):
+                record.update(
+                    outcome="refused",
+                    reason=f"the tester did not supply the required parameter: {message[:90]}",
+                )
+                results.append(record)
+                print(
+                    f"[{number:3}/{len(operations)}] REFUSED {operation['id']} — {message[:60]}"
+                )
+                continue
+            if exc.category == "validation" and "binary body" in message:
+                record.update(
+                    outcome="refused",
+                    reason="binary operation; read through read_binary, not the JSON reader",
+                )
+                results.append(record)
+                print(
+                    f"[{number:3}/{len(operations)}] REFUSED {operation['id']} — binary"
+                )
+                continue
             missing = required_parameter(detail)
             record.update(
                 outcome="failed",
