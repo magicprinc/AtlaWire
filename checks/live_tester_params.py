@@ -20,11 +20,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from atlawire.credentials import load_saved_credentials  # noqa: E402
-from atlawire.http import AtlaWireError  # noqa: E402
-from atlawire.operations import list_operations, read_operation  # noqa: E402
-from live_tester_discovery import discover  # noqa: E402
-from live_tester_operations import argument_value  # noqa: E402
+from live_tester_discovery import discover
+from live_tester_operations import argument_value
+
+from atlawire.credentials import load_saved_credentials
+from atlawire.http import AtlaWireError
+from atlawire.operations import list_operations, read_operation
 
 
 def probe_value(field: dict[str, object]) -> object | None:
@@ -114,9 +115,10 @@ def run(out: Path) -> int:
                 continue
 
             baseline, baseline_error = call(
-                operation["id"], operation["product"], arguments, {name: "1"}
-                if field.get("type") == "integer"
-                else {}
+                operation["id"],
+                operation["product"],
+                arguments,
+                {name: "1"} if field.get("type") == "integer" else {},
             )
             changed, changed_error = call(
                 operation["id"], operation["product"], arguments, {name: alternative}
@@ -147,9 +149,7 @@ def run(out: Path) -> int:
                     observable_difference=before != after,
                 )
             results.append(record)
-            print(
-                f"{record['outcome']:18} {operation['id']} {name}={alternative}"
-            )
+            print(f"{record['outcome']:18} {operation['id']} {name}={alternative}")
 
     summary = Counter(record["outcome"] for record in results)
     document = {

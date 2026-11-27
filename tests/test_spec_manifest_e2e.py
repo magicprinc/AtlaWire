@@ -68,8 +68,10 @@ def test_cli_operations_matches_the_packaged_manifest():
         (entry["product"], entry["method"], entry["path"]) for entry in operations
     }
 
-    # 202 non-administrative reads plus 117 administrative reads, each declared
-    # in its own artifact and gated behind --allow-admin.
-    assert len(operations) == 319
+    # 201 non-administrative reads plus 117 administrative reads, each declared
+    # in its own artifact and gated behind --allow-admin. The read count fell by
+    # one when the same Bitbucket file route stopped being declared twice: the
+    # JSON duplicate could never be read, and the binary declaration serves it.
+    assert len(operations) == 318
     assert sum(1 for entry in operations if entry["scope"] == "admin") == 117
     assert manifest_routes - registry_routes == set()

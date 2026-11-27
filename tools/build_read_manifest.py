@@ -14,18 +14,20 @@ are reported as deferred with the reason instead of being silently dropped.
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MAPPINGS = ROOT / ".development"
 OUTPUT = ROOT / "src" / "atlawire" / "manifest.json"
 
+sys.path.insert(0, str(ROOT / "tools"))
+import wadl_surface  # noqa: E402 - resolved through the path above
+
 # Endpoints whose body is not JSON, or which the core reference does not
 # define. They stay in the release inventory with an explicit disposition.
-# Match the route's own shape, not a substring like "/content/": Confluence
-# content routes are JSON.
-_DEFERRED_SUFFIXES = ("/archive", "/raw", "/raw/", "/download")
-_DEFERRED_MARKERS = ("/avatar/", "avatar.png", "/markup/preview")
+# The shape test is shared with the admin generator so a file route cannot be a
+# download in one artifact and a JSON read in the other.
 _PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
 
 # Segments the canonical SDK adapter refuses. An advertised operation must not
@@ -91,13 +93,8 @@ def _version(product: str) -> str:
 
 def _deferred(path: str) -> str | None:
     lowered = path.lower()
-    if lowered.endswith("/avatar"):
-        return "non-JSON body (/avatar)"
-    if lowered.endswith(_DEFERRED_SUFFIXES):
-        return "non-JSON body (archive, raw or download)"
-    for marker in _DEFERRED_MARKERS:
-        if marker in lowered:
-            return f"non-JSON body ({marker})"
+    if wadl_surface.is_non_json_route(lowered):
+        return "non-JSON body (archive, raw, download or avatar)"
     segments = {part for part in lowered.split("/") if part}
     if segments & _ADMIN_SEGMENTS:
         return "administrative or system route"

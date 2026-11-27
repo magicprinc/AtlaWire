@@ -1110,35 +1110,6 @@
       ]
     },
     {
-      "id": "bitbucket.projects.projectkey.repos.repositoryslug.raw.path",
-      "product": "bitbucket",
-      "method": "GET",
-      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
-      "description": "Bitbucket read: raw.",
-      "documented_version": "Bitbucket Server 5.10.0 REST API 1.0",
-      "kind": "json",
-      "arguments": [
-        {
-          "name": "projectKey",
-          "pattern": "[A-Za-z0-9_.~\\-]+",
-          "allow_slash": false,
-          "description": "Path value for projectKey."
-        },
-        {
-          "name": "repositorySlug",
-          "pattern": "[A-Za-z0-9_.~\\-]+",
-          "allow_slash": false,
-          "description": "Path value for repositorySlug."
-        },
-        {
-          "name": "path",
-          "pattern": "[A-Za-z0-9_.~\\-]+",
-          "allow_slash": true,
-          "description": "Path value for path."
-        }
-      ]
-    },
-    {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.related",
       "product": "bitbucket",
       "method": "GET",
@@ -3415,12 +3386,12 @@
     {
       "product": "jira",
       "path": "/rest/api/2/attachment/{id}/expand/raw",
-      "reason": "non-JSON body (archive, raw or download)"
+      "reason": "non-JSON body (archive, raw, download or avatar)"
     },
     {
       "product": "jira",
       "path": "/rest/api/2/avatar/{type}/system",
-      "reason": "non-JSON body (/avatar/)"
+      "reason": "non-JSON body (archive, raw, download or avatar)"
     },
     {
       "product": "jira",
@@ -3450,22 +3421,27 @@
     {
       "product": "bitbucket",
       "path": "/rest/api/1.0/hooks/{hookKey}/avatar",
-      "reason": "non-JSON body (/avatar)"
+      "reason": "non-JSON body (archive, raw, download or avatar)"
     },
     {
       "product": "bitbucket",
       "path": "/rest/api/1.0/projects/{projectKey}/avatar.png",
-      "reason": "non-JSON body (avatar.png)"
+      "reason": "non-JSON body (archive, raw, download or avatar)"
     },
     {
       "product": "bitbucket",
       "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/archive",
-      "reason": "non-JSON body (archive, raw or download)"
+      "reason": "non-JSON body (archive, raw, download or avatar)"
     },
     {
       "product": "bitbucket",
       "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw",
-      "reason": "non-JSON body (archive, raw or download)"
+      "reason": "non-JSON body (archive, raw, download or avatar)"
+    },
+    {
+      "product": "bitbucket",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
+      "reason": "non-JSON body (archive, raw, download or avatar)"
     },
     {
       "product": "bitbucket",

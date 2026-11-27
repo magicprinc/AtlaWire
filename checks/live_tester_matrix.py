@@ -7,19 +7,21 @@ the command line API, and does it match the deployment's official description?
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from atlawire.operations import list_operations, read_operation  # noqa: E402
+from atlawire.operations import list_operations
 
 ROOT = Path(__file__).resolve().parents[1]
 completed = subprocess.run(
     [sys.executable, "-B", "-m", "atlawire", "--catalog"],
-    capture_output=True, text=True, encoding="utf-8-sig", check=False,
+    capture_output=True,
+    text=True,
+    encoding="utf-8-sig",
+    check=False,
 )
 catalog = json.loads(completed.stdout)["commands"]
 docs = json.loads((ROOT / "checks/live_tester_docs.json").read_text(encoding="utf-8"))
@@ -34,6 +36,7 @@ undocumented_routes = {
 # Which CLI commands exist, for matching an operation to a dedicated command.
 COMMAND_NAMES = set(catalog)
 
+
 # Candidate command names for one operation: the last meaningful segment of the
 # path, plus the operation id's last segments.
 def candidate_commands(operation: dict) -> list[str]:
@@ -42,6 +45,7 @@ def candidate_commands(operation: dict) -> list[str]:
     tail = segments[-2:] if len(segments) >= 2 else segments
     guesses = {"-".join(tail), tail[-1] if tail else ""}
     return sorted(name for name in COMMAND_NAMES if name in guesses)
+
 
 rows = []
 for operation in list_operations():
@@ -63,7 +67,9 @@ for operation in list_operations():
 
 print(f"operations: {len(rows)}")
 print(f"with a dedicated CLI command: {sum(1 for r in rows if r['cli_commands'])}")
-print(f"reachable only through `read <id>`: {sum(1 for r in rows if not r['cli_commands'])}")
+print(
+    f"reachable only through `read <id>`: {sum(1 for r in rows if not r['cli_commands'])}"
+)
 print(f"not documented by the WADL: {sum(1 for r in rows if not r['wadl_documented'])}")
 print()
 print("operations with no dedicated command, by product:")

@@ -73,8 +73,11 @@ def test_query_documented_matches_the_registry_census():
     """
     described = operations.list_operations()
 
-    # 319 = 202 non-administrative reads + 117 administrative reads.
-    assert len(described) == 319
-    assert sum(1 for entry in described if entry["scope"] == "read") == 202
+    # 318 = 201 non-administrative reads + 117 administrative reads. The read
+    # count fell by one when the registry stopped declaring the same Bitbucket
+    # file route twice: the JSON duplicate could never be read, and the binary
+    # declaration now serves it.
+    assert len(described) == 318
+    assert sum(1 for entry in described if entry["scope"] == "read") == 201
     assert sum(1 for entry in described if entry["scope"] == "admin") == 117
     assert sum(1 for entry in described if entry["query_documented"] is True) >= 113

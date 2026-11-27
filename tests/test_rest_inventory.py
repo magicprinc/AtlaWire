@@ -45,14 +45,16 @@ def test_committed_inventory_is_the_regenerated_document():
 
 
 def test_frozen_totals_are_exact(built):
-    """251 would mean a lost row; 202 a silently added one."""
+    """251 would mean a lost row; 319 a silently added one."""
     assert built["totals"] == {
         "documented_rows": 252,
         "rows_with_disposition": 248,
-        "required": 201,
-        "excluded": 51,
+        # 200/52, not 201/51: the bare Bitbucket `/raw` row is excluded because
+        # the deployment answers 400 on every form of it.
+        "required": 200,
+        "excluded": 52,
         "unresolved": 0,
-        "runtime_operations": 319,
+        "runtime_operations": 318,
     }
 
 
@@ -104,6 +106,9 @@ def test_every_excluded_row_states_a_known_reason(built):
     assert reasons == {
         "administrative",
         "authorization-uncertain",
+        # Added for the bare Bitbucket `/raw` row: the deployment answers 400 on
+        # every form of it, so it is excluded rather than claimed as covered.
+        "deployment-rejects",
         "documented-inconsistently",
         "system-route",
     }
@@ -144,15 +149,15 @@ def test_verify_catches_an_unaccounted_runtime_operation(built):
 def test_verify_catches_a_drifted_total(built):
     generator = _load_generator()
     broken = json.loads(json.dumps(built))
-    broken["totals"]["required"] = 200
+    broken["totals"]["required"] = 199
 
     assert any(
-        "required: expected 201" in problem for problem in generator.verify(broken)
+        "required: expected 200" in problem for problem in generator.verify(broken)
     )
 
 
 def test_verify_catches_a_compensating_per_product_shift(built):
-    """201 must not be reachable by one product short and another long."""
+    """200 must not be reachable by one product short and another long."""
     generator = _load_generator()
     broken = json.loads(json.dumps(built))
     jira_rows = broken["products"]["jira"]["rows"]
@@ -196,10 +201,12 @@ def test_verify_catches_an_addition_that_masks_a_required_row(built):
 
 def test_per_product_required_counts_are_pinned(built):
     """The split is part of the freeze, not just the global total."""
+    # Bitbucket is 56, not 57: the bare `/raw` row is excluded because the
+    # deployment rejects it, and only `/raw/{path}` serves a file.
     assert {
         product: block["counts"]["required"]
         for product, block in built["products"].items()
-    } == {"jira": 108, "confluence": 36, "bitbucket": 57}
+    } == {"jira": 108, "confluence": 36, "bitbucket": 56}
 
 
 def test_verify_checks_the_confluence_rule_against_the_mapping_prose(built):

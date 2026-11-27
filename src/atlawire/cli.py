@@ -173,6 +173,7 @@ from atlawire.jira import (
     get_issue_watchers,
     get_issue_worklog,
     get_issue_worklogs,
+    issue_url,
     list_issue_comments_with_metadata,
     list_issue_remote_links,
     list_issue_subtasks,
@@ -187,6 +188,7 @@ from atlawire.jira import (
     search_issues,
     search_raw,
     search_users,
+    titles,
 )
 from atlawire.jira_comments_search import find_author_comments
 from atlawire.jira_metadata import (
@@ -3885,6 +3887,15 @@ def repo_changes(
 @click.argument("project_key")
 @click.argument("slug")
 @click.argument("commit_id")
+@click.option(
+    "--path",
+    "file_path",
+    default=None,
+    help=(
+        "Only comments on this repository file path. The deployment requires it "
+        "on this route, so a call without it is refused with HTTP 400."
+    ),
+)
 @click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
 @click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
 @click.option(
@@ -3898,6 +3909,7 @@ def commit_comments(
     project_key: str,
     slug: str,
     commit_id: str,
+    file_path: str | None,
     base_url: str | None,
     token_from_env: bool,
     as_json: bool,
@@ -3916,6 +3928,7 @@ def commit_comments(
             slug,
             commit_id,
             token=token,
+            path=file_path,
             raw=raw,
             allow_http_loopback=allow_http_loopback,
         )
@@ -4949,6 +4962,68 @@ def transitions(
     for row in rows:
         values = (row["id"], row["name"], row["to_status"])
         click.echo("\t".join(map(_tsv_cell, values)))
+
+
+@cli.command("titles")
+@click.argument("keys", nargs=-1, required=True)
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def titles_command(
+    keys: tuple[str, ...],
+    base_url: str | None,
+    token_from_env: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Map each issue key to its summary in one or more batched reads.
+
+    A key list longer than one request's URL budget is split into input-ordered
+    batches of fifty, so a bulk lookup costs one read per fifty keys.
+    """
+    base_url, token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        document = titles(
+            base_url,
+            list(keys),
+            token=token,
+            allow_http_loopback=allow_http_loopback,
+        )
+    except AtlaWireError as exc:
+        raise _click_error(exc) from None
+    click.echo(json.dumps(document))
+
+
+@cli.command("issue-url")
+@click.argument("key_or_url")
+@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
+@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@click.option(
+    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
+)
+def issue_url_command(
+    key_or_url: str,
+    base_url: str | None,
+    token_from_env: bool,
+    allow_http_loopback: bool,
+) -> None:
+    """Print the browser URL of one issue without making a request.
+
+    Only the issue key is used; the destination always comes from the configured
+    base URL, so a key or link from an untrusted source cannot redirect the read.
+    """
+    base_url, _token = _product_base_url_and_token(
+        "jira", base_url, token_from_env, allow_http_loopback
+    )
+    try:
+        click.echo(
+            issue_url(base_url, key_or_url, allow_http_loopback=allow_http_loopback)
+        )
+    except AtlaWireError as exc:
+        raise _click_error(exc) from None
 
 
 @cli.command("jira-edit-meta")

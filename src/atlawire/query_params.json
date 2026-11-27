@@ -499,24 +499,6 @@
         "type": "string"
       }
     ],
-    "bitbucket.projects.projectkey.repos.repositoryslug.raw.path": [
-      {
-        "name": "at",
-        "type": "string"
-      },
-      {
-        "name": "hardwrap",
-        "type": "string"
-      },
-      {
-        "name": "htmlEscape",
-        "type": "string"
-      },
-      {
-        "name": "markup",
-        "type": "string"
-      }
-    ],
     "bitbucket.projects.projectkey.repos.repositoryslug.tags": [
       {
         "name": "filterText",

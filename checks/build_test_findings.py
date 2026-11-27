@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
-from atlawire.operations import list_operations  # noqa: E402
+from atlawire.operations import list_operations
 
 CHECKS = pathlib.Path("checks")
 OUT = CHECKS / "TEST-FINDINGS.md"
@@ -100,7 +100,9 @@ out(
 out(f"- Documentation vs WADL: {docs.get('summary')}")
 out(f"- Parameters: {params.get('summary')}")
 if cli:
-    out(f"- CLI: {cli.get('commands', 0)} commands, help failures: {cli.get('help_failures') or 'none'}")
+    out(
+        f"- CLI: {cli.get('commands', 0)} commands, help failures: {cli.get('help_failures') or 'none'}"
+    )
 if parity:
     out(f"- BBK parity: {parity.get('summary')}")
 out()
@@ -126,7 +128,9 @@ for record in operations_doc.get("results", []):
     needed = None
     for word in detail.split():
         cleaned = word.strip("'\".,:;")
-        if cleaned in {f["name"] for f in (registry.get(record["id"]) or {}).get("query") or []}:
+        if cleaned in {
+            f["name"] for f in (registry.get(record["id"]) or {}).get("query") or []
+        }:
             needed = cleaned
             break
     if needed is None:
@@ -184,9 +188,9 @@ for record in operations_doc.get("results", []):
     if not record.get("registry_gap"):
         continue
     operation = registry.get(record["id"]) or {}
-    declared = {
-        field["name"] for field in operation.get("query") or []
-    } | {field["name"] for field in operation.get("body") or []}
+    declared = {field["name"] for field in operation.get("query") or []} | {
+        field["name"] for field in operation.get("body") or []
+    }
     name = required_name(record.get("detail") or "", declared)
     if name:
         f2_rows.append([f"`{record['id']}`", record["product"], f"`{name}`"])
@@ -204,7 +208,9 @@ if docs:
     extra = [p for p in problems if p["kind"] == "parameter-not-in-wadl"]
     routes = [p for p in problems if p["kind"] == "route-not-in-wadl"]
 
-    out(f"**F3a. Documented by the WADL but absent from the registry ({len(missing)}).**")
+    out(
+        f"**F3a. Documented by the WADL but absent from the registry ({len(missing)}).**"
+    )
     out()
     out(
         "Two of these are deliberate and need no change: `updateHistory` is a write "
@@ -288,7 +294,10 @@ if params:
                     f"`{r['id']}`",
                     f"`{r['parameter']}`",
                     esc(r.get("value"), 30),
-                    esc(f"{r.get('category')} {r.get('status')}: {r.get('detail') or ''}", 130),
+                    esc(
+                        f"{r.get('category')} {r.get('status')}: {r.get('detail') or ''}",
+                        130,
+                    ),
                 ]
                 for r in entries
             ],
@@ -306,7 +315,9 @@ if params:
 out("### F5. CLI commands")
 out()
 if cli:
-    failures = [r for r in cli.get("results", []) if r.get("live_exit") not in (None, 0)]
+    failures = [
+        r for r in cli.get("results", []) if r.get("live_exit") not in (None, 0)
+    ]
     if failures:
         out("A live invocation failed with arguments the command's own help accepts.")
         out()
@@ -366,8 +377,7 @@ else:
 out("## Not defects")
 out()
 out(
-    "These look like failures in the raw data and are not. Do not change code for "
-    "them."
+    "These look like failures in the raw data and are not. Do not change code for them."
 )
 out()
 permission = [
@@ -379,18 +389,25 @@ out(
     f"- **{len(admin_denied)} administrative reads refused.** The token is read-only "
     "and has no admin rights. This is the boundary working as designed."
 )
-out(f"- **{len(non_admin)} non-administrative reads refused** — check the token's project permissions.")
+out(
+    f"- **{len(non_admin)} non-administrative reads refused** — check the token's project permissions."
+)
 if non_admin:
     for record in non_admin:
         out(f"  - `{record['id']}` -> {record['status']}")
-blocked = Counter(r.get("reason", "") for r in operations_doc.get("results", []) if r["outcome"] == "blocked")
+blocked = Counter(
+    r.get("reason", "")
+    for r in operations_doc.get("results", [])
+    if r["outcome"] == "blocked"
+)
 out(
     f"- **{sum(blocked.values())} operations could not be called** because this "
     "deployment has no such object (webhooks, schemes, screens, dashboards). The "
     "tester refuses to invent an id. No conclusion can be drawn about them."
 )
 empty = [
-    r for r in operations_doc.get("results", [])
+    r
+    for r in operations_doc.get("results", [])
     if r["outcome"] == "ok" and (r.get("shape") or {}).get("empty")
 ]
 out(

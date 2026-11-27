@@ -532,9 +532,13 @@ def _send_binary(
     *,
     product: str,
 ) -> requests.Response:
-    """Send one binary GET; a pre-response failure is one transport error."""
+    """Send one binary GET; a pre-response failure is one transport error.
+
+    The request accepts any media type: a binary route serves an image or a file
+    and answers 406 to the JSON ``Accept`` the shared session sends by default.
+    """
     try:
-        return _send(client, "GET", path, params=params, body=None)
+        return _send(client, "GET", path, params=params, body=None, accept="*/*")
     except requests.RequestException:
         raise SdkRequestError(
             status=None,
@@ -811,15 +815,26 @@ def _send(
     *,
     params: dict[str, str | int],
     body: dict[str, object] | None,
+    accept: str | None = None,
 ) -> requests.Response:
-    """Send one request through the read-only session, without following it."""
+    """Send one request through the read-only session, without following it.
+
+    ``accept`` overrides the session's JSON ``Accept`` header for one request. A
+    binary route serves an image and answers 406 to a request that asks for JSON,
+    so a file read must state what it accepts.
+    """
     url = f"{client.url.rstrip('/')}{path}"
+    headers: dict[str, str] = {}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    if accept is not None:
+        headers["Accept"] = accept
     return client._session.request(
         method,
         url,
         params=params or None,
         data=json.dumps(body) if body is not None else None,
-        headers=({"Content-Type": "application/json"} if body is not None else None),
+        headers=headers or None,
         timeout=_TIMEOUT,
         allow_redirects=False,
         stream=True,

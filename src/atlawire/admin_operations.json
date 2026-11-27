@@ -2,6 +2,12 @@
   "deferred": [
     {
       "method": "GET",
+      "path": "/projects/{projectKey}/repos/{repositorySlug}/raw",
+      "product": "bitbucket",
+      "reason": "non-JSON body"
+    },
+    {
+      "method": "GET",
       "path": "/audit/export",
       "product": "confluence",
       "reason": "binary archive body (application/zip, text/csv)"

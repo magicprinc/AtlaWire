@@ -10,10 +10,11 @@ from __future__ import annotations
 import json
 import pathlib
 import sys
-import xml.etree.ElementTree as ElementTree
+
+from defusedxml import ElementTree
 
 sys.path.insert(0, str(pathlib.Path(r"D:\REPO\github\AtlaWire\src")))
-from atlawire.operations import list_operations  # noqa: E402
+from atlawire.operations import list_operations
 
 WADL = {
     "bitbucket": pathlib.Path(
@@ -166,7 +167,9 @@ def main() -> int:
                 continue
 
             declared = {field["name"] for field in operation.get("query") or []}
-            path_names = {argument["name"] for argument in operation.get("arguments") or []}
+            path_names = {
+                argument["name"] for argument in operation.get("arguments") or []
+            }
             wadl_query = {
                 name
                 for name, where in documented.items()

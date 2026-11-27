@@ -245,16 +245,20 @@ def get_issue(
     return issue
 
 
-def issue_url(base_url: str, key_or_url: str) -> str:
+def issue_url(
+    base_url: str, key_or_url: str, *, allow_http_loopback: bool = False
+) -> str:
     """Return the browser URL of one Jira issue without making a request.
 
     ``base_url`` is normalized with the shared rules, so a deployment context
     path such as ``/jira`` is preserved. ``key_or_url`` accepts a bare key or a
     browse/API URL; only its key is used, and the destination always comes from
-    the supplied base URL, never from the argument.
+    the supplied base URL, never from the argument. ``allow_http_loopback``
+    relaxes the HTTPS-only rule for a local test server, exactly as the readers
+    do, so a loopback command can be exercised.
     """
     key = _issue_key(key_or_url)
-    base = normalize_base_url(base_url, allow_http_loopback=False)
+    base = normalize_base_url(base_url, allow_http_loopback=allow_http_loopback)
     return f"{base}/browse/{key}"
 
 

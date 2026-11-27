@@ -25,13 +25,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from live_tester_discovery import discover  # noqa: E402
+from live_tester_discovery import discover
 
 PYTHON = sys.executable
 
 
 def run_cli(argv: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(  # noqa: S603 - fixed argv, resolved interpreter
+    return subprocess.run(
         [PYTHON, "-B", "-m", "atlawire", *argv],
         capture_output=True,
         text=True,
@@ -51,7 +51,9 @@ def catalog() -> dict[str, dict]:
 def live_arguments(name: str, pool: dict[str, object]) -> list[str] | None:
     """Return argv for one live call, or None when the command needs a shape
     this tester cannot build safely."""
-    repo = f"{pool.get('bitbucket_project_key')}/{pool.get('bitbucket_repository_slug')}"
+    repo = (
+        f"{pool.get('bitbucket_project_key')}/{pool.get('bitbucket_repository_slug')}"
+    )
     pr = str(pool.get("bitbucket_pull_request_id"))
     issue = str(pool.get("jira_issue_key"))
     page = str(pool.get("confluence_page_id"))
@@ -123,8 +125,11 @@ def run(out: Path) -> int:
             record["live_exit"] = live.returncode
             output = live.stdout.strip()
             record["live_stdout_kind"] = (
-                "json" if output.startswith(("{", "[")) else
-                "empty" if not output else "text"
+                "json"
+                if output.startswith(("{", "["))
+                else "empty"
+                if not output
+                else "text"
             )
             if live.returncode != 0:
                 record["live_stderr"] = live.stderr.strip()[:240]
@@ -154,8 +159,6 @@ def run(out: Path) -> int:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--out", type=Path, default=Path("checks/live_tester_cli.json")
-    )
+    parser.add_argument("--out", type=Path, default=Path("checks/live_tester_cli.json"))
     options = parser.parse_args()
     raise SystemExit(run(options.out))

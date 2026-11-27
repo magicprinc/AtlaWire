@@ -79,17 +79,22 @@ _REGISTERED_ADDITIONS_SOURCE = {
 # routine regeneration, so the check fails until this table is updated.
 _EXPECTED = {
     "documented_rows": 252,
-    "required": 201,
-    "excluded": 51,
+    "required": 200,
+    "excluded": 52,
     "unresolved": 0,
-    "runtime_operations": 319,
+    # 318, not 319: the registry no longer declares the same Bitbucket file
+    # route twice. The duplicate was a JSON declaration of a binary route,
+    # which could never be read; the binary declaration now serves it.
+    "runtime_operations": 318,
 }
 # Per-product counts. Without them a global total could be satisfied by two
 # compensating mistakes, one product short and another long.
 _EXPECTED_PRODUCT = {
     "jira": {"required": 108, "excluded": 5},
     "confluence": {"required": 36, "excluded": 0},
-    "bitbucket": {"required": 57, "excluded": 42},
+    # 56/43, not 57/42: the bare `/raw` row moved to excluded because the
+    # deployment rejects every form of it, and only `/raw/{path}` serves a file.
+    "bitbucket": {"required": 56, "excluded": 43},
 }
 # Digest of the sorted normalized exclusions per product. Counting excluded rows
 # is not enough: swapping one for another keeps every total identical, so the
@@ -97,12 +102,16 @@ _EXPECTED_PRODUCT = {
 _EXPECTED_EXCLUDED_DIGEST: dict[str, str] = {
     "jira": "fe0a49d5fb2048de60981768d7a5bc9cab410630ff1788e67b1caf42d2abfa2c",
     "confluence": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "bitbucket": "864595cb50f98f93704cbe56854ed5dbaffa67ebf483dd06b1dd4ec175602460",
+    "bitbucket": "04f9a4602bc880a4c9082ffd5f00ff1e2a5e0b7d57a351aa867e71d3fa3cf182",
 }
 
 _REASON_TEXT = {
     "administrative": "Administrative, project-admin or system route.",
     "authorization-uncertain": "Only HTTP 200 is documented; authorization is unstated.",
+    "deployment-rejects": (
+        "Documented, but the deployment answers 400 on every form of the route; "
+        "the wildcard form is the one that serves a file."
+    ),
     "documented-inconsistently": "Documented as a GET but changes state; the same path is a POST.",
     "system-route": "No SDK builder and the runtime path validator refuses the segment.",
 }
@@ -249,6 +258,12 @@ def _disposition(row: _Row) -> tuple[str, str]:
             return "excluded", "administrative"
         if segments & _BITBUCKET_SYSTEM_SEGMENTS:
             return "excluded", "system-route"
+        if row.path.endswith("/raw"):
+            # The deployment answers 400 "The parameter 'path' is required" for
+            # the bare route and for `/raw?path=...`; only `/raw/{path}` serves a
+            # file. The bare row is documented but not served here, and claiming
+            # it is covered by the wildcard operation would be a false receipt.
+            return "excluded", "deployment-rejects"
     return "required", ""
 
 

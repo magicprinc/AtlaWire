@@ -122,6 +122,29 @@ def route_variants(path: str) -> set[str]:
     return {bare, f"{bare}/{{}}"}
 
 
+# Routes that serve a file, an archive, or an image rather than a JSON document.
+# Both generators consult this one list, so a route cannot be a file download in
+# one artifact and a JSON read in the other.
+_NON_JSON_SUFFIXES = ("/archive", "/raw", "/download")
+_NON_JSON_MARKERS = ("/avatar/", "avatar.png", "/markup/preview")
+
+
+def is_non_json_route(path: str) -> bool:
+    """True when a route's body is not a JSON document.
+
+    A wildcard file route spells its file path as a trailing placeholder, and
+    `normalize` collapses it to `{}`, so the comparison drops that suffix first:
+    `/raw/{path:.*}` becomes `/raw` and is recognised, while `/browse/{path:.*}`
+    becomes `/browse` and is not.
+    """
+    shape = normalize(path).lower()
+    if shape.endswith("/{}"):
+        shape = shape[: -len("/{}")]
+    if shape.endswith(_NON_JSON_SUFFIXES):
+        return True
+    return any(marker in f"{shape}/" for marker in _NON_JSON_MARKERS)
+
+
 def prose(element: ElementTree.Element | None) -> str:
     """Return an element's text with tags stripped and whitespace collapsed."""
     if element is None:

@@ -136,6 +136,10 @@ _FROM_REPO_ID = re.compile(r"[1-9][0-9]*")
 _FROM_REPO_PROJECT = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _FROM_REPO_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _PULL_REQUEST_ID = re.compile(r"[1-9][0-9]*")
+# A repository file path served from the route. It may contain slashes, so the
+# shared argument check permits them; every segment stays inside the generated
+# character class, which the manifest uses for the same template.
+_RAW_FILE_PATH = re.compile(r"[A-Za-z0-9_.~\-\/]+")
 _FULL_COMMIT_ID = re.compile(r"[0-9A-Fa-f]{40}")
 _TASK_ID = re.compile(r"[1-9][0-9]*")
 _USER_SLUG = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
@@ -525,8 +529,11 @@ _OPERATIONS: dict[str, _Operation] = {
         _Operation(
             id="bitbucket.repository.raw",
             product="bitbucket",
-            path=("/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw"),
-            description="Download the repository root as raw bytes.",
+            path=(
+                "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}"
+                "/raw/{path:.*}"
+            ),
+            description="Download one repository file at a revision as raw bytes.",
             documented_version=_BITBUCKET_VERSION,
             kind="binary",
             required=(),
@@ -540,6 +547,15 @@ _OPERATIONS: dict[str, _Operation] = {
                     "repositorySlug",
                     _BITBUCKET_REPOSITORY_SLUG,
                     "Bitbucket repository slug.",
+                ),
+                # The server reads the file path from the route, not from a query
+                # parameter: `/raw` alone answers 400 "The parameter 'path' is
+                # required", while `/raw/dir/file` serves the file.
+                _Argument(
+                    "path",
+                    _RAW_FILE_PATH,
+                    "Repository file path, which may contain slashes.",
+                    allow_slash=True,
                 ),
             ),
         ),
@@ -582,17 +598,17 @@ _OPERATIONS: dict[str, _Operation] = {
             id="jira.worklog.list",
             product="jira",
             path="/rest/api/2/worklog/list",
-            description="List worklogs for up to 1000 issue IDs in one read.",
+            description="List worklogs for up to 1000 worklog IDs in one read.",
             documented_version=_JIRA_VERSION,
             kind="array",
             required=(),
             method="POST",
             body=(
                 _BodyField(
-                    "issueIds",
+                    "ids",
                     "integer_array",
                     True,
-                    "Issue IDs whose worklogs are returned (at most 1000).",
+                    "Worklog IDs whose entries are returned (at most 1000).",
                 ),
             ),
         ),
@@ -1900,9 +1916,78 @@ def _install_admin_operations() -> int:
     return added
 
 
+# Parameters a live deployment refuses to answer without, and the exclusion rules
+# it enforces. Neither can come from the WADL: it carries no `required` attribute
+# at all, so every generated field is optional, and it states no "one of these"
+# rule. Recorded once here, after every installer, so a route from the manifest or
+# from the admin surface is covered as well as a hand-written one.
+_CONFIRMED_REQUIRED: dict[str, tuple[str, ...]] = {
+    "bitbucket.admin.groups.more-members": ("context",),
+    "bitbucket.admin.groups.more-non-members": ("context",),
+    "bitbucket.admin.users.more-members": ("context",),
+    "bitbucket.admin.users.more-non-members": ("context",),
+    "bitbucket.projects.projectkey.repos.repositoryslug.changes": ("until",),
+    "bitbucket.projects.projectkey.repos.repositoryslug.diff.path": ("until",),
+    "bitbucket.projects.projectkey.repos.repositoryslug"
+    ".pull-requests.pullrequestid.comments": ("path",),
+    "bitbucket.repository.commit-comments": ("path",),
+    "confluence.search": ("cql",),
+}
+# The deployment answers 400 "Only one query param of key or username is required"
+# when both are sent, so exactly one of them is mandatory.
+_CONFIRMED_EXACTLY_ONE: dict[str, tuple[str, ...]] = {
+    "confluence.user.memberof": ("key", "username"),
+}
+_CONFIRMED_FIELD_NOTE = (
+    "Required by the deployment; it answers a request without this parameter with 400."
+)
+
+
+def _apply_confirmed_query() -> int:
+    """Mark the parameters this deployment enforces as required.
+
+    A field the registry does not declare at all is added: a route nobody can call
+    because its mandatory parameter is unknown is not usable, and silently
+    omitting it would hide that. Existing fields keep their position, so the
+    advertised order does not change.
+    """
+    changed = 0
+    for operation_id, names in _CONFIRMED_REQUIRED.items():
+        operation = _OPERATIONS.get(operation_id)
+        if operation is None:
+            continue
+        present = {field.name for field in operation.query}
+        query = tuple(
+            replace(field, required=True) if field.name in names else field
+            for field in operation.query
+        )
+        added = tuple(
+            _QueryField(
+                name,
+                "string",
+                True,
+                _CONFIRMED_FIELD_NOTE,
+                max_length=_MAX_QUERY_TEXT,
+                allow_spaces=True,
+            )
+            for name in names
+            if name not in present
+        )
+        _OPERATIONS[operation_id] = replace(operation, query=query + added)
+        changed += 1
+    for operation_id, names in _CONFIRMED_EXACTLY_ONE.items():
+        operation = _OPERATIONS.get(operation_id)
+        if operation is None:
+            continue
+        _OPERATIONS[operation_id] = replace(operation, query_exactly_one=names)
+        changed += 1
+    return changed
+
+
 _install_manifest_operations()
 _install_documented_query()
 _install_admin_operations()
+_apply_confirmed_query()
 
 
 def list_operations() -> list[dict[str, object]]:
@@ -2203,7 +2288,10 @@ def read_operation(
             operation=operation.id,
         )
     url = f"{base}{path}"
-    if use_library:
+    # A semantic-read POST can only go through the shared request builder, which
+    # is what carries a body and the audited method list. A caller that did not
+    # ask for the library still gets it for a POST instead of a dead end.
+    if use_library or operation.method != "GET":
         status, payload = sdk_request_json_with_status(
             operation.product,
             base,
@@ -2216,8 +2304,6 @@ def read_operation(
             allow_admin=operation.scope == "admin",
         )
         no_content = status == 204 and payload is None
-    elif operation.method != "GET":
-        raise _invalid("This operation requires the library transport.", operation)
     else:
         status = None
         with bearer_session(token, product=operation.product) as session:
@@ -2329,12 +2415,27 @@ def _validated_query(
         operation.query_exactly_one
         and sum(name in present for name in operation.query_exactly_one) != 1
     ):
-        raise _invalid(_INVALID_QUERY, operation)
+        raise AtlaWireError(
+            "Pass exactly one of these query parameters: "
+            + ", ".join(operation.query_exactly_one)
+            + ".",
+            category="validation",
+            product=operation.product,
+            operation=operation.id,
+        )
     validated: dict[str, str | int] = {}
     for field in operation.query:
         if field.name not in supplied:
             if field.required:
-                raise _invalid(_INVALID_QUERY, operation)
+                # Name the parameter: the deployment would have answered 400 with
+                # its own message, so a generic error would be less useful than
+                # the one this check replaces.
+                raise AtlaWireError(
+                    f"The {field.name} query parameter is required.",
+                    category="validation",
+                    product=operation.product,
+                    operation=operation.id,
+                )
             continue
         if any(name not in present for name in field.depends_on):
             raise _invalid(_INVALID_QUERY, operation)

@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from live_tester_discovery import discover  # noqa: E402
+from live_tester_discovery import discover
 
 PYTHON = sys.executable
 
@@ -32,7 +32,15 @@ def value_for(product: str, name: str, pool: dict[str, object]):
     )
     table = {
         "product": product,
-        "path": "/rest/api/2/myself" if product == "jira" else "/rest/api/1.0/projects",
+        # A REST path for `api-get`/`api-request`; a repository file path is a
+        # different argument with the same name, so the two get distinct keys.
+        "rest_path": (
+            "/rest/api/2/myself"
+            if product == "jira"
+            else "/rest/api/1.0/projects"
+            if product == "bitbucket"
+            else "/rest/api/space"
+        ),
         "method": "GET",
         "repo": bitbucket_repo,
         "project": str(pool.get("bitbucket_project_key")),
@@ -67,7 +75,10 @@ def value_for(product: str, name: str, pool: dict[str, object]):
 def catalog() -> dict[str, dict]:
     completed = subprocess.run(
         [PYTHON, "-B", "-m", "atlawire", "--catalog"],
-        capture_output=True, text=True, encoding="utf-8-sig", check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig",
+        check=False,
     )
     return json.loads(completed.stdout)["commands"]
 
@@ -93,10 +104,14 @@ SKIP = {"login", "selftest"}  # interactive prompt / not a product read
 
 
 def run(argv: list[str]) -> tuple[int, str, str]:
-    completed = subprocess.run(  # noqa: S603 - fixed argv, resolved interpreter
+    completed = subprocess.run(
         [PYTHON, "-B", "-m", "atlawire", *argv],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=300, check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+        check=False,
     )
     return completed.returncode, completed.stdout, completed.stderr
 
@@ -116,7 +131,8 @@ def main(out: Path) -> int:
         body = commands[name]
         params = body.get("params") or []
         positionals = [
-            p["opts"][0] for p in params
+            p["opts"][0]
+            for p in params
             if p.get("opts") and not p["opts"][0].startswith("--")
         ]
         required = [p["opts"][0] for p in params if p.get("required") and p.get("opts")]
@@ -126,7 +142,12 @@ def main(out: Path) -> int:
         missing = None
         for positional in positionals:
             if positional in required or positional in {
-                "repo", "project", "project_key", "slug", "key_or_url", "page_id_or_url"
+                "repo",
+                "project",
+                "project_key",
+                "slug",
+                "key_or_url",
+                "page_id_or_url",
             }:
                 value = value_for(product, positional, pool)
                 if value is None:
@@ -143,8 +164,11 @@ def main(out: Path) -> int:
         code, stdout, stderr = run(argv)
         record.update(argv=argv, exit=code)
         record["stdout_kind"] = (
-            "json" if stdout.strip().startswith(("{", "["))
-            else "empty" if not stdout.strip() else "text"
+            "json"
+            if stdout.strip().startswith(("{", "["))
+            else "empty"
+            if not stdout.strip()
+            else "text"
         )
         if code == 0:
             record["outcome"] = "ok"
@@ -171,6 +195,8 @@ def main(out: Path) -> int:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out", type=Path, default=Path("checks/live_tester_cli_full.json"))
+    parser.add_argument(
+        "--out", type=Path, default=Path("checks/live_tester_cli_full.json")
+    )
     options = parser.parse_args()
     raise SystemExit(main(options.out))

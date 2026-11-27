@@ -13,9 +13,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from atlawire.credentials import load_saved_credentials  # noqa: E402
-from atlawire.http import AtlaWireError  # noqa: E402
-from atlawire.sdk import get_json  # noqa: E402
+from atlawire.credentials import load_saved_credentials
+from atlawire.http import AtlaWireError
+from atlawire.sdk import get_json
 
 PRODUCTS = ("jira", "confluence", "bitbucket")
 
@@ -35,7 +35,9 @@ def fetch(product: str, path: str, params: dict[str, object] | None = None):
             params=params or {},
         )
     except AtlaWireError as exc:
-        print(f"  ! {product} {path} -> {exc.category} {exc.http_status}", file=sys.stderr)
+        print(
+            f"  ! {product} {path} -> {exc.category} {exc.http_status}", file=sys.stderr
+        )
         return None
 
 
@@ -50,7 +52,9 @@ def discover() -> dict[str, object]:
     project = fetch("jira", "/rest/api/2/project")
     if isinstance(project, list) and project:
         ids["jira_project_key"] = project[0].get("key")
-        versions = fetch("jira", f"/rest/api/2/project/{ids['jira_project_key']}/versions")
+        versions = fetch(
+            "jira", f"/rest/api/2/project/{ids['jira_project_key']}/versions"
+        )
         if isinstance(versions, list) and versions:
             ids["jira_version_id"] = versions[0].get("id")
         components = fetch(
@@ -106,9 +110,7 @@ def discover() -> dict[str, object]:
     fields = fetch("jira", "/rest/api/2/field")
     if isinstance(fields, list) and fields:
         ids["jira_field_id"] = fields[0].get("id")
-        priority_field = next(
-            (f for f in fields if f.get("id") == "priority"), None
-        )
+        priority_field = next((f for f in fields if f.get("id") == "priority"), None)
         if priority_field:
             ids["jira_field_id"] = "priority"
 
@@ -155,7 +157,9 @@ def discover() -> dict[str, object]:
                 ids["confluence_content_type"] = page.get("type") or "page"
                 page_id = ids["confluence_page_id"]
                 comments = fetch(
-                    "confluence", f"/rest/api/content/{page_id}/child/comment", {"limit": 1}
+                    "confluence",
+                    f"/rest/api/content/{page_id}/child/comment",
+                    {"limit": 1},
                 )
                 if isinstance(comments, dict):
                     entries = comments.get("results") or []
@@ -182,9 +186,7 @@ def discover() -> dict[str, object]:
     if isinstance(users, dict):
         values = users.get("values") or []
         if values:
-            ids["bitbucket_user_slug"] = values[0].get("slug") or values[0].get(
-                "name"
-            )
+            ids["bitbucket_user_slug"] = values[0].get("slug") or values[0].get("name")
 
     if "bitbucket_project_key" in ids:
         project_key = ids["bitbucket_project_key"]
@@ -233,10 +235,10 @@ def discover() -> dict[str, object]:
                 ids["bitbucket_repository_slug"] = slug
                 ids["bitbucket_pull_request_id"] = values[0].get("id")
                 ids["bitbucket_pull_request_from"] = (
-                    (values[0].get("fromRef") or {}).get("id")
-                )
-                ids["bitbucket_pull_request_to"] = (
-                    (values[0].get("toRef") or {}).get("id")
+                    values[0].get("fromRef") or {}
+                ).get("id")
+                ids["bitbucket_pull_request_to"] = (values[0].get("toRef") or {}).get(
+                    "id"
                 )
                 break
         if "bitbucket_pull_request_id" in ids:

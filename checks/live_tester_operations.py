@@ -20,10 +20,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from atlawire.credentials import load_saved_credentials  # noqa: E402
-from atlawire.http import AtlaWireError  # noqa: E402
-from atlawire.operations import list_operations, read_operation  # noqa: E402
-from live_tester_discovery import discover  # noqa: E402
+from live_tester_discovery import discover
+
+from atlawire.credentials import load_saved_credentials
+from atlawire.http import AtlaWireError
+from atlawire.operations import list_operations, read_operation
 
 # A property key is caller-chosen, so an arbitrary literal is a valid probe:
 # the documented answer for an absent property is a 404, not a misuse.
@@ -198,12 +199,12 @@ def run(limit: int | None, out: Path) -> int:
         if blocked is not None:
             record.update(outcome="blocked", reason=blocked)
             results.append(record)
-            print(f"[{number:3}/{len(operations)}] BLOCKED {operation['id']} — {blocked}")
+            print(
+                f"[{number:3}/{len(operations)}] BLOCKED {operation['id']} — {blocked}"
+            )
             continue
 
-        saved = load_saved_credentials(
-            operation["product"], allow_http_loopback=False
-        )
+        saved = load_saved_credentials(operation["product"], allow_http_loopback=False)
         try:
             payload = read_operation(
                 operation["id"],
