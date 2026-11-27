@@ -535,6 +535,34 @@ def _product_base_url_and_token(
     return saved.base_url, saved.token
 
 
+def _product_options(base_var: str, token_var: str):
+    """Apply the three options every single-product command takes.
+
+    A callback keeps its own signature: Click injects ``base_url``,
+    ``token_from_env`` and ``allow_http_loopback`` by name, exactly as the three
+    explicit decorators did. Declaring them once means the option order and the
+    help text cannot drift between eighty commands.
+
+    The statements are applied loopback, token, base because Click reverses the
+    collected parameter list; the rendered order therefore stays ``--base-url``,
+    ``--token-from-env``, …, ``--allow-http-loopback``.
+    """
+
+    def decorate(function):
+        function = click.option(
+            "--allow-http-loopback",
+            is_flag=True,
+            help="Allow local HTTP for tests only.",
+        )(function)
+        function = click.option(
+            "--token-from-env", is_flag=True, help=f"Read {token_var}."
+        )(function)
+        function = click.option("--base-url", envvar=base_var)(function)
+        return function
+
+    return decorate
+
+
 def _federated_targets(
     token_from_env: bool,
     allow_http_loopback: bool,
@@ -632,8 +660,7 @@ def _operation_json_object(raw: str) -> dict[str, object]:
 
 @cli.command()
 @click.argument("project")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -642,9 +669,6 @@ def _operation_json_object(raw: str) -> dict[str, object]:
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def repos(
     project: str,
@@ -680,8 +704,7 @@ def repos(
 
 
 @cli.command()
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -690,9 +713,6 @@ def repos(
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def projects(
     base_url: str | None,
@@ -727,8 +747,7 @@ def projects(
 
 @cli.command("find-repos")
 @click.argument("name")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -745,9 +764,6 @@ def projects(
     default=100,
     show_default=True,
     help="Total page budget across projects and repositories (1-1000).",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def find_repos_command(
     name: str,
@@ -1332,7 +1348,11 @@ def api_get_command(
 @click.option("--params", "raw_params", default=None)
 @click.option("--body", "raw_body", default=None)
 @click.option("--base-url", default=None)
-@click.option("--token-from-env", is_flag=True)
+@click.option(
+    "--token-from-env",
+    is_flag=True,
+    help="Read the selected product's URL/token pair from the environment.",
+)
 @click.option(
     "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
@@ -1684,13 +1704,9 @@ def _verify_login(
     is_flag=True,
     help="Follow result pages up to the row limit instead of one page.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of a summary."
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def search_command(
     query: str,
@@ -1805,11 +1821,7 @@ def search_command(
     is_flag=True,
     help="Accepted for symmetry; JSON is always printed.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def grep_repo_command(
     repo: str,
     pattern: str | None,
@@ -1902,11 +1914,7 @@ def grep_repo_command(
 @click.option(
     "--case-sensitive", is_flag=True, help="Match the regex case-sensitively."
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def repo_search_command(
     query: str,
     project: str | None,
@@ -1971,8 +1979,7 @@ def repo_search_command(
 @cli.command()
 @click.argument("repo")
 @click.option("--filter", "filter_text", default=None, help="Branch text to match.")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -1981,9 +1988,6 @@ def repo_search_command(
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def branches(
     repo: str,
@@ -2017,13 +2021,9 @@ def branches(
 @cli.command("branch")
 @click.argument("repo")
 @click.argument("name")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def branch_command(
     repo: str,
@@ -2062,16 +2062,12 @@ def branch_command(
     show_default=True,
     help="Maximum commits to return (1-1000).",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def commits(
     repo: str,
@@ -2107,16 +2103,12 @@ def commits(
 @cli.command()
 @click.argument("repo")
 @click.argument("sha")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json",
     "as_json",
     is_flag=True,
     help="Accepted for symmetry; JSON is always printed.",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def commit_command(
     repo: str,
@@ -2146,8 +2138,7 @@ def commit_command(
 @cli.command("commit-changes")
 @click.argument("repo")
 @click.argument("sha")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -2156,9 +2147,6 @@ def commit_command(
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def commit_changes_command(
     repo: str,
@@ -2209,11 +2197,7 @@ def commit_changes_command(
 @click.option(
     "--json", "as_json", is_flag=True, help="Print raw JSON instead of review text."
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def commit_diff_command(
     repo: str,
     sha: str,
@@ -2257,11 +2241,7 @@ def commit_diff_command(
     is_flag=True,
     help="Print one JSON object with the receipt and text instead of raw bytes.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def file_command(
     repo: str,
     path: str,
@@ -2353,11 +2333,7 @@ def _write_bytes(destination: str, payload: bytes) -> dict[str, object]:
     show_default=True,
     help="Maximum response-body bytes (positive; default is 8 MiB).",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def attachment_get_command(
     repo: str,
     attachment_id: str,
@@ -2409,8 +2385,7 @@ def attachment_get_command(
 @cli.command("files")
 @click.argument("repo")
 @click.option("--at", default=None, help="Revision to list files at.")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of plain paths."
 )
@@ -2419,9 +2394,6 @@ def attachment_get_command(
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def files_command(
     repo: str,
@@ -2456,8 +2428,7 @@ def files_command(
 @click.argument("repo")
 @click.argument("path", required=False, default="")
 @click.option("--at", default=None, help="Revision to list at.")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -2466,9 +2437,6 @@ def files_command(
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def ls_command(
     repo: str,
@@ -2505,13 +2473,9 @@ def ls_command(
 @click.argument("repo")
 @click.argument("path")
 @click.option("--at", default=None, help="Revision to blame.")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def blame_command(
     repo: str,
@@ -2960,8 +2924,7 @@ def _run_pr_file_action(
 @click.argument("pr_id")
 @click.argument("action", required=False)
 @click.argument("path", nargs=-1)
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json",
     "as_json",
@@ -3002,9 +2965,6 @@ def _run_pr_file_action(
     "--source-path",
     default=None,
     help="Previous relative path for a renamed, copied, or moved diff file.",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def pr(
     repo: str,
@@ -3079,11 +3039,7 @@ def pr(
 @cli.command("pr-merge-status")
 @click.argument("repo")
 @click.argument("pr_id")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def pr_merge_status(
     repo: str,
     pr_id: str,
@@ -3128,11 +3084,7 @@ def pr_merge_status(
     is_flag=True,
     help="Accepted for symmetry; JSON is always printed.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def pr_diff_complete_command(
     repo: str,
     pr_id: str,
@@ -3204,11 +3156,7 @@ def pr_diff_complete_command(
     is_flag=True,
     help="Read the Jira token from ATLAWIRE_JIRA_TOKEN.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def pr_review_command(
     repo_or_url: str,
     pr_id: str | None,
@@ -3323,11 +3271,7 @@ def pr_review_command(
     is_flag=True,
     help="Accepted for symmetry; JSON is always printed.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def tags_command(
     repo: str,
     filter_text: str | None,
@@ -3368,11 +3312,7 @@ def tags_command(
 @cli.command("tag")
 @click.argument("repo")
 @click.argument("name")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def tag_command(
     repo: str,
     name: str,
@@ -3412,11 +3352,7 @@ def tag_command(
         "branch and sends its latest full commit."
     ),
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def last_modified_command(
     repo: str,
     path: str | None,
@@ -3482,11 +3418,7 @@ def last_modified_command(
     is_flag=True,
     help="Accepted for symmetry; JSON is always printed.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 def scan_extension_command(
     extension: str,
     project: str | None,
@@ -3572,16 +3504,12 @@ def scan_extension_command(
     show_default=True,
     help="Maximum pull requests to return (1-1000).",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def prs(
     repo: str,
@@ -3651,16 +3579,12 @@ def prs(
     show_default=True,
     help="Maximum pull requests to return (1-1000).",
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
 @click.option(
     "--max-pages", type=click.IntRange(1, 1000), default=100, show_default=True
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def my_prs(
     state: str,
@@ -3722,15 +3646,11 @@ def _read_raw_json(
 
 @cli.command()
 @click.argument("project_key")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def project(
     project_key: str,
     base_url: str | None,
@@ -3760,15 +3680,11 @@ def project(
 @cli.command()
 @click.argument("project_key")
 @click.argument("slug")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def repository(
     project_key: str,
     slug: str,
@@ -3800,15 +3716,11 @@ def repository(
 @cli.command("default-branch")
 @click.argument("project_key")
 @click.argument("slug")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def default_branch(
     project_key: str,
     slug: str,
@@ -3844,15 +3756,11 @@ def default_branch(
 @click.argument("project_key")
 @click.argument("slug")
 @click.argument("until")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def repo_changes(
     project_key: str,
     slug: str,
@@ -3896,15 +3804,11 @@ def repo_changes(
         "on this route, so a call without it is refused with HTTP 400."
     ),
 )
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def commit_comments(
     project_key: str,
     slug: str,
@@ -3942,15 +3846,11 @@ def commit_comments(
 @click.argument("slug")
 @click.argument("commit_id")
 @click.argument("comment_id")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def commit_comment(
     project_key: str,
     slug: str,
@@ -3986,15 +3886,11 @@ def commit_comment(
 @cli.command("repo-participants")
 @click.argument("project_key")
 @click.argument("slug")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def repo_participants(
     project_key: str,
     slug: str,
@@ -4026,15 +3922,11 @@ def repo_participants(
 @cli.command("repo-forks")
 @click.argument("project_key")
 @click.argument("slug")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def repo_forks(
     project_key: str,
     slug: str,
@@ -4066,15 +3958,11 @@ def repo_forks(
 @cli.command("related-repos")
 @click.argument("project_key")
 @click.argument("slug")
-@click.option("--base-url", envvar="ATLAWIRE_BITBUCKET_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_BITBUCKET_TOKEN.")
+@_product_options("ATLAWIRE_BITBUCKET_URL", "ATLAWIRE_BITBUCKET_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def related_repos(
     project_key: str,
     slug: str,
@@ -4105,8 +3993,7 @@ def related_repos(
 
 @cli.command()
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option("--markdown", is_flag=True, help="Print Markdown instead of JSON.")
 @click.option(
     "--json",
@@ -4141,9 +4028,6 @@ def related_repos(
     "--fail-fast",
     is_flag=True,
     help="Stop at the first field error instead of returning partial data.",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def issue(
     key_or_url: str,
@@ -4199,8 +4083,7 @@ def issue(
 
 @cli.command("issue-comments")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--max-pages",
     type=click.IntRange(COMMENT_PAGES_MIN, COMMENT_PAGES_MAX),
@@ -4218,9 +4101,6 @@ def issue(
     "as_json",
     is_flag=True,
     help="Print rows plus truncation metadata as one JSON object.",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def issue_comments(
     key_or_url: str,
@@ -4269,11 +4149,7 @@ def issue_comments(
 
 @cli.command("issue-remote-links")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def issue_remote_links(
     key_or_url: str,
     base_url: str | None,
@@ -4302,11 +4178,7 @@ def issue_remote_links(
 
 @cli.command("issue-worklogs")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def issue_worklogs(
     key_or_url: str,
     base_url: str | None,
@@ -4335,11 +4207,7 @@ def issue_worklogs(
 
 @cli.command("issue-changelog")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def issue_changelog(
     key_or_url: str,
     base_url: str | None,
@@ -4369,15 +4237,11 @@ def issue_changelog(
 
 @cli.command("issue-votes")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_votes(
     key_or_url: str,
     base_url: str | None,
@@ -4414,15 +4278,11 @@ def issue_votes(
 
 @cli.command("issue-watchers")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_watchers(
     key_or_url: str,
     base_url: str | None,
@@ -4459,15 +4319,11 @@ def issue_watchers(
 
 @cli.command("issue-subtasks")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_subtasks(
     key_or_url: str,
     base_url: str | None,
@@ -4506,15 +4362,11 @@ def issue_subtasks(
 @cli.command("issue-comment")
 @click.argument("key_or_url")
 @click.argument("comment_id")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_comment(
     key_or_url: str,
     comment_id: str,
@@ -4555,15 +4407,11 @@ def issue_comment(
 @cli.command("issue-worklog")
 @click.argument("key_or_url")
 @click.argument("worklog_id")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_worklog(
     key_or_url: str,
     worklog_id: str,
@@ -4603,15 +4451,11 @@ def issue_worklog(
 
 @cli.command("issue-properties")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_properties(
     key_or_url: str,
     base_url: str | None,
@@ -4649,15 +4493,11 @@ def issue_properties(
 @cli.command("issue-property")
 @click.argument("key_or_url")
 @click.argument("property_key")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_property(
     key_or_url: str,
     property_key: str,
@@ -4697,15 +4537,11 @@ def issue_property(
 
 @cli.command("issue-link")
 @click.argument("link_id")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def issue_link(
     link_id: str,
     base_url: str | None,
@@ -4742,8 +4578,7 @@ def issue_link(
 
 @cli.command()
 @click.argument("query")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -4769,9 +4604,6 @@ def issue_link(
         "Comma-separated Jira expansions for a raw search request; implies "
         "raw output and is sent verbatim as expand."
     ),
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def jql(
     query: str,
@@ -4840,8 +4672,7 @@ def jql(
 
 @cli.command()
 @click.option("--status", default=None, help="Return issues in this exact status name.")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -4851,9 +4682,6 @@ def jql(
     default=50,
     show_default=True,
     help=f"Maximum rows to return ({SEARCH_LIMIT_MIN}-{SEARCH_LIMIT_MAX}).",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def mine(
     status: str | None,
@@ -4894,13 +4722,9 @@ def mine(
 
 
 @cli.command()
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array of status names."
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def statuses(
     base_url: str | None,
@@ -4927,13 +4751,9 @@ def statuses(
 
 @cli.command()
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def transitions(
     key_or_url: str,
@@ -4966,11 +4786,7 @@ def transitions(
 
 @cli.command("titles")
 @click.argument("keys", nargs=-1, required=True)
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def titles_command(
     keys: tuple[str, ...],
     base_url: str | None,
@@ -4999,11 +4815,7 @@ def titles_command(
 
 @cli.command("issue-url")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def issue_url_command(
     key_or_url: str,
     base_url: str | None,
@@ -5028,11 +4840,7 @@ def issue_url_command(
 
 @cli.command("jira-edit-meta")
 @click.argument("key_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_edit_meta(
     key_or_url: str,
     base_url: str | None,
@@ -5064,11 +4872,7 @@ def jira_edit_meta(
     default=None,
     help="Optional exact uppercase Jira project key.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_create_meta(
     project: str | None,
     base_url: str | None,
@@ -5102,11 +4906,7 @@ def jira_create_meta(
     default=None,
     help="Optional numeric Jira transition ID.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_transition_fields(
     key_or_url: str,
     transition_id: str | None,
@@ -5135,11 +4935,7 @@ def jira_transition_fields(
 
 
 @cli.command("jira-me")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_me(
     base_url: str | None,
     token_from_env: bool,
@@ -5159,11 +4955,7 @@ def jira_me(
 
 
 @cli.command("jira-priorities")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_priorities(
     base_url: str | None,
     token_from_env: bool,
@@ -5183,11 +4975,7 @@ def jira_priorities(
 
 
 @cli.command("jira-resolutions")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_resolutions(
     base_url: str | None,
     token_from_env: bool,
@@ -5207,11 +4995,7 @@ def jira_resolutions(
 
 
 @cli.command("jira-issue-types")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_issue_types(
     base_url: str | None,
     token_from_env: bool,
@@ -5231,11 +5015,7 @@ def jira_issue_types(
 
 
 @cli.command("jira-status-categories")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_status_categories(
     base_url: str | None,
     token_from_env: bool,
@@ -5255,11 +5035,7 @@ def jira_status_categories(
 
 
 @cli.command("jira-projects")
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_projects(
     base_url: str | None,
     token_from_env: bool,
@@ -5299,11 +5075,7 @@ def jira_projects(
     show_default=True,
     help=(f"Maximum users in this page ({USER_RESULTS_MIN}-{USER_RESULTS_MAX})."),
 )
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_users(
     query: str,
     start_at: int,
@@ -5376,11 +5148,7 @@ def jira_users(
     is_flag=True,
     help="Accepted for symmetry; JSON is always printed.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_JIRA_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_JIRA_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_JIRA_URL", "ATLAWIRE_JIRA_TOKEN")
 def jira_author_comments(
     user: str | None,
     days: int,
@@ -5429,8 +5197,7 @@ def jira_author_comments(
 
 @cli.command()
 @click.argument("query")
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 @click.option(
     "--json",
     "as_json",
@@ -5454,9 +5221,6 @@ def jira_author_comments(
         "Confluence expansion list for a raw search page; prints the raw "
         "envelope instead of short rows."
     ),
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def cql(
     query: str,
@@ -5529,8 +5293,7 @@ def cql(
 
 
 @cli.command()
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print a JSON array instead of TSV."
 )
@@ -5540,9 +5303,6 @@ def cql(
     default=SPACE_LIMIT_DEFAULT,
     show_default=True,
     help=f"Maximum spaces to return ({SPACE_LIMIT_MIN}-{SPACE_LIMIT_MAX}).",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def spaces(
     base_url: str | None,
@@ -5575,15 +5335,11 @@ def spaces(
 
 @cli.command()
 @click.argument("space_key")
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def space(
     space_key: str,
     base_url: str | None,
@@ -5620,15 +5376,11 @@ def space(
 
 @cli.command("space-content")
 @click.argument("space_key")
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 @click.option(
     "--json", "as_json", is_flag=True, help="Print the JSON projection (the default)."
 )
 @click.option("--raw", is_flag=True, help="Print the raw server response instead.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
 def space_content(
     space_key: str,
     base_url: str | None,
@@ -5665,8 +5417,7 @@ def space_content(
 
 @cli.command()
 @click.argument("page_id_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 @click.option(
     "--json",
     "as_json",
@@ -5682,9 +5433,6 @@ def space_content(
     default=CHILD_LIMIT_DEFAULT,
     show_default=True,
     help=f"Maximum child pages to return ({CHILD_LIMIT_MIN}-{CHILD_LIMIT_MAX}).",
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def children(
     page_id_or_url: str,
@@ -5736,8 +5484,7 @@ def children(
 
 @cli.command()
 @click.argument("page_id_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 @click.option(
     "--storage",
     "--html",
@@ -5759,9 +5506,6 @@ def children(
         "Confluence expansion list sent verbatim as expand; prints the raw "
         "JSON page and cannot be combined with --markdown/--storage."
     ),
-)
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
 )
 def page(
     page_id_or_url: str,
@@ -5849,11 +5593,7 @@ def page(
     default=None,
     help="Optional expand query value; an empty string is sent unchanged.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def convert_body_command(
     representation: str,
     target: str,
@@ -5920,11 +5660,7 @@ def convert_body_command(
     show_default=True,
     help=f"Maximum attachments in this page ({PAGE_LIMIT_MIN}-{PAGE_LIMIT_MAX}).",
 )
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def page_attachments(
     page_id_or_url: str,
     start: int,
@@ -5976,11 +5712,7 @@ def page_attachments(
     is_flag=True,
     help="Request root comments only; omit depth=all.",
 )
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def page_comments(
     page_id_or_url: str,
     start: int,
@@ -6032,11 +5764,7 @@ def page_comments(
     show_default=True,
     help=f"Maximum labels in this page ({PAGE_LIMIT_MIN}-{PAGE_LIMIT_MAX}).",
 )
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def page_labels(
     page_id_or_url: str,
     start: int,
@@ -6069,11 +5797,7 @@ def page_labels(
 
 @cli.command("page-history")
 @click.argument("page_id_or_url")
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def page_history(
     page_id_or_url: str,
     base_url: str | None,
@@ -6103,11 +5827,7 @@ def page_history(
 @cli.command("page-version")
 @click.argument("page_id_or_url")
 @click.argument("version", type=click.IntRange(min=1))
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def page_version(
     page_id_or_url: str,
     version: int,
@@ -6145,11 +5865,7 @@ def page_version(
     is_flag=True,
     help='Print {"url": ...} instead of the bare URL.',
 )
-@click.option("--base-url", envvar="ATLAWIRE_CONFLUENCE_URL")
-@click.option("--token-from-env", is_flag=True, help="Read ATLAWIRE_CONFLUENCE_TOKEN.")
-@click.option(
-    "--allow-http-loopback", is_flag=True, help="Allow local HTTP for tests only."
-)
+@_product_options("ATLAWIRE_CONFLUENCE_URL", "ATLAWIRE_CONFLUENCE_TOKEN")
 def page_url(
     page_id_or_url: str,
     as_json: bool,

@@ -23,23 +23,21 @@ deprecated there but remains available). A later server with a different
 createmeta shape fails the documented-shape check instead of being projected.
 """
 
-import re
-
 from atlawire.http import (
     AtlaWireError,
     bearer_session,
     get_json_object,
     normalize_base_url,
 )
+
+# Jira project keys are uppercase letters, digits and underscore only. The grammar
+# is imported so this module cannot drift into accepting a Bitbucket key shape.
+from atlawire.identifiers import JIRA_PROJECT_KEY as _PROJECT_KEY
 from atlawire.jira import _issue_key
 
 _API = "rest/api/2"
 _CREATE_META_EXPAND = "projects.issuetypes.fields"
 _TRANSITION_EXPAND = "transitions.fields"
-# Jira project keys start with an uppercase letter and continue with at least
-# one uppercase letter, digit, or underscore, matching the existing search
-# adapter's accepted domain.
-_PROJECT_KEY = re.compile(r"[A-Z][A-Z0-9_]+")
 
 __all__ = ["get_create_meta", "get_edit_meta", "get_transition_fields"]
 

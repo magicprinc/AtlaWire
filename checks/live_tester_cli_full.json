@@ -1,11 +1,11 @@
 {
-  "generated": "2026-11-27T04:27:53.784423+03:00",
-  "commands": 90,
+  "generated": "2026-11-27T06:49:24.255651+03:00",
+  "commands": 92,
   "summary": {
     "failed": 16,
-    "ok": 70,
+    "ok": 71,
     "skipped": 2,
-    "blocked": 2
+    "blocked": 3
   },
   "results": [
     {
@@ -353,6 +353,16 @@
       ],
       "exit": 0,
       "stdout_kind": "json",
+      "outcome": "ok"
+    },
+    {
+      "command": "issue-url",
+      "argv": [
+        "issue-url",
+        "INC-1753"
+      ],
+      "exit": 0,
+      "stdout_kind": "text",
       "outcome": "ok"
     },
     {
@@ -915,6 +925,11 @@
       "exit": 0,
       "stdout_kind": "json",
       "outcome": "ok"
+    },
+    {
+      "command": "titles",
+      "outcome": "blocked",
+      "reason": "no identifier for keys"
     },
     {
       "command": "transitions",

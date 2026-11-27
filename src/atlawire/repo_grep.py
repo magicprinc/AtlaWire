@@ -65,6 +65,11 @@ from atlawire.bitbucket import (
     read_repository_file_in_session,
 )
 from atlawire.http import AtlaWireError, bearer_session, normalize_base_url
+
+# Shared grammar: a Bitbucket key is not a Jira key, so the concept is imported.
+from atlawire.identifiers import BITBUCKET_PROJECT_KEY as _PROJECT_KEY
+from atlawire.identifiers import COMMIT_SHA1 as _COMMIT_SHA1
+from atlawire.identifiers import REPOSITORY_SLUG as _REPOSITORY_SLUG
 from atlawire.operations import read_operation
 
 GREP_LIMIT_MIN = 1
@@ -128,9 +133,6 @@ TEXT_SUFFIXES = frozenset(
 _PAGE_LIMIT_MIN = 1
 _PAGE_LIMIT_MAX = 1000
 _GLOB_MAX_LENGTH = 1024
-_COMMIT_SHA1 = re.compile(r"[0-9A-Fa-f]{40}")
-_PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
-_REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _UNSAFE_TEXT = re.compile(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]")
 _PERCENT_ESCAPE = re.compile(r"%[0-9A-Fa-f]{2}")
 _HEAD_PREFIX = "refs/heads/"

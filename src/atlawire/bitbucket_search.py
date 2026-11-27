@@ -20,6 +20,8 @@ from atlawire.http import (
     post_json_object,
     reject_credential_echo,
 )
+from atlawire.identifiers import BITBUCKET_PROJECT_KEY as _PROJECT_KEY
+from atlawire.identifiers import REPOSITORY_SLUG as _REPOSITORY_SLUG
 
 SEARCH_LIMIT_MIN = 1
 SEARCH_LIMIT_MAX = 999
@@ -27,8 +29,6 @@ SEARCH_LIMIT_DEFAULT = 20
 
 _PAGE_SIZE = 100
 _MAX_REQUESTS = 20
-_PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
-_REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _EMPHASIS = re.compile(r"<em>(.*?)</em>", re.DOTALL)
 
 MatchEvidence = Literal["highlight", "context-only", "none"]

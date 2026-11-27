@@ -1,8 +1,8 @@
 {
-  "generated": "2026-11-27T04:25:25.193493+03:00",
-  "operations": 319,
+  "generated": "2026-11-27T06:48:49.813703+03:00",
+  "operations": 318,
   "summary": {
-    "failed": 132,
+    "failed": 131,
     "ok": 125,
     "blocked": 62
   },
@@ -77,10 +77,9 @@
       "argument_sources": {},
       "query_declared": 2,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The context parameter is required.",
-      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.admin.groups.more-non-members",
@@ -91,10 +90,9 @@
       "argument_sources": {},
       "query_declared": 2,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The context parameter is required.",
-      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.admin.license",
@@ -230,10 +228,9 @@
       "argument_sources": {},
       "query_declared": 2,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The context parameter is required.",
-      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.admin.users.more-non-members",
@@ -244,10 +241,9 @@
       "argument_sources": {},
       "query_declared": 2,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The context parameter is required.",
-      "registry_gap": "server requires query parameter 'context'; declared: ['context', 'filter']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.application-properties",
@@ -710,10 +706,9 @@
       },
       "query_declared": 2,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The until query parameter is required",
-      "registry_gap": "server requires query parameter 'until'; declared: ['since', 'until']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.commits",
@@ -962,10 +957,9 @@
       },
       "query_declared": 5,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The \"until\" query parameter is required.",
-      "registry_gap": "server requires query parameter 'until'; declared: ['contextLines', 'since', 'srcPath', 'until', 'whitespace']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.files",
@@ -1249,10 +1243,9 @@
       },
       "query_declared": 5,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The path query parameter is required when retrieving comments.",
-      "registry_gap": "server requires query parameter 'path'; declared: ['anchorState', 'diffType', 'fromHash', 'path', 'toHash']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.pull-requests.pullrequestid.comments.commentid",
@@ -1475,27 +1468,6 @@
         ],
         "empty": false
       }
-    },
-    {
-      "id": "bitbucket.projects.projectkey.repos.repositoryslug.raw.path",
-      "product": "bitbucket",
-      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
-      "scope": "read",
-      "arguments": {
-        "projectKey": "AB",
-        "repositorySlug": "address-book-api",
-        "path": ".gitignore"
-      },
-      "argument_sources": {
-        "projectKey": "discovered project",
-        "repositorySlug": "discovered repository",
-        "path": "discovered file path"
-      },
-      "query_declared": 4,
-      "outcome": "failed",
-      "category": "http",
-      "status": 500,
-      "detail": null
     },
     {
       "id": "bitbucket.projects.projectkey.repos.repositoryslug.settings.hooks",
@@ -1853,10 +1825,9 @@
       },
       "query_declared": 4,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "The path query parameter is required when retrieving comments.",
-      "registry_gap": "server requires query parameter 'path'; declared: ['path', 'since', 'start', 'limit']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "bitbucket.repository.compare-changes",
@@ -2070,22 +2041,23 @@
     {
       "id": "bitbucket.repository.raw",
       "product": "bitbucket",
-      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw",
+      "path": "/rest/api/1.0/projects/{projectKey}/repos/{repositorySlug}/raw/{path:.*}",
       "scope": "read",
       "arguments": {
         "projectKey": "AB",
-        "repositorySlug": "address-book-api"
+        "repositorySlug": "address-book-api",
+        "path": ".gitignore"
       },
       "argument_sources": {
         "projectKey": "discovered project",
-        "repositorySlug": "discovered repository"
+        "repositorySlug": "discovered repository",
+        "path": "discovered file path"
       },
       "query_declared": 4,
       "outcome": "failed",
       "category": "http",
-      "status": 400,
-      "detail": "The parameter 'path' is required",
-      "registry_gap": "server requires query parameter 'path'; declared: ['at', 'hardwrap', 'htmlEscape', 'markup']"
+      "status": 500,
+      "detail": null
     },
     {
       "id": "bitbucket.repository.related",
@@ -2701,10 +2673,9 @@
       "argument_sources": {},
       "query_declared": 7,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "cql query parameter is required Bad Request",
-      "registry_gap": "server requires query parameter 'cql'; declared: ['cql', 'cqlcontext', 'excerpt', 'expand', 'includeArchivedSpaces', 'limit', 'start']"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "confluence.space",
@@ -2919,9 +2890,9 @@
       "argument_sources": {},
       "query_declared": 5,
       "outcome": "failed",
-      "category": "http",
-      "status": 400,
-      "detail": "Only one query param of key or username is required Bad Request"
+      "category": "validation",
+      "status": null,
+      "detail": null
     },
     {
       "id": "confluence.user.watch.content.contentid",

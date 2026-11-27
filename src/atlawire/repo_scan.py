@@ -45,12 +45,14 @@ from atlawire.bitbucket import (
 )
 from atlawire.http import AtlaWireError, bearer_session, normalize_base_url
 
+# Shared grammar: a Bitbucket key is not a Jira key, so the concept is imported.
+from atlawire.identifiers import BITBUCKET_PROJECT_KEY as _PROJECT_KEY
+
 _DEFAULT_WORKERS = 8
 _MAX_WORKERS = 8
 _DEFAULT_MAX_PAGES = 100
 _SAMPLE_LIMIT = 5
 _EXTENSION_UNSAFE = re.compile(r"[\s/\\\x00-\x1f\x7f-\x9f\ud800-\udfff]")
-_PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _INVALID_EXTENSION = "The file extension must be non-empty text such as .py."
 _INVALID_WORKERS = "The worker count must be between 1 and 8."
 _INVALID_PAGE_LIMIT = "The page limit must be between 1 and 1000."

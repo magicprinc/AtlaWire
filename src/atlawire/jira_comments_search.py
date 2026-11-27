@@ -49,6 +49,10 @@ from atlawire.http import (
     get_json_object,
     normalize_base_url,
 )
+
+# Jira project keys are uppercase letters, digits and underscore only. The grammar
+# is imported so this module cannot drift into accepting a Bitbucket key shape.
+from atlawire.identifiers import JIRA_PROJECT_KEY as _PROJECT_KEY
 from atlawire.regex_helper import (
     HelperFailure,
     InvalidRegex,
@@ -63,7 +67,6 @@ _SEARCH_FIELDS = "summary,comment,updated"
 _SEARCH_PAGE_SIZE = 100
 _COMMENT_PAGE_SIZE = 100
 _ISSUE_KEY = re.compile(r"[A-Z][A-Z0-9_]*-[0-9]+")
-_PROJECT_KEY = re.compile(r"[A-Z][A-Z0-9_]+")
 _COMMENT_ID = re.compile(r"[0-9]+")
 
 DEFAULT_DAYS = 90

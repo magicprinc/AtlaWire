@@ -42,6 +42,13 @@ from atlawire.http import (
     reject_credential_echo as reject_shared_credential_echo,
 )
 
+# Shared grammar and limits: a Bitbucket key is not a Jira key, so the concept is
+# imported rather than re-declared here.
+from atlawire.identifiers import BITBUCKET_PROJECT_KEY as _PROJECT_KEY
+from atlawire.identifiers import DIFF_CONTEXT_MAX as _DIFF_CONTEXT_MAX
+from atlawire.identifiers import PULL_REQUEST_ID_MAX as _PULL_REQUEST_ID_MAX
+from atlawire.identifiers import REPOSITORY_SLUG as _REPOSITORY_SLUG
+
 __all__ = [
     "ADDED_SYMBOL_LIMIT",
     "BIG_METHOD_LIMIT",
@@ -119,9 +126,6 @@ UNDOCUMENTED_LIMIT = 10
 TEST_NAME_LIMIT = 10
 BIG_METHOD_LIMIT = 10
 
-_DIFF_CONTEXT_MAX = 100
-_PULL_REQUEST_ID_MAX = 2**63 - 1
-
 # These markers say where a per-file line count came from. ``not-requested``
 # and ``server-diff-missing-file`` deliberately leave the counts null instead
 # of presenting an invented zero.
@@ -139,8 +143,6 @@ _JIRA_PAIR_INVALID = "Jira base URL and token must be supplied together."
 
 # Validation mirrors the public adapters so bad arguments fail before the
 # first adapter call, including when a caller substitutes the adapter in tests.
-_PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
-_REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _PR_ID_TEXT = re.compile(r"[1-9][0-9]*")
 
 _PR_URL = re.compile(

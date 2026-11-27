@@ -25,6 +25,15 @@ from atlawire.http import (
     reject_credential_echo,
 )
 
+# One grammar per concept, shared with every other module that validates it, so a
+# Bitbucket key can never be validated against Jira's rules by accident.
+from atlawire.identifiers import BITBUCKET_PROJECT_KEY as _PROJECT_KEY
+from atlawire.identifiers import COMMIT_SHA1 as _COMMIT_SHA1
+from atlawire.identifiers import DIFF_CONTEXT_MAX as _DIFF_CONTEXT_MAX
+from atlawire.identifiers import PAGE_SIZE as _PAGE_SIZE
+from atlawire.identifiers import PULL_REQUEST_ID_MAX as _PULL_REQUEST_ID_MAX
+from atlawire.identifiers import REPOSITORY_SLUG as _REPOSITORY_SLUG
+
 
 class PageLimitError(AtlaWireError):
     """A bounded page walk stopped at its configured request budget.
@@ -34,16 +43,11 @@ class PageLimitError(AtlaWireError):
     """
 
 
-_PROJECT_KEY = re.compile(r"~?[A-Za-z0-9_][A-Za-z0-9_.-]*")
-_REPOSITORY_SLUG = re.compile(r"[A-Za-z0-9_.-]+")
 _FILE_UNSAFE = re.compile(r"[\\\x00-\x1f\x7f-\x9f\ud800-\udfff]")
 _FILE_PERCENT_ESCAPE = re.compile(r"%[0-9A-Fa-f]{2}")
 _REVISION_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\ud800-\udfff]")
-_COMMIT_SHA1 = re.compile(r"[0-9A-Fa-f]{40}")
 _COMMIT_ID = re.compile(r"[0-9A-Fa-f]{7,40}")
-_PULL_REQUEST_ID_MAX = 2**63 - 1
 _CHANGES_LIMIT = 1000
-_PAGE_SIZE = 100
 _ARCHIVE_FORMATS = frozenset({"zip", "tar", "tar.gz", "tgz"})
 # Default transport bound on archive bytes returned as one in-memory value, not
 # a claim about expected archive sizes; the body is never truncated.
@@ -77,7 +81,6 @@ _DASHBOARD_PARTICIPANT_STATUSES = frozenset({"UNAPPROVED", "NEEDS_WORK", "APPROV
 _DASHBOARD_PARTICIPANT_STATUS_MAX = 3
 _COMMIT_DIFF_PATH_MAX = 100
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
-_DIFF_CONTEXT_MAX = 100
 _DIFF_REVIEW_HEADER = (
     "# Bitbucket {subject} diff review "
     "(context={context}; whitespace={whitespace}; "
