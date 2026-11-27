@@ -205,6 +205,7 @@ from atlawire.operations import (
     list_operations,
     read_binary,
     read_operation,
+    require_declared_route,
 )
 from atlawire.pr_review import collect_pr_review, parse_pr_link, render_markdown
 from atlawire.repo_grep import (
@@ -1334,6 +1335,20 @@ def api_get_command(
         )
         raise click.exceptions.Exit(2) from None
     try:
+        require_declared_route(product, "GET", path, allow_admin=False)
+    except AtlaWireError as exc:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message=str(exc),
+                    path=path,
+                )
+            )
+        )
+        raise click.exceptions.Exit(1) from None
+    try:
         result = get_json(
             product,
             resolved_url,
@@ -1410,6 +1425,20 @@ def api_request_command(
             )
         )
         raise click.exceptions.Exit(2) from None
+    try:
+        require_declared_route(product, method, path, allow_admin=False)
+    except AtlaWireError as exc:
+        click.echo(
+            json.dumps(
+                _error_envelope(
+                    product,
+                    code="validation_error",
+                    message=str(exc),
+                    path=path,
+                )
+            )
+        )
+        raise click.exceptions.Exit(1) from None
     try:
         result = request_json(
             product,

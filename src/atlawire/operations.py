@@ -123,6 +123,15 @@ _MAX_QUERY_INTEGER = 2**31 - 1
 # controls, and allowed to contain the spaces that search terms need.
 _MAX_QUERY_TEXT = 2048
 _SAFE_QUERY_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
+# A generic escape hatch is only acceptable for a route this registry already
+# declares: that route has been audited as a read. An unregistered path can be
+# any plugin's or any newer server's route, whose GET may change state, and a
+# segment name is not proof otherwise. The refusal names the fix, because a
+# caller who needs such a route should declare it rather than reach around this.
+_UNDECLARED_ROUTE = (
+    "This route is not declared in the read-only registry; add it there with "
+    "evidence that it only reads."
+)
 _ADMIN_REFUSED = "This operation is administrative; pass --allow-admin to read it."
 _GENERATED_QUERY_NOTE = "Documented by the deployment's own API description (WADL)."
 
@@ -2128,6 +2137,72 @@ def canonical_operations() -> list[dict[str, object]]:
         }
         for operation_id in sorted(CANONICAL_IDS)
     ]
+
+
+def _segments(path: str) -> list[str]:
+    """Split a route into segments, keeping a trailing wildcard as one segment."""
+    return path.strip("/").split("/")
+
+
+def _is_placeholder(segment: str) -> bool:
+    """True for a documented parameter, including a `{path:.*}` wildcard."""
+    return segment.startswith("{") and segment.endswith("}")
+
+
+def _matches_declared(declared: str, actual: str) -> bool:
+    """True when a real request path matches one registry path.
+
+    A registry parameter is a hole, not a fixed word: `{projectIdOrKey}` accepts
+    `AB`. A trailing `{path:.*}` wildcard also absorbs any remaining segments,
+    which is how the file routes serve `dir/file.txt`. Every literal segment is
+    compared case-insensitively, so `/admin` can never pass as `/projects`.
+    """
+    declared_segments = _segments(declared)
+    actual_segments = _segments(actual)
+    for index, declared_segment in enumerate(declared_segments):
+        if _is_placeholder(declared_segment):
+            if declared_segment.endswith(":.*}"):
+                return (
+                    index == len(declared_segments) - 1 and len(actual_segments) > index
+                )
+            if index >= len(actual_segments):
+                return False
+            continue
+        if index >= len(actual_segments):
+            return False
+        if declared_segment.lower() != actual_segments[index].lower():
+            return False
+    return len(actual_segments) == len(declared_segments)
+
+
+def require_declared_route(
+    product: str, method: str, path: str, *, allow_admin: bool
+) -> None:
+    """Refuse a route the registry does not declare for this product and method.
+
+    This is the one gate behind both generic entry points, so neither can reach a
+    route the read-only audit never examined. Parameters are compared by position,
+    not by value, so a real key satisfies a documented placeholder. The transport
+    runs its own path check first, so an admin path still answers with the refusal
+    a caller already knows (`api-get` has no `--allow-admin` flag, and a registry
+    hint would be a dead end there).
+    """
+    from atlawire.sdk import _validate_path  # local: avoids a circular import
+
+    _validate_path(path, product=product, allow_admin=allow_admin)
+    wanted_method = method.upper()
+    for operation in _OPERATIONS.values():
+        if operation.product != product or operation.method != wanted_method:
+            continue
+        if _matches_declared(operation.path, path):
+            return
+    raise AtlaWireError(
+        _UNDECLARED_ROUTE,
+        product=product,
+        category="validation",
+        method=wanted_method,
+        path=path,
+    )
 
 
 def _invalid(message: str, operation: _Operation) -> AtlaWireError:
